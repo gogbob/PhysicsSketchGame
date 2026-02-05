@@ -4,6 +4,8 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
@@ -13,6 +15,7 @@ public class Main extends ApplicationAdapter {
     FitViewport viewport;
     private Texture image;
     private Texture ballImage;
+    World world;
 
     @Override
     public void create() {
@@ -20,6 +23,7 @@ public class Main extends ApplicationAdapter {
         viewport = new FitViewport(8, 5);
         image = new Texture("libgdx.png");
         ballImage = new Texture("simple_ball.png");
+        world = new World(new Vector2(0,0), true);
     }
 
     @Override
@@ -55,7 +59,6 @@ public class Main extends ApplicationAdapter {
         viewport.apply();
         batch.setProjectionMatrix(viewport.getCamera().combined);
         batch.begin();
-        batch.draw(ballImage, 0, 0, 1, 1);
         batch.end();
     }
 }
