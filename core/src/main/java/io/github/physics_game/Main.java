@@ -37,7 +37,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     @Override
     public void create() {
         Box2D.init();
-        world = new World(new Vector2(0,0), true);
+        world = new World(new Vector2(0,-1.0f), true);
         debugRenderer = new Box2DDebugRenderer();
 
         // Use a small world size (meters) so Box2D objects are visible with the debug renderer.
@@ -57,9 +57,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         BodyDef bd = new BodyDef();
         bd.type = BodyDef.BodyType.DynamicBody;
         bd.position.set(startX, startY);
-
         circleBody = world.createBody(bd);
-
         CircleShape shape = new CircleShape();
         // give the circle a radius so the fixture is valid and visible
         shape.setRadius(circleRadius);
@@ -69,9 +67,30 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         fd.density = 1f;
         fd.friction = 0.3f;
         fd.restitution = 0.1f;
-
         circleBody.createFixture(fd);
         shape.dispose();
+
+        // Create a slanted static floor along the bottom of the viewport so the circle can collide with it.
+        // We use an EdgeShape from a left point near the left edge up to a slightly higher right point to make it slanted.
+        BodyDef groundBd = new BodyDef();
+        groundBd.type = BodyDef.BodyType.StaticBody;
+        groundBd.position.set(0f, 0f);
+        Body groundBody = world.createBody(groundBd);
+
+        EdgeShape floor = new EdgeShape();
+        float leftX = 0.5f; // small margin from left edge
+        float rightX = viewport.getWorldWidth() - 0.5f; // small margin from right edge
+        float leftY = 0.5f; // near bottom
+        float rightY = 1.5f; // slanted upward to the right
+        floor.set(new Vector2(leftX, leftY), new Vector2(rightX, rightY));
+
+        FixtureDef floorFd = new FixtureDef();
+        floorFd.shape = floor;
+        floorFd.friction = 0.0f;
+        floorFd.restitution = 0f;
+        groundBody.createFixture(floorFd);
+        floor.dispose();
+
         setupContactListener();
     }
 
