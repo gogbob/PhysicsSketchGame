@@ -1,6 +1,6 @@
-# Physics Game
+# Physics Sketch Game
 
-A small experimental physics sandbox built with libGDX. This project uses only libGDX's graphics and collision features (no built-in physics engine like Box2D) to let users draw objects into the world and see simple physics applied: gravity, collisions, and restitution. It's meant as a learning / demo project for experimenting with collision response and simple object behaviors.
+An experimental physics sandbox game built with libGDX. This project uses only libGDX's graphics and collision features (no built-in physics engine like Box2D) to let users draw objects into the world and see simple physics applied: gravity, collisions, friction, etc. It's meant as a project for learning physics practically, like experimenting with collisions and simple object behaviors.
 
 Summary
 
@@ -11,9 +11,9 @@ Summary
 
 How the game works (brief)
 
-- On launch the application opens a window and starts the render loop.
-- The world contains a static slanted floor near the bottom of the screen used to demonstrate collisions and resting contact.
-- When the player clicks/taps a supported input location (mouse / touch), the game creates a new dynamic object at that location. The object type or appearance is chosen at random from the available set (for example: circle, rectangle, or an image sprite).
+- On launch the application opens the menu window where you can select levels, change settings, etc.
+- The levels will contain static objects like floors and walls, and dynamic objects, like balls, cups, the drawn object, etc.
+- When the player draws within a supported input location (mouse / touch), the game creates a new dynamic object at that location. The object type or appearance is chosen by the user.
 - Each dynamic object is simulated by simple physics code: position, velocity, gravity, and collision detection/response against static and other dynamic objects. Collisions try to prevent overlaps and apply simple impulse-based responses so objects bounce, slide, and rest naturally.
 
 Play controls
@@ -48,7 +48,7 @@ The built jar will be in `lwjgl3/build/libs/`.
 IDE setup (IntelliJ IDEA recommended)
 
 1. Open IntelliJ IDEA -> "Open or Import" -> select the project root folder (the Gradle project). Allow IntelliJ to import the Gradle project.
-2. Ensure a suitable JDK is configured for the project (Java 8+ is typical; match the project's Gradle settings). Set the Project SDK in File → Project Structure if needed.
+2. Ensure a suitable JDK is configured for the project. Set the Project SDK in File → Project Structure if needed.
 3. If IntelliJ asks to auto-import Gradle changes, accept it so dependencies and modules are configured.
 4. Run configuration:
    - Create or use the existing `lwjgl3` run configuration that launches `io.github.physics_game.lwjgl3.Lwjgl3Launcher` (or use the Gradle task `lwjgl3:run`).
@@ -60,9 +60,7 @@ Project layout (quick dev guide)
 - `lwjgl3/src/main/java` — desktop launcher classes. Keep platform-specific code (window size, icon loading) here.
 - `assets/` and `lwjgl3/src/main/resources` — images and other assets used by the game (sprites, icons).
 
-How to contribute
-
-Thanks for your interest! A few suggestions to get started:
+How to contribute:
 
 - Workflow:
   1. Fork the repository.
@@ -75,27 +73,3 @@ Thanks for your interest! A few suggestions to get started:
   - Keep platform-independent game logic in `core` so it remains reusable.
   - If adding assets, put them in `lwjgl3/src/main/resources` (or `assets/` for shared assets) and reference them from `core` through the asset paths used in the desktop launcher.
   - Follow existing code style: Java, small classes, descriptive names.
-
-- IDE tips:
-  - Use IntelliJ's Gradle integration for running and debugging.
-  - Make sure to run `./gradlew build` before opening a PR to confirm the project compiles.
-
-Extending the game (ideas)
-
-- Add configurable physics parameters: gravity strength, restitution, friction.
-- Implement different object types (polygons, compound shapes) and a small editor to configure them.
-- Add serialization to save and load scenes.
-- Integrate a proper physics engine (Box2D) as an advanced mode.
-
-Troubleshooting
-
-- Gradle import issues: try refreshing the Gradle project in the IDE and verify the JDK version.
-- Missing assets: ensure `lwjgl3/src/main/resources` and `assets/` contents are available to the run configuration's classpath.
-
-License & Contact
-
-- This project is experimental and released without a strict license in the repository. If you want a specific license added, open an issue or PR.
-- For questions, open an issue in the repository describing the problem or idea.
-
-
-(Short development note) If you're looking for the exact input-to-object mapping or want to tweak the slanted floor placement, check `core/src/main/java/io/github/physics_game` and `lwjgl3/src/main/java/io/github/physics_game/lwjgl3` for the launcher and main application class implementations.
