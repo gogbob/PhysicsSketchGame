@@ -1,75 +1,84 @@
 # Physics Sketch Game
 
-An experimental physics sandbox game built with libGDX. This project uses only libGDX's graphics and collision features (no built-in physics engine like Box2D) to let users draw objects into the world and see simple physics applied: gravity, collisions, friction, etc. It's meant as a project for learning physics practically, like experimenting with collisions and simple object behaviors.
+Physics Sketch Game is a libGDX-based prototype inspired by games like Brain It On.
+The long-term goal is to let players draw in a constrained area, spawn randomized objects, and watch them interact using custom physics and collision logic.
 
-Summary
+Current prototype status:
+- Desktop app built with libGDX + LWJGL3.
+- A slanted floor test setup at the bottom of the screen.
+- A custom concave-polygon contact detector (ear clipping + SAT) called every frame from the render loop.
 
-- Project structure:
-  - `core` — shared application logic and game code.
-  - `lwjgl3` — desktop launcher using LWJGL3 (starts the application on desktop).
-- Purpose: allow a user to draw an object at a specified location; a randomly selected shape is created and physics (gravity, simple collision resolution) is applied so it interacts with the world (including a slanted floor example at the bottom of the screen).
+## Project Structure
 
-How the game works (brief)
+- `core/` - shared game logic, rendering, and collision/math code.
+- `lwjgl3/` - desktop launcher and platform-specific window configuration.
+- `assets/` - shared textures/assets.
 
-- On launch the application opens the menu window where you can select levels, change settings, etc.
-- The levels will contain static objects like floors and walls, and dynamic objects, like balls, cups, the drawn object, etc.
-- When the player draws within a supported input location (mouse / touch), the game creates a new dynamic object at that location. The object type or appearance is chosen by the user.
-- Each dynamic object is simulated by simple physics code: position, velocity, gravity, and collision detection/response against static and other dynamic objects. Collisions try to prevent overlaps and apply simple impulse-based responses so objects bounce, slide, and rest naturally.
+## How the Game Works (Brief)
 
-Play controls
+The intended gameplay loop is:
+1. Player points/clicks (or touches) in a valid draw zone.
+2. The game spawns a random object at that location.
+3. Physics updates move objects over time.
+4. Collisions are detected and resolved so objects can slide, stack, and bounce.
 
-- Left click (or primary touch) — spawn a random object at the pointer location.
-- Optional keys / mouse controls the project may support (implementation dependent):
-  - R — reset/clear dynamic objects.
-  - Space — toggle pause simulation.
+In the current codebase, the focus is collision math experimentation:
+- A concave polygon body is moved downward each frame.
+- It is checked against a slanted floor polygon.
+- On contact, the game logs penetration depth and contact normal continuously.
 
-See the source for exact controls if you want to change or extend them.
+## Collision System Notes
 
-Run & build
+The custom detector in `core/src/main/java/io/github/physics_game/collision/` is independent of Box2D contact callbacks:
+- Concave polygons are decomposed into triangles with ear clipping.
+- Triangle pairs are broad-phase filtered with AABB overlap.
+- Narrow-phase SAT checks produce overlap depth and normal.
+- The final contact normal follows the convention `A -> B` for future impulse-based simulation.
 
-This project uses Gradle with the included wrapper. From the repository root you can:
+## How To Play
 
-- Run from Gradle (desktop):
+Right now this is a prototype collision demo:
+- Run the desktop launcher.
+- Watch the moving test shape descend toward the slanted floor.
+- Open logs/console to see continuous contact output once overlap begins.
 
-  On Windows (PowerShell):
+As user drawing/spawning controls are expanded, this section should be updated with exact controls.
 
-  ./gradlew.bat lwjgl3:run
+## Run and Build
 
-  or if using the wrapper script:
+From the project root (Windows PowerShell):
 
-  ./gradlew lwjgl3:run
+```powershell
+.\gradlew.bat lwjgl3:run
+.\gradlew.bat lwjgl3:jar
+```
 
-- Build a runnable jar (desktop):
+Output jar path:
+- `lwjgl3/build/libs/`
 
-  ./gradlew.bat lwjgl3:jar
+## IntelliJ IDEA Setup (Contributors)
 
-The built jar will be in `lwjgl3/build/libs/`.
+1. Open IntelliJ IDEA and choose **Open** on the repository root.
+2. Import as a Gradle project when prompted.
+3. Ensure a valid JDK is set in **File -> Project Structure**.
+4. Let IntelliJ finish Gradle sync.
+5. Run `lwjgl3:run` or launch `io.github.physics_game.lwjgl3.Lwjgl3Launcher`.
 
-IDE setup (IntelliJ IDEA recommended)
+## Contributing
 
-1. Open IntelliJ IDEA -> "Open or Import" -> select the project root folder (the Gradle project). Allow IntelliJ to import the Gradle project.
-2. Ensure a suitable JDK is configured for the project. Set the Project SDK in File → Project Structure if needed.
-3. If IntelliJ asks to auto-import Gradle changes, accept it so dependencies and modules are configured.
-4. Run configuration:
-   - Create or use the existing `lwjgl3` run configuration that launches `io.github.physics_game.lwjgl3.Lwjgl3Launcher` (or use the Gradle task `lwjgl3:run`).
-5. Run/debug directly from the IDE for iterative development.
+1. Fork the repository.
+2. Create a branch, for example:
+   - `feat/custom-contact`
+   - `fix/collision-normal`
+3. Implement your change in `core` when platform-independent.
+4. Verify it builds and runs.
+5. Open a pull request with:
+   - What changed
+   - Why it changed
+   - How it was tested
 
-Project layout (quick dev guide)
-
-- `core/src/main/java` — main game logic, rendering, input handling, physics and collision code.
-- `lwjgl3/src/main/java` — desktop launcher classes. Keep platform-specific code (window size, icon loading) here.
-- `assets/` and `lwjgl3/src/main/resources` — images and other assets used by the game (sprites, icons).
-
-How to contribute:
-
-- Workflow:
-  1. Fork the repository.
-  2. Create a feature branch: `git checkout -b feat/your-feature`.
-  3. Implement your feature or fix.
-  4. Add or update tests if applicable.
-  5. Open a pull request back to the main repository with a clear description.
-
-- Development notes:
-  - Keep platform-independent game logic in `core` so it remains reusable.
-  - If adding assets, put them in `lwjgl3/src/main/resources` (or `assets/` for shared assets) and reference them from `core` through the asset paths used in the desktop launcher.
-  - Follow existing code style: Java, small classes, descriptive names.
+Recommended contribution areas:
+- Draw-zone input and freehand shape capture.
+- Randomized object generation rules.
+- Collision response (impulses/friction/resting contact).
+- Level goals and win conditions.
