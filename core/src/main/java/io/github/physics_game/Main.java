@@ -34,26 +34,21 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     // throttle logging to once-per-second
     float logTimer = 0f;
 
-    // Custom collision demo bodies (independent from Box2D contact callbacks).
-    private CustomContactHandler.PolygonBody customDynamicBody;
-    private CustomContactHandler.PolygonBody customFloorBody;
 
     // Box2D body built from ear-clipped triangles of the same concave polygon.
-    private Body concaveBox2dBody;
     private ShapeRenderer shapeRenderer;
 
-    private List<List<Vector2>> concaveLocalTriangles;
-    private List<List<Vector2>> floorLocalTriangles;
 
     private boolean showDebugOverlay = true;
     private ContactResult lastCustomContact = ContactResult.NO_CONTACT;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
-
+    private DynamicObject dynamicObject;
+    private StaticObject floorObject;
     @Override
     public void create() {
         Box2D.init();
-        world = new World(new Vector2(0,-1.0f), true);
+        world = new World(new Vector2(0,0), true);
         debugRenderer = new Box2DDebugRenderer();
 
         // Use a small world size (meters) so Box2D objects are visible with the debug renderer.
@@ -73,24 +68,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         // Create a slanted static floor along the bottom of the viewport so the circle can collide with it.
         // We use an EdgeShape from a left point near the left edge up to a slightly higher right point to make it slanted.
-        BodyDef groundBd = new BodyDef();
-        groundBd.type = BodyDef.BodyType.StaticBody;
-        groundBd.position.set(0f, 0f);
-        Body groundBody = world.createBody(groundBd);
-
-        EdgeShape floor = new EdgeShape();
-        float leftX = 0.5f; // small margin from left edge
-        float rightX = viewport.getWorldWidth() - 0.5f; // small margin from right edge
-        float leftY = 0.5f; // near bottom
-        float rightY = 1.5f; // slanted upward to the right
-        floor.set(new Vector2(leftX, leftY), new Vector2(rightX, rightY));
-
-        FixtureDef floorFd = new FixtureDef();
-        floorFd.shape = floor;
-        floorFd.friction = 0.0f;
-        floorFd.restitution = 0f;
-        groundBody.createFixture(floorFd);
-        floor.dispose();
 
         // Shared concave local polygon definition used by both custom math and Box2D fixtures.
         List<Vector2> concaveLocalVertices = Arrays.asList(
@@ -102,13 +79,12 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             new Vector2(-0.7f, -0.7f)
         );
 
-        concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(concaveLocalVertices);
+        dynamicObject = new DynamicObject(0, 0.3f, 0.1f, concaveLocalVertices, startX, startY, 0f, world);
 
-        // Concave "L" shape to demonstrate ear clipping decomposition in custom detection.
-        customDynamicBody = new CustomContactHandler.PolygonBody(concaveLocalVertices)
-            .setPosition(startX, startY)
-            .setRotationRadians(0f);
-
+        float leftX = 0.5f; // small margin from left edge
+        float rightX = viewport.getWorldWidth() - 0.5f; // small margin from right edge
+        float leftY = 0.5f; // near bottom
+        float rightY = 1.5f; // slanted upward to the right
         List<Vector2> floorLocalVertices = Arrays.asList(
             new Vector2(leftX, leftY - 0.08f),
             new Vector2(rightX, rightY - 0.08f),
@@ -116,19 +92,18 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             new Vector2(leftX, leftY + 0.08f)
         );
 
-        customFloorBody = new CustomContactHandler.PolygonBody(floorLocalVertices)
-            .setPosition(0f, 0f)
-            .setRotationRadians(0f);
-        floorLocalTriangles = EarClippingDecomposer.decomposeToTriangles(floorLocalVertices);
 
+
+        floorObject = new StaticObject(1, 0.3f, 0.1f, floorLocalVertices, 0f, 0f, 0f, world);
         // Example: build a Box2D body from the same concave polygon by adding one fixture per ear-clipped triangle.
-        concaveBox2dBody = createBodyFromEarClippedTriangles(concaveLocalVertices, startX, startY, BodyDef.BodyType.DynamicBody);
-
-        setupContactListener();
+        Gdx.app.log("Object data", "Inertia of example body: " + String.valueOf(dynamicObject.getBody().getInertia()));
+        Gdx.app.log("Object data", "Mass of example body: " + String.valueOf(dynamicObject.getBody().getMass()));
+        dynamicObject.setLinearVelocity(new Vector2(1f, -1f));
     }
 
     @Override
     public void render() {
+
         float delta = Gdx.graphics.getDeltaTime();
         accumulator += Math.min(delta, 0.25f);
         logTimer += delta;
@@ -142,19 +117,14 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         while(accumulator >= fixedStep) {
 
             // Move Box2D concave polygon down so it collides with the slanted floor in debug view.
-            if (concaveBox2dBody != null) {
-                Vector2 p = concaveBox2dBody.getPosition();
-                concaveBox2dBody.setTransform(p.x, p.y - 0.01f, concaveBox2dBody.getAngle() - 0.01f);
-
-                // Keep custom-math body synchronized with Box2D transform for apples-to-apples contact logs.
-                Vector2 bp = concaveBox2dBody.getPosition();
-                customDynamicBody.setPosition(bp.x, bp.y).setRotationRadians(concaveBox2dBody.getAngle());
+            if (dynamicObject.getBody()  != null) {
+                dynamicObject.updatePosition(fixedStep);
             }
 
             accumulator -= fixedStep;
         }
 
-        ContactResult customContact = CustomContactHandler.detect(customDynamicBody, customFloorBody);
+        ContactResult customContact = CustomContactHandler.detect(dynamicObject.getLocalBody(), floorObject.getLocalBody());
         lastCustomContact = customContact;
         if (customContact.isColliding()) {
             Vector2 n = customContact.getNormal();
@@ -175,9 +145,20 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             // Draw ear-clipped triangles on top of Box2D debug view.
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-            drawEarTriangles(customFloorBody, floorLocalTriangles, Color.CYAN);
-            drawEarTriangles(customDynamicBody, concaveLocalTriangles, Color.YELLOW);
+            drawEarTriangles(floorObject.getLocalBody(), floorObject.getConcaveLocalTriangles(), Color.CYAN);
+            drawEarTriangles(dynamicObject.getLocalBody(), dynamicObject.getConcaveLocalTriangles(), Color.YELLOW);
             drawContactNormalOverlay(lastCustomContact, Color.RED);
+
+            //draw a marker at the center of mass of the Box2D body
+            if (dynamicObject.getBody() != null) {
+                Vector2 com = dynamicObject.getBody() .getWorldCenter();
+                drawMarker(com, CONTACT_MARK_HALF_SIZE, Color.MAGENTA);
+            }
+
+            if(dynamicObject.getLocalBody() != null) {
+                Vector2 com = dynamicObject.getLocalBody().getPosition();
+                drawMarker(com, CONTACT_MARK_HALF_SIZE, Color.GREEN);
+            }
             shapeRenderer.end();
         }
 
@@ -209,31 +190,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     }
 
     private void draw() {
-    }
-
-    private void setupContactListener() {
-        world.setContactListener(new ContactListener() {
-
-            @Override
-            public void beginContact(Contact contact) {
-                Body a = contact.getFixtureA().getBody();
-                Body b = contact.getFixtureB().getBody();
-                Gdx.app.log("Main", "beginContact between bodies: " + a + " and " + b);
-                // Trigger game logic here
-            }
-
-            @Override
-            public void endContact(Contact contact) {}
-
-            @Override
-            public void preSolve(Contact contact, Manifold oldManifold) {
-                // Optional: disable or modify collisions
-                // contact.setEnabled(false);
-            }
-
-            @Override
-            public void postSolve(Contact contact, ContactImpulse impulse) {}
-        });
     }
 
     private Body createBodyFromEarClippedTriangles(List<Vector2> localVertices,
@@ -286,26 +242,31 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             return;
         }
 
-        Vector2 p = contact.getContactPoint();
-        Vector2 n = contact.getNormal().nor();
-        Vector2 tip = new Vector2(p).mulAdd(n, NORMAL_DEBUG_LENGTH);
+        Vector2 cp = contact.getContactPoint();
+        Vector2 n = contact.getNormal();
+        drawArrow(cp, n, NORMAL_DEBUG_LENGTH, color);
+        drawMarker(cp, CONTACT_MARK_HALF_SIZE, color);
+    }
 
+    private void drawArrow(Vector2 start, Vector2 direction, float scale, Color color) {
         shapeRenderer.setColor(color);
 
-        // Contact marker (small X) and normal direction ray from the estimated contact point.
-        shapeRenderer.line(p.x - CONTACT_MARK_HALF_SIZE, p.y - CONTACT_MARK_HALF_SIZE,
-            p.x + CONTACT_MARK_HALF_SIZE, p.y + CONTACT_MARK_HALF_SIZE);
-        shapeRenderer.line(p.x - CONTACT_MARK_HALF_SIZE, p.y + CONTACT_MARK_HALF_SIZE,
-            p.x + CONTACT_MARK_HALF_SIZE, p.y - CONTACT_MARK_HALF_SIZE);
-        shapeRenderer.line(p.x, p.y, tip.x, tip.y);
+        // Arrow
+        Vector2 end = new Vector2(start).mulAdd(direction.nor(), scale);
+        shapeRenderer.line(start.x, start.y, end.x, end.y);
+        // Arrowhead
+        Vector2 side = new Vector2(-direction.y, direction.x).scl(0.06f);
+        Vector2 back = new Vector2(direction).scl(0.12f);
+        Vector2 left = new Vector2(end).sub(back).add(side);
+        Vector2 right = new Vector2(end).sub(back).sub(side);
+        shapeRenderer.line(end.x, end.y, left.x, left.y);
+        shapeRenderer.line(end.x, end.y, right.x, right.y);
+    }
 
-        // Tiny arrow head at the ray tip for direction clarity.
-        Vector2 side = new Vector2(-n.y, n.x).scl(0.06f);
-        Vector2 back = new Vector2(n).scl(0.12f);
-        Vector2 left = new Vector2(tip).sub(back).add(side);
-        Vector2 right = new Vector2(tip).sub(back).sub(side);
-        shapeRenderer.line(tip.x, tip.y, left.x, left.y);
-        shapeRenderer.line(tip.x, tip.y, right.x, right.y);
+    private void drawMarker(Vector2 position, float size, Color color) {
+        shapeRenderer.setColor(color);
+        shapeRenderer.line(position.x - size, position.y - size, position.x + size, position.y + size);
+        shapeRenderer.line(position.x - size, position.y + size, position.x + size, position.y - size);
     }
 
     private Vector2 toWorld(Vector2 local, Vector2 position, float angle) {
