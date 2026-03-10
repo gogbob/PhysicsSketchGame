@@ -36,6 +36,7 @@ public class DynamicObject extends PhysicsObject {
 
             FixtureDef fixtureDef = new FixtureDef();
             fixtureDef.shape = polygon;
+
             fixtureDef.density = 1f;
             fixtureDef.friction = friction;
             fixtureDef.restitution = restitution;
@@ -82,5 +83,10 @@ public class DynamicObject extends PhysicsObject {
         body.setTransform((body.getPosition().add(linearVelocity.scl(delta))), angle);
         setLocalPosition(body.getPosition());
         setLocalRotation(angle);
+    }
+    public void reinitialize() {
+            body.setTransform(new Vector2(getStartX(), getStartY()), 0f);
+            setLocalPosition(body.getPosition());
+            setLocalRotation(0f);
     }
 }

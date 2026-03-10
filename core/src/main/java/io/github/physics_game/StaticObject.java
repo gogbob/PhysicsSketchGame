@@ -68,4 +68,9 @@ public class StaticObject extends PhysicsObject {
     public float getInertia() {
         return body.getInertia();
     }
+    public void reinitialize() {
+        body.setTransform(new Vector2(getStartX(), getStartY()), 0f);
+        setLocalPosition(body.getPosition());
+        setLocalRotation(0f);
+    }
 }

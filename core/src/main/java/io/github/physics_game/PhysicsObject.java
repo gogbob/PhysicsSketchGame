@@ -18,6 +18,8 @@ public abstract class PhysicsObject {
     private List<Vector2> vertices;
     private CustomContactHandler.PolygonBody localBody;
     private List<List<Vector2>> concaveLocalTriangles;
+    private float startX;
+    private float startY;
 
     public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
         this.id = id;
@@ -26,7 +28,8 @@ public abstract class PhysicsObject {
         this.vertices = new ArrayList<>(vertices);
         this.localBody = new CustomContactHandler.PolygonBody(vertices);
         this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
-
+        this.startX = startX;
+        this.startY = startY;
     }
     public void setLocalPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);
@@ -52,4 +55,11 @@ public abstract class PhysicsObject {
     public List<List<Vector2>> getConcaveLocalTriangles() {
         return new ArrayList<>(concaveLocalTriangles);
     }
+    public float getStartX() {
+        return startX;
+    }
+    public float getStartY() {
+        return startY;
+    }
+    public abstract void reinitialize();
 }

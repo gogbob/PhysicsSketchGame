@@ -30,6 +30,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     float accumulator = 0f;
+    final float GRAVITY = -1.8f;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
@@ -39,7 +40,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     private ShapeRenderer shapeRenderer;
 
 
-    private boolean showDebugOverlay = true;
+    private boolean showDebugOverlay = false;
     private ContactResult lastCustomContact = ContactResult.NO_CONTACT;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
@@ -98,7 +99,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         // Example: build a Box2D body from the same concave polygon by adding one fixture per ear-clipped triangle.
         Gdx.app.log("Object data", "Inertia of example body: " + String.valueOf(dynamicObject.getBody().getInertia()));
         Gdx.app.log("Object data", "Mass of example body: " + String.valueOf(dynamicObject.getBody().getMass()));
-        dynamicObject.setLinearVelocity(new Vector2(1f, -1f));
     }
 
     @Override
@@ -113,10 +113,31 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             Gdx.app.log("Main", "Debug overlay " + (showDebugOverlay ? "ON" : "OFF"));
         }
 
+
+
         final float fixedStep = 1f / 60f;
         while(accumulator >= fixedStep) {
+            // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.
+
+            //1. Integrate forces → update velocity
+            //2. Detect collisions
+            //3. Build contact constraints
+            //4. Solve velocity constraints (impulses)
+            //5. Solve position constraints
+            //6. Update positions
+
+            //RESOLVING ALL FORCES
 
             // Move Box2D concave polygon down so it collides with the slanted floor in debug view.
+            if (dynamicObject.getBody()  != null) {
+
+                dynamicObject.setLinearVelocity(new Vector2(dynamicObject.getLinearVelocity()).add(new Vector2(0f, GRAVITY).scl(fixedStep)));
+            }
+
+            //RESOLVE COLLISIONS
+
+            lastCustomContact = resolveCollisions(dynamicObject, floorObject);
+
             if (dynamicObject.getBody()  != null) {
                 dynamicObject.updatePosition(fixedStep);
             }
@@ -124,14 +145,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             accumulator -= fixedStep;
         }
 
-        ContactResult customContact = CustomContactHandler.detect(dynamicObject.getLocalBody(), floorObject.getLocalBody());
-        lastCustomContact = customContact;
-        if (customContact.isColliding()) {
-            Vector2 n = customContact.getNormal();
-            Vector2 cp = customContact.getContactPoint();
-            Gdx.app.log("CustomContact", String.format("contact p=(%.3f, %.3f) depth=%.4f normal=(%.3f, %.3f)",
-                cp.x, cp.y, customContact.getPenetrationDepth(), n.x, n.y));
-        }
+
 
         // clear the screen so debug renderer is visible
         ScreenUtils.clear(Color.BLACK);
@@ -141,6 +155,12 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         // render physics debug shapes
         debugRenderer.render(world, camera.combined);
 
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setProjectionMatrix(camera.combined);
+        drawEarTriangles(floorObject.getLocalBody(), floorObject.getConcaveLocalTriangles(), Color.WHITE);
+        drawEarTriangles(dynamicObject.getLocalBody(), dynamicObject.getConcaveLocalTriangles(), Color.WHITE);
+        shapeRenderer.end();
+        camera.update();
         if (showDebugOverlay) {
             // Draw ear-clipped triangles on top of Box2D debug view.
             shapeRenderer.setProjectionMatrix(camera.combined);
@@ -150,9 +170,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             drawContactNormalOverlay(lastCustomContact, Color.RED);
 
             //draw a marker at the center of mass of the Box2D body
+            //and also draw where the gravity is being applied to the body
             if (dynamicObject.getBody() != null) {
                 Vector2 com = dynamicObject.getBody() .getWorldCenter();
                 drawMarker(com, CONTACT_MARK_HALF_SIZE, Color.MAGENTA);
+                drawArrow(com, new Vector2(0f, -GRAVITY).nor(), GRAVITY * 0.1f * dynamicObject.getMass(), Color.MAGENTA);
             }
 
             if(dynamicObject.getLocalBody() != null) {
@@ -161,8 +183,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
             shapeRenderer.end();
         }
-
-
     }
 
     @Override
@@ -192,32 +212,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     private void draw() {
     }
 
-    private Body createBodyFromEarClippedTriangles(List<Vector2> localVertices,
-                                                   float worldX,
-                                                   float worldY,
-                                                   BodyDef.BodyType type) {
-        BodyDef bodyDef = new BodyDef();
-        bodyDef.type = type;
-        bodyDef.position.set(worldX, worldY);
-        Body body = world.createBody(bodyDef);
-
-        List<List<Vector2>> triangles = EarClippingDecomposer.decomposeToTriangles(localVertices);
-        for (List<Vector2> triangle : triangles) {
-            PolygonShape polygon = new PolygonShape();
-            polygon.set(new Vector2[]{triangle.get(0), triangle.get(1), triangle.get(2)});
-
-            FixtureDef fixtureDef = new FixtureDef();
-            fixtureDef.shape = polygon;
-            fixtureDef.density = type == BodyDef.BodyType.DynamicBody ? 1f : 0f;
-            fixtureDef.friction = 0.3f;
-            fixtureDef.restitution = 0.1f;
-            body.createFixture(fixtureDef);
-            polygon.dispose();
-        }
-
-        return body;
-    }
-
     private void drawEarTriangles(CustomContactHandler.PolygonBody body,
                                   List<List<Vector2>> localTriangles,
                                   Color color) {
@@ -235,6 +229,24 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             Vector2 c = toWorld(tri.get(2), position, angle);
             shapeRenderer.triangle(a.x, a.y, b.x, b.y, c.x, c.y);
         }
+    }
+
+    private ContactResult resolveCollisions(PhysicsObject physicsObject1, PhysicsObject physicsObject2) {
+        if(physicsObject1 instanceof StaticObject && physicsObject2 instanceof StaticObject) {
+            return null; // skip collision when concerning two static objects
+        }
+        ContactResult customContact = CustomContactHandler.detect(physicsObject1.getLocalBody(), physicsObject2.getLocalBody());
+        lastCustomContact = customContact;
+        if (customContact.isColliding()) {
+
+            Vector2 n = customContact.getNormal();
+            Vector2 cp = customContact.getContactPoint();
+            float penetrationDepth = customContact.getPenetrationDepth();
+            float restitution = Math.min(physicsObject1.getRestitution(), physicsObject2.getRestitution());
+            Gdx.app.log("CustomContact", String.format("contact p=(%.3f, %.3f) depth=%.4f normal=(%.3f, %.3f)",
+                cp.x, cp.y, customContact.getPenetrationDepth(), n.x, n.y));
+        }
+        return lastCustomContact;
     }
 
     private void drawContactNormalOverlay(ContactResult contact, Color color) {
