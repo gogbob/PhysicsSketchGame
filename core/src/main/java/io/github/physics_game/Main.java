@@ -17,6 +17,7 @@ import io.github.physics_game.collision.ContactResult;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.collision.EarClippingDecomposer;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -41,11 +42,13 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
 
     private boolean showDebugOverlay = false;
-    private ContactResult lastCustomContact = ContactResult.NO_CONTACT;
+    private ArrayList<ContactResult> customContacts;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
+    private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
     private DynamicObject dynamicObject;
     private StaticObject floorObject;
+    private Level exampleLevel;
     @Override
     public void create() {
         Box2D.init();
@@ -58,47 +61,29 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-
+        exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
 
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
 
         // Place the body near the center of the viewport so it's visible
-        float startX = viewport.getWorldWidth() / 2f;
-        float startY = viewport.getWorldHeight() / 2f;
+//        float startX = viewport.getWorldWidth() / 2f;
+//        float startY = viewport.getWorldHeight() / 2f;
 
         // Create a slanted static floor along the bottom of the viewport so the circle can collide with it.
         // We use an EdgeShape from a left point near the left edge up to a slightly higher right point to make it slanted.
 
         // Shared concave local polygon definition used by both custom math and Box2D fixtures.
-        List<Vector2> concaveLocalVertices = Arrays.asList(
-            new Vector2(-0.7f, 0.7f),
-            new Vector2(0.7f, 0.7f),
-            new Vector2(0.7f, 0.2f),
-            new Vector2(0.2f, 0.2f),
-            new Vector2(0.2f, -0.7f),
-            new Vector2(-0.7f, -0.7f)
-        );
-
-        dynamicObject = new DynamicObject(0, 0.3f, 0.1f, concaveLocalVertices, startX, startY, 0f, world);
-
-        float leftX = 0.5f; // small margin from left edge
-        float rightX = viewport.getWorldWidth() - 0.5f; // small margin from right edge
-        float leftY = 0.5f; // near bottom
-        float rightY = 1.5f; // slanted upward to the right
-        List<Vector2> floorLocalVertices = Arrays.asList(
-            new Vector2(leftX, leftY - 0.08f),
-            new Vector2(rightX, rightY - 0.08f),
-            new Vector2(rightX, rightY + 0.08f),
-            new Vector2(leftX, leftY + 0.08f)
-        );
-
-
-
-        floorObject = new StaticObject(1, 0.3f, 0.1f, floorLocalVertices, 0f, 0f, 0f, world);
-        // Example: build a Box2D body from the same concave polygon by adding one fixture per ear-clipped triangle.
-        Gdx.app.log("Object data", "Inertia of example body: " + String.valueOf(dynamicObject.getBody().getInertia()));
-        Gdx.app.log("Object data", "Mass of example body: " + String.valueOf(dynamicObject.getBody().getMass()));
+//        List<Vector2> concaveLocalVertices = Arrays.asList(
+//            new Vector2(-0.7f, 0.7f),
+//            new Vector2(0.7f, 0.7f),
+//            new Vector2(0.7f, 0.2f),
+//            new Vector2(0.2f, 0.2f),
+//            new Vector2(0.2f, -0.7f),
+//            new Vector2(-0.7f, -0.7f)
+//        );
+//
+//        dynamicObject = new DynamicObject(0, 0.3f, 0.1f, concaveLocalVertices, startX, startY, 0f, world);
     }
 
     @Override
@@ -113,75 +98,42 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             Gdx.app.log("Main", "Debug overlay " + (showDebugOverlay ? "ON" : "OFF"));
         }
 
-
-
-        final float fixedStep = 1f / 60f;
-        while(accumulator >= fixedStep) {
-            // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.
-
-            //1. Integrate forces → update velocity
-            //2. Detect collisions
-            //3. Build contact constraints
-            //4. Solve velocity constraints (impulses)
-            //5. Solve position constraints
-            //6. Update positions
-
-            //RESOLVING ALL FORCES
-
-            // Move Box2D concave polygon down so it collides with the slanted floor in debug view.
-            if (dynamicObject.getBody()  != null) {
-
-                dynamicObject.setLinearVelocity(new Vector2(dynamicObject.getLinearVelocity()).add(new Vector2(0f, GRAVITY).scl(fixedStep)));
-            }
-
-            //RESOLVE COLLISIONS
-
-            lastCustomContact = resolveCollisions(dynamicObject, floorObject);
-
-            if (dynamicObject.getBody()  != null) {
-                dynamicObject.updatePosition(fixedStep);
-            }
-
-            accumulator -= fixedStep;
-        }
-
-
-
-        // clear the screen so debug renderer is visible
+        // clear the screen
         ScreenUtils.clear(Color.BLACK);
-
-        camera.update();
-
-        // render physics debug shapes
-        debugRenderer.render(world, camera.combined);
-
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setProjectionMatrix(camera.combined);
-        drawEarTriangles(floorObject.getLocalBody(), floorObject.getConcaveLocalTriangles(), Color.WHITE);
-        drawEarTriangles(dynamicObject.getLocalBody(), dynamicObject.getConcaveLocalTriangles(), Color.WHITE);
-        shapeRenderer.end();
-        camera.update();
-        if (showDebugOverlay) {
-            // Draw ear-clipped triangles on top of Box2D debug view.
+        if(!showDebugOverlay) {
+            //Normal view
+            PhysicsResolver.step(accumulator, exampleLevel.getPhysicsObjects());
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-            drawEarTriangles(floorObject.getLocalBody(), floorObject.getConcaveLocalTriangles(), Color.CYAN);
-            drawEarTriangles(dynamicObject.getLocalBody(), dynamicObject.getConcaveLocalTriangles(), Color.YELLOW);
-            drawContactNormalOverlay(lastCustomContact, Color.RED);
-
-            //draw a marker at the center of mass of the Box2D body
-            //and also draw where the gravity is being applied to the body
-            if (dynamicObject.getBody() != null) {
-                Vector2 com = dynamicObject.getBody() .getWorldCenter();
-                drawMarker(com, CONTACT_MARK_HALF_SIZE, Color.MAGENTA);
-                drawArrow(com, new Vector2(0f, -GRAVITY).nor(), GRAVITY * 0.1f * dynamicObject.getMass(), Color.MAGENTA);
-            }
-
-            if(dynamicObject.getLocalBody() != null) {
-                Vector2 com = dynamicObject.getLocalBody().getPosition();
-                drawMarker(com, CONTACT_MARK_HALF_SIZE, Color.GREEN);
+            for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
+                drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
             }
             shapeRenderer.end();
+
+            camera.update();
+        } else {
+            //Debug view
+            debugRenderer.render(world, camera.combined);
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects());
+            shapeRenderer.setProjectionMatrix(camera.combined);
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+            for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
+                if(obj instanceof DynamicObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.YELLOW);
+                } else if (obj instanceof StaticObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
+                } else {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                }
+            }
+
+            for(DebugForce f : forces) {
+                drawArrow(f.getPosition(), f.getForce(), f.getForce().len(), f.getColor());
+            }
+
+            shapeRenderer.end();
+
+            camera.update();
         }
     }
 
@@ -231,25 +183,13 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         }
     }
 
-    private ContactResult resolveCollisions(PhysicsObject physicsObject1, PhysicsObject physicsObject2) {
-        if(physicsObject1 instanceof StaticObject && physicsObject2 instanceof StaticObject) {
-            return null; // skip collision when concerning two static objects
+    private void drawContactNormalOverlay(ArrayList<ContactResult> contact, Color color) {
+        for(ContactResult c : contact) {
+            drawSingleContactNormal(c, color);
         }
-        ContactResult customContact = CustomContactHandler.detect(physicsObject1.getLocalBody(), physicsObject2.getLocalBody());
-        lastCustomContact = customContact;
-        if (customContact.isColliding()) {
-
-            Vector2 n = customContact.getNormal();
-            Vector2 cp = customContact.getContactPoint();
-            float penetrationDepth = customContact.getPenetrationDepth();
-            float restitution = Math.min(physicsObject1.getRestitution(), physicsObject2.getRestitution());
-            Gdx.app.log("CustomContact", String.format("contact p=(%.3f, %.3f) depth=%.4f normal=(%.3f, %.3f)",
-                cp.x, cp.y, customContact.getPenetrationDepth(), n.x, n.y));
-        }
-        return lastCustomContact;
     }
 
-    private void drawContactNormalOverlay(ContactResult contact, Color color) {
+    private void drawSingleContactNormal(ContactResult contact, Color color) {
         if (contact == null || !contact.isColliding()) {
             return;
         }
