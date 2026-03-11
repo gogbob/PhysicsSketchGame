@@ -105,8 +105,9 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             PhysicsResolver.step(accumulator, exampleLevel.getPhysicsObjects());
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
+            int i = 1;
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
-                drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), (obj instanceof StaticObject)? Color.GRAY : Color.WHITE);
             }
             shapeRenderer.end();
 

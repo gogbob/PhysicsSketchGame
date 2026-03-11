@@ -11,6 +11,8 @@ public class StaticObject extends PhysicsObject {
     public StaticObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation, World world) {
         super(id, friction, restitution, vertices, startX, startY, rotation);
         body = createBodyFromEarClippedTriangles(vertices, startX, startY, world, friction, restitution);
+        setLocalPosition(new Vector2(startX, startY));
+        setLocalRotation(rotation);
     }
 
     private Body createBodyFromEarClippedTriangles(List<Vector2> localVertices,

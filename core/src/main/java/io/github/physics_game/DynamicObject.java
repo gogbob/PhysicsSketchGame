@@ -14,7 +14,9 @@ public class DynamicObject extends PhysicsObject {
     public DynamicObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation, World world) {
         super(id, friction, restitution, vertices, startX, startY, rotation);
         body = createBodyFromEarClippedTriangles(vertices, startX, startY, world, friction, restitution);
+
         //sync initial position and rotation with local body
+        setLocalPosition(new Vector2(startX, startY));
         setLocalRotation(body.getAngle());
     }
 

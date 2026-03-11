@@ -19,9 +19,9 @@ public class Level {
         List<Vector2> floorPoly = Arrays.asList(new Vector2(0, 0), new Vector2(10, 0), new Vector2(10, 1), new Vector2(0, 1));
         StaticObject floor = new StaticObject(-1, 0.5f, 0.5f, floorPoly, 0, 0, 0, world);
 
-        List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(2, 0), new Vector2(2, 10), new Vector2(0, 10));
+        List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 10), new Vector2(0, 10));
         StaticObject leftWall = new StaticObject(-2, 0.5f, 0.5f, wallPoly, 0, 0, 0, world);
-        StaticObject rightWall = new StaticObject(-3, 0.5f, 0.5f, wallPoly, 5, 0, 0, world);
+        StaticObject rightWall = new StaticObject(-3, 0.5f, 0.5f, wallPoly, 9, 0, 0, world);
 
         physicsObjects.add(floor);
         physicsObjects.add(leftWall);
