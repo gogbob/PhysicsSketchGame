@@ -42,6 +42,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
 
     private boolean showDebugOverlay = false;
+    private boolean runPhysics = false;
     private ArrayList<ContactResult> customContacts;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
@@ -61,8 +62,18 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
+        DynamicObject exampleObject = new DynamicObject(4, 0.5f, 0.5f,
+            Arrays.asList(
+                new Vector2(-0.7f, 0.7f),
+                new Vector2(0.7f, 0.7f),
+                new Vector2(0.7f, 0.2f),
+                new Vector2(0.2f, 0.2f),
+                new Vector2(0.2f, -0.7f),
+                new Vector2(-0.7f, -0.7f)
+            ),
+            5, 5, 0, world);
         exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
-
+        exampleLevel.addPhysicsObject(exampleObject);
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
 
@@ -90,7 +101,8 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
 
         float delta = Gdx.graphics.getDeltaTime();
-        accumulator += Math.min(delta, 0.25f);
+        if(runPhysics) accumulator += Math.min(delta, 0.25f);
+        else accumulator = 0.25f;
         logTimer += delta;
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
@@ -98,11 +110,19 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             Gdx.app.log("Main", "Debug overlay " + (showDebugOverlay ? "ON" : "OFF"));
         }
 
+        if(Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+            runPhysics = !runPhysics;
+            Gdx.app.log("Main", "Physics " + (runPhysics ? "RUNNING" : "PAUSED"));
+        }
+
         // clear the screen
         ScreenUtils.clear(Color.BLACK);
+        debugRenderer.render(world, camera.combined);
         if(!showDebugOverlay) {
             //Normal view
-            PhysicsResolver.step(accumulator, exampleLevel.getPhysicsObjects());
+            if(runPhysics){
+                PhysicsResolver.step(accumulator, exampleLevel.getPhysicsObjects());
+            }
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
@@ -114,8 +134,8 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             camera.update();
         } else {
             //Debug view
-            debugRenderer.render(world, camera.combined);
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects());
+
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects(), runPhysics);
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
@@ -129,7 +149,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             for(DebugForce f : forces) {
-                drawArrow(f.getPosition(), f.getForce(), f.getForce().len(), f.getColor());
+                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len() * 10f, f.getColor());
             }
 
             shapeRenderer.end();

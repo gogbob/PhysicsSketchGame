@@ -31,6 +31,14 @@ public class Level {
     public ArrayList<PhysicsObject> getPhysicsObjects() {
         return new ArrayList<>(physicsObjects);
     }
-
+    public void addPhysicsObject(PhysicsObject obj) {
+        physicsObjects.add(obj);
+    }
+     public int getLevelId() {
+        return levelId;
+    }
+    public String getLevelName() {
+        return levelName;
+    }
 
 }
