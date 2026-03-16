@@ -31,12 +31,21 @@ public abstract class PhysicsObject {
         this.startX = startX;
         this.startY = startY;
     }
+    public abstract Vector2 getCenter();
     public void setLocalPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);
     }
     public void setLocalRotation(float angle) {
         localBody.setRotationRadians(angle);
     }
+    public Vector2 getLocalPosition() {
+        return new Vector2(localBody.getPosition());
+    }
+    public float getLocalRotation() {
+        return localBody.getRotationRadians();
+    }
+    public abstract void setPosition(Vector2 position);
+    public abstract void setRotation(float angle);
     public int getId() {
         return id;
     }
@@ -62,4 +71,6 @@ public abstract class PhysicsObject {
         return startY;
     }
     public abstract void reinitialize();
+    public abstract Vector2 getLinearVelocity();
+    public abstract float getAngularVelocity();
 }

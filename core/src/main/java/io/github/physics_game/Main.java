@@ -62,7 +62,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-        DynamicObject exampleObject = new DynamicObject(4, 0.5f, 0.5f,
+        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
                 new Vector2(0.7f, 0.7f),
@@ -73,7 +73,9 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             ),
             5, 5, 0, world);
         exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
+        //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
+
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
 
@@ -102,7 +104,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         float delta = Gdx.graphics.getDeltaTime();
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
-        else accumulator = 0.25f;
+        else accumulator = 0.0f;
         logTimer += delta;
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
@@ -117,7 +119,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         // clear the screen
         ScreenUtils.clear(Color.BLACK);
-        debugRenderer.render(world, camera.combined);
+
         if(!showDebugOverlay) {
             //Normal view
             if(runPhysics){
@@ -134,7 +136,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             camera.update();
         } else {
             //Debug view
-
+            debugRenderer.render(world, camera.combined);
             ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects(), runPhysics);
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);

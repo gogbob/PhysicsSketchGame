@@ -48,13 +48,26 @@ public class DynamicObject extends PhysicsObject {
 
         return body;
     }
-
     public Body getBody() {
         return body;
     }
+    @Override
     public Vector2 getCenter() {
         return body.getWorldCenter();
     }
+
+    @Override
+    public void setPosition(Vector2 position) {
+        body.setTransform(new Vector2(body.getPosition()).add(new Vector2(position).sub(getLocalPosition())), body.getAngle());
+        setLocalPosition(position);
+    }
+
+    @Override
+    public void setRotation(float angle) {
+        body.setTransform(body.getPosition(), angle);
+        setLocalRotation(angle);
+    }
+
     public Vector2 getPosition() {
         return body.getPosition();
     }
@@ -67,14 +80,20 @@ public class DynamicObject extends PhysicsObject {
     public float getInertia() {
         return body.getInertia();
     }
+    @Override
     public Vector2 getLinearVelocity() {
         return currentVelocity;
     }
+    @Override
     public float getAngularVelocity() {
         return currentAngularVelocity;
     }
-     public void setLinearVelocity(Vector2 velocity) {
-        this.currentVelocity = velocity;
+    public void setLinearVelocity(Vector2 velocity) {
+        if (velocity == null) {
+            this.currentVelocity.setZero();
+        } else {
+            this.currentVelocity.set(velocity);
+        }
     }
     public void setAngularVelocity(float velocity) {
         this.currentAngularVelocity = velocity;
@@ -82,13 +101,15 @@ public class DynamicObject extends PhysicsObject {
     public void updatePosition(float delta) {
         Vector2 linearVelocity = new Vector2(getLinearVelocity());
         float angle = body.getAngle() + getAngularVelocity() * delta;
-        body.setTransform((body.getPosition().add(linearVelocity.scl(delta))), angle);
-        setLocalPosition(body.getPosition());
-        setLocalRotation(angle);
+        Vector2 position = new Vector2(body.getPosition()).add(linearVelocity.scl(delta));
+        setPosition(position);
+        setRotation(angle);
     }
     public void reinitialize() {
             body.setTransform(new Vector2(getStartX(), getStartY()), 0f);
             setLocalPosition(body.getPosition());
             setLocalRotation(0f);
+            currentVelocity.setZero();
+            currentAngularVelocity = 0f;
     }
 }

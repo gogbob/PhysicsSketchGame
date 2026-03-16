@@ -41,6 +41,7 @@ public final class CustomContactHandler {
         }
 
         ContactResult best = ContactResult.NO_CONTACT;
+        float bestDepth = Float.MAX_VALUE;
 
         for (List<Vector2> triA : trianglesA) {
             Aabb aabbA = Aabb.fromPolygon(triA);
@@ -51,7 +52,12 @@ public final class CustomContactHandler {
                 }
 
                 ContactResult result = SatCollision.detect(triA, triB);
-                if (result.isColliding() && result.getPenetrationDepth() > best.getPenetrationDepth()) {
+                if (!result.isColliding()) {
+                    continue;
+                }
+                float d = result.getPenetrationDepth();
+                if(d < bestDepth) {
+                    bestDepth = d;
                     best = result;
                 }
             }

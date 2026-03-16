@@ -45,19 +45,25 @@ public class StaticObject extends PhysicsObject {
     public Vector2 getPosition() {
         return body.getPosition();
     }
+
     public float getAngle() {
         return body.getAngle();
     }
+    @Override
     public void setPosition(Vector2 position) {
         body.setTransform(position, body.getAngle());
+        setLocalPosition(position);
     }
+    @Override
     public void setRotation(float angle) {
         body.setTransform(body.getPosition(), angle);
+        setLocalRotation(angle);
     }
 
     public Body getBody() {
         return body;
     }
+    @Override
     public Vector2 getCenter() {
         return body.getWorldCenter();
     }
@@ -74,5 +80,15 @@ public class StaticObject extends PhysicsObject {
         body.setTransform(new Vector2(getStartX(), getStartY()), 0f);
         setLocalPosition(body.getPosition());
         setLocalRotation(0f);
+    }
+
+    @Override
+    public Vector2 getLinearVelocity() {
+        return new Vector2(0, 0);
+    }
+
+    @Override
+    public float getAngularVelocity() {
+        return 0;
     }
 }
