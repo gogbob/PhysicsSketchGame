@@ -83,7 +83,7 @@ public class PhysicsResolver {
         }
     }
 
-    public static ArrayList<DebugForce> stepWithDebug(float accumulator, ArrayList<PhysicsObject> objects, boolean runPhysics) {
+    public static ArrayList<DebugForce> stepWithDebug(float accumulator, ArrayList<PhysicsObject> objects) {
 
         ArrayList<DebugForce> forces = new ArrayList<>();
 
@@ -115,15 +115,9 @@ public class PhysicsResolver {
             for (PhysicsObject obj : objects) {
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
-                    //apply gravity
-                    if (runPhysics) {
-                        Vector2 currentVelocity = dynObj.getLinearVelocity();
-                        Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
-                        dynObj.setLinearVelocity(newVelocity);
-                    }
-                    if(accumulator - fixedStep <= fixedStep) {
-                        forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass())));
-                    }
+                    Vector2 currentVelocity = dynObj.getLinearVelocity();
+                    Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
+                    dynObj.setLinearVelocity(newVelocity);
                 }
             }
 
@@ -145,12 +139,10 @@ public class PhysicsResolver {
                 }
             }
             // move the objects
-            if(runPhysics) {
-                for (PhysicsObject obj : objects) {
-                    if (obj instanceof DynamicObject) {
-                        DynamicObject dynObj = (DynamicObject) obj;
-                        dynObj.updatePosition(fixedStep);
-                    }
+            for (PhysicsObject obj : objects) {
+                if (obj instanceof DynamicObject) {
+                    DynamicObject dynObj = (DynamicObject) obj;
+                    dynObj.updatePosition(fixedStep);
                 }
             }
 
@@ -167,6 +159,7 @@ public class PhysicsResolver {
                     }
                 }
                 if(!anyCorrection) {
+                    //Gdx.app.log("PhysicsResolver", "Collision iterations ended");
                     break;
                 }
             }
@@ -263,6 +256,7 @@ public class PhysicsResolver {
                     if (Math.abs(jt) > mu * j) {
                         jt = mu * j * Math.signum(jt);
                     }
+                    Gdx.app.log("Physics Resolver", "Applying friction impulse with magnitude " + jt);
                     Vector2 frictionImpulse = new Vector2(tangent).scl(jt);
                     if(isDebug) {
                         DebugForce frictionImpulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(tangent).scl(0.1f)), new Vector2(frictionImpulse).scl(0.1f));

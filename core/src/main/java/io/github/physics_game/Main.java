@@ -116,6 +116,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             runPhysics = !runPhysics;
             Gdx.app.log("Main", "Physics " + (runPhysics ? "RUNNING" : "PAUSED"));
         }
+        //make stepping key
+        if(Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            Gdx.app.log("Main", "ticking 1 time step");
+            accumulator = 2f / 60f;
+        }
 
         // clear the screen
         ScreenUtils.clear(Color.BLACK);
@@ -137,7 +142,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         } else {
             //Debug view
             debugRenderer.render(world, camera.combined);
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects(), runPhysics);
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects());
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
