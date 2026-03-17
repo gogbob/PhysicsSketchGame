@@ -229,7 +229,7 @@ public class PhysicsResolver {
                     DynamicObject dynObj1 = (DynamicObject) obj1;
                     //substract since impulse is in the same direction as the normal, which points from obj1 to obj2
                     Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(impulse).scl(invMassA));
-                    float newAngularVelA = dynObj1.getAngularVelocity() + rA.crs(impulse) * invInertiaA;
+                    float newAngularVelA = dynObj1.getAngularVelocity() - rA.crs(impulse) * invInertiaA;
                     dynObj1.setLinearVelocity(newLinearVelA);
                     dynObj1.setAngularVelocity(newAngularVelA);
                 }
@@ -237,12 +237,12 @@ public class PhysicsResolver {
                 if (obj2 instanceof DynamicObject) {
                     DynamicObject dynObj2 = (DynamicObject) obj2;
                     Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(impulse).scl(invMassB));
-                    float newAngularVelB = dynObj2.getAngularVelocity() - rB.crs(impulse) * invInertiaB;
+                    float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(impulse) * invInertiaB;
                     dynObj2.setLinearVelocity(newLinearVelB);
                     dynObj2.setAngularVelocity(newAngularVelB);
                 }
 
-                //resolve friction
+                // resolve friction
                 Vector2 tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n))).nor();
                 if(tangent.len2() > 1e-8f) tangent = tangent.nor();
                 else tangent.setZero();
@@ -269,16 +269,16 @@ public class PhysicsResolver {
                     // Apply friction impulse to obj1
                     if (obj1 instanceof DynamicObject) {
                         DynamicObject dynObj1 = (DynamicObject) obj1;
-                        Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).add(new Vector2(frictionImpulse).scl(invMassA));
-                        float newAngularVelA = dynObj1.getAngularVelocity() + rA.crs(frictionImpulse) * invInertiaA;
+                        Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(frictionImpulse).scl(invMassA));
+                        float newAngularVelA = dynObj1.getAngularVelocity() - rA.crs(frictionImpulse) * invInertiaA;
                         dynObj1.setLinearVelocity(newLinearVelA);
                         dynObj1.setAngularVelocity(newAngularVelA);
                     }
                     // Apply friction impulse to obj2
                     if (obj2 instanceof DynamicObject) {
                         DynamicObject dynObj2 = (DynamicObject) obj2;
-                        Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).sub(new Vector2(frictionImpulse).scl(invMassB));
-                        float newAngularVelB = dynObj2.getAngularVelocity() - rB.crs(frictionImpulse) * invInertiaB;
+                        Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(frictionImpulse).scl(invMassB));
+                        float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(frictionImpulse) * invInertiaB;
                         dynObj2.setLinearVelocity(newLinearVelB);
                         dynObj2.setAngularVelocity(newAngularVelB);
                     }
