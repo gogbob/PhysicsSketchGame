@@ -113,7 +113,7 @@ public class DrawTool {
         );
 
         nextId++;  // next object ID + 1
-        level.addDrawnObject(obj);
+        level.addPhysicsObject(obj);
 
         System.out.println("You have created the object! The point size is " + localPoints.size());
     }
