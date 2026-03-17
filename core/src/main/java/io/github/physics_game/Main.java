@@ -36,10 +36,8 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     // throttle logging to once-per-second
     float logTimer = 0f;
 
-
     // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
-
 
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
@@ -50,6 +48,9 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     private DynamicObject dynamicObject;
     private StaticObject floorObject;
     private Level exampleLevel;
+    private DrawTool drawTool;
+
+
     @Override
     public void create() {
         Box2D.init();
@@ -75,6 +76,9 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
+
+        drawTool = new DrawTool(camera, world, exampleLevel);
+        Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
@@ -103,6 +107,10 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
 
         float delta = Gdx.graphics.getDeltaTime();
+
+        drawTool.update();
+
+
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
         logTimer += delta;
@@ -136,6 +144,20 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
                 drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), (obj instanceof StaticObject)? Color.GRAY : Color.WHITE);
             }
+
+            // draw the drawing line
+            if (drawTool.isDrawing()) {
+                ArrayList<Vector2> pts = drawTool.getPoints();
+                if (pts.size() > 1) {
+                    shapeRenderer.setColor(Color.GREEN);
+                    for (int j = 0; j < pts.size() - 1; j++) {
+                        Vector2 p1 = pts.get(j);
+                        Vector2 p2 = pts.get(j + 1);
+                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
+                    }
+                }
+            }
+
             shapeRenderer.end();
 
             camera.update();

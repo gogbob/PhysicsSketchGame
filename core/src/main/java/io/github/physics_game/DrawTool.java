@@ -39,7 +39,7 @@ public class DrawTool {
         }
 
         // release mouse = done + create object
-        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
+        if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
             finishDrawing();
         }
     }
