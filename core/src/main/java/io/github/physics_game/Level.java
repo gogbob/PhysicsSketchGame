@@ -41,4 +41,8 @@ public class Level {
         return levelName;
     }
 
+    public void addDrawnObject(PhysicsObject obj) {
+        physicsObjects.add(obj);
+    }
+
 }
