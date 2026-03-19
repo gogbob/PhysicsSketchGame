@@ -1,5 +1,6 @@
 package io.github.physics_game;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -37,7 +38,8 @@ public abstract class PhysicsObject {
         setPosition(new Vector2(startX, startY));
     }
     public Vector2 getCenter()  {
-        return com;
+        //Gdx.app.log("DynamicObject", "Center of mass: " + com);
+        return new Vector2(com).add(getPosition());
     }
     public void setPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);

@@ -179,7 +179,7 @@ public class PhysicsResolver {
                 Vector2 cp = customContact.getContactPoint();
                 float penetrationDepth = customContact.getPenetrationDepth();
                 float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
-                Gdx.app.log("Physics Resolver", "Collision detected at (" + cp.x + ", " + cp.y + ") with normal (" + n.x + ", " + n.y + ") and penetration depth " + penetrationDepth);
+                //Gdx.app.log("Physics Resolver", "Collision detected at (" + cp.x + ", " + cp.y + ") with normal (" + n.x + ", " + n.y + ") and penetration depth " + penetrationDepth);
                 Vector2 rA = new Vector2(cp).sub(obj1.getCenter());
                 Vector2 rB = new Vector2(cp).sub(obj2.getCenter());
 
@@ -196,7 +196,7 @@ public class PhysicsResolver {
 
                 Vector2 relativeVel = new Vector2(velAtContactB).sub(velAtContactA);
                 if(relativeVel.dot(n) >= 0f) {
-                    Gdx.app.log("Physics Resolver", "Objects are moving apart, no collision resolution needed");
+                    //Gdx.app.log("Physics Resolver", "Objects are moving apart, no collision resolution needed");
                     return false; // Objects are moving apart, no need to resolve
                 }
                 //according to the equation (v'rel)*n = -e(vrel * n) the equation for the impulse scalar (j) is:
@@ -209,12 +209,12 @@ public class PhysicsResolver {
 
                 float effectiveMass = invMassA + invMassB + (rA.crs(n) * rA.crs(n)) * invInertiaA + (rB.crs(n) * rB.crs(n)) * invInertiaB;
                 if (effectiveMass <= 0f) {
-                    Gdx.app.log("Physics Resolver", "Effective mass is zero or negative, cannot resolve collision");
+                    //Gdx.app.log("Physics Resolver", "Effective mass is zero or negative, cannot resolve collision");
                     return false; // No collision resolution possible
                 }
 
                 float j = -(1f + restitution) * relativeVel.dot(n) / effectiveMass; //should be positive
-                Gdx.app.log("Physics Resolver", "Applying impulse with magnitude " + j);
+                //Gdx.app.log("Physics Resolver", "Applying impulse with magnitude " + j);
                 Vector2 impulse = new Vector2(n).scl(j);
                 if(isDebug) {
                     DebugForce impulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(n).scl(0.1f)), new Vector2(impulse).scl(0.1f));
@@ -257,7 +257,7 @@ public class PhysicsResolver {
                     if (Math.abs(jt) > mu * j) {
                         jt = mu * j * Math.signum(jt);
                     }
-                    Gdx.app.log("Physics Resolver", "Applying friction impulse with magnitude " + jt);
+                    //Gdx.app.log("Physics Resolver", "Applying friction impulse with magnitude " + jt);
                     Vector2 frictionImpulse = new Vector2(tangent).scl(jt);
                     if(isDebug) {
                         DebugForce frictionImpulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(tangent).scl(0.1f)), new Vector2(frictionImpulse).scl(0.1f));
@@ -300,7 +300,7 @@ public class PhysicsResolver {
             return false; // No penetration to correct
         }
 
-        Gdx.app.log("Physics Resolver", "Resolving penetration");
+        //Gdx.app.log("Physics Resolver", "Resolving penetration");
         Vector2 n = contact.getNormal();
         Vector2 cp = contact.getContactPoint();
         float penetrationDepth = contact.getPenetrationDepth();
