@@ -63,7 +63,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f, 0.5f,
+        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f, 1.2f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
                 new Vector2(0.7f, 0.7f),
