@@ -13,9 +13,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import io.github.physics_game.collision.ContactResult;
-import io.github.physics_game.collision.CustomContactHandler;
-import io.github.physics_game.collision.EarClippingDecomposer;
+import io.github.physics_game.collision.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +41,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
-    private ArrayList<ContactResult> customContacts;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
     private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
@@ -71,11 +68,21 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(0.2f, -0.7f),
                 new Vector2(-0.7f, -0.7f)
             ),
-            5, 5, 0, world);
+            3, 5, 0, world);
+
+        DynamicObject exampleObject2 = new DynamicObject(0, 0.5f, 0.5f, Arrays.asList(
+            new Vector2(-0.7f, 0.7f),
+            new Vector2(0.7f, 0.7f),
+            new Vector2(0.7f, 0.2f),
+            new Vector2(0.2f, 0.2f),
+            new Vector2(0.2f, -0.7f),
+            new Vector2(-0.7f, -0.7f)
+        ),
+            3, 7, 0 ,world);
         exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
-
+        exampleLevel.addPhysicsObject(exampleObject2);
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
 
@@ -209,23 +216,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             Vector2 c = toWorld(tri.get(2), position, angle);
             shapeRenderer.triangle(a.x, a.y, b.x, b.y, c.x, c.y);
         }
-    }
-
-    private void drawContactNormalOverlay(ArrayList<ContactResult> contact, Color color) {
-        for(ContactResult c : contact) {
-            drawSingleContactNormal(c, color);
-        }
-    }
-
-    private void drawSingleContactNormal(ContactResult contact, Color color) {
-        if (contact == null || !contact.isColliding()) {
-            return;
-        }
-
-        Vector2 cp = contact.getContactPoint();
-        Vector2 n = contact.getNormal();
-        drawArrow(cp, n, NORMAL_DEBUG_LENGTH, color);
-        drawMarker(cp, CONTACT_MARK_HALF_SIZE, color);
     }
 
     private void drawArrow(Vector2 start, Vector2 direction, float scale, Color color) {

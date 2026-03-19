@@ -5,7 +5,8 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
-import io.github.physics_game.collision.ContactResult;
+import io.github.physics_game.collision.ContactManifold;
+import io.github.physics_game.collision.ContactPoint;
 import io.github.physics_game.collision.CustomContactHandler;
 
 import java.util.ArrayList;
@@ -37,10 +38,10 @@ public class PhysicsResolver {
                     dynObj.setLinearVelocity(newVelocity);
                 }
             }
-            boolean anyCollision = false;
+
             //RESOLVE COLLISIONS
             for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {
-
+                boolean anyCollision = false;
                 for (int i = 0; i < objects.size(); i++) {
                     for (int j = i + 1; j < objects.size(); j++) {
                         PhysicsObject obj1 = objects.get(i);
@@ -63,8 +64,9 @@ public class PhysicsResolver {
             }
 
             //correct the positions to prevent sinking due to numerical errors
-            boolean anyCorrection = false;
+
             for(int iteration = 0; iteration < NUM_POS_ITERATIONS; iteration++) {
+                boolean anyCorrection = false;
                 for (int i = 0; i < objects.size(); i++) {
                     for (int j = i + 1; j < objects.size(); j++) {
                         PhysicsObject obj1 = objects.get(i);
@@ -171,116 +173,121 @@ public class PhysicsResolver {
 
     public static boolean resolveCollision(PhysicsObject obj1, PhysicsObject obj2, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration) {
         if (!(obj1 instanceof StaticObject && obj2 instanceof StaticObject)) {
-            ContactResult customContact = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
-            if (customContact.isColliding()) {
-
-                Vector2 n = customContact.getNormal();
-                Vector2 cp = customContact.getContactPoint();
-                float penetrationDepth = customContact.getPenetrationDepth();
+            ContactManifold manifold = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
+            if (manifold.isColliding()) {
+                Vector2 n = manifold.getNormal();
                 float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
-                Gdx.app.log("Physics Resolver", "Collision detected at (" + cp.x + ", " + cp.y + ") with normal (" + n.x + ", " + n.y + ") and penetration depth " + penetrationDepth);
-                Vector2 rA = new Vector2(cp).sub(obj1.getCenter());
-                Vector2 rB = new Vector2(cp).sub(obj2.getCenter());
 
-                Vector2 linearVelA = obj1.getLinearVelocity();
-                float angularVelA = obj1.getAngularVelocity();
-
-                Vector2 velAtContactA = getContactVelocity(obj1, rA, linearVelA, angularVelA);
-
-
-                Vector2 linearVelB = obj2.getLinearVelocity();
-                float angularVelB = obj2.getAngularVelocity();
-
-                Vector2 velAtContactB = getContactVelocity(obj2, rB, linearVelB, angularVelB);
-
-                Vector2 relativeVel = new Vector2(velAtContactB).sub(velAtContactA);
-                if(relativeVel.dot(n) >= 0f) {
-                    Gdx.app.log("Physics Resolver", "Objects are moving apart, no collision resolution needed");
-                    return false; // Objects are moving apart, no need to resolve
-                }
-                //according to the equation (v'rel)*n = -e(vrel * n) the equation for the impulse scalar (j) is:
-                // j = -(1 + e) * (vrel * n) / (mA^-1 + mB^-1 + (rA x n)^2 * IA^-1 + (rB x n)^2 * IB^-1)
-                // The inverse mass and inertia will euqual to zero for static objects, so they have "infinite" mass:
+                // Pre-compute inverse masses and inertias once per manifold
                 float invMassA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getMass();
                 float invMassB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getMass();
                 float invInertiaA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getInertia();
                 float invInertiaB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getInertia();
 
-                float effectiveMass = invMassA + invMassB + (rA.crs(n) * rA.crs(n)) * invInertiaA + (rB.crs(n) * rB.crs(n)) * invInertiaB;
-                if (effectiveMass <= 0f) {
-                    Gdx.app.log("Physics Resolver", "Effective mass is zero or negative, cannot resolve collision");
-                    return false; // No collision resolution possible
-                }
+                // Solve impulse for each contact point
+                for (ContactPoint contact : manifold.getPoints()) {
+                    Vector2 cp = contact.point;
+                    Vector2 rA = new Vector2(cp).sub(obj1.getCenter());
+                    Vector2 rB = new Vector2(cp).sub(obj2.getCenter());
 
-                float j = -(1f + restitution) * relativeVel.dot(n) / effectiveMass; //should be positive
-                Gdx.app.log("Physics Resolver", "Applying impulse with magnitude " + j);
-                Vector2 impulse = new Vector2(n).scl(j);
-                if(isDebug) {
-                    DebugForce impulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(n).scl(0.1f)), new Vector2(impulse).scl(0.1f));
-                    impulseForceA.setColor(new Color(1f, 0f, 0f, 1f / (iteration + 1)));
-                    debugForces.add(impulseForceA);
-                    DebugForce impulseForceB = new DebugForce(new Vector2(cp).sub(new Vector2(n).scl(0.1f)), new Vector2(impulse).scl(-0.1f));
-                    impulseForceB.setColor(new Color(1f, 0f, 0f, 1f / (iteration + 1)));
-                    debugForces.add(impulseForceB);
-                }
+                    // Recompute current velocities at contact point
+                    Vector2 vA = getContactVelocity(obj1, rA, obj1.getLinearVelocity(), obj1.getAngularVelocity());
+                    Vector2 vB = getContactVelocity(obj2, rB, obj2.getLinearVelocity(), obj2.getAngularVelocity());
+                    Vector2 relativeVel = new Vector2(vB).sub(vA);
 
-                // Apply impulse to obj1
-                if (obj1 instanceof DynamicObject) {
-                    DynamicObject dynObj1 = (DynamicObject) obj1;
-                    //substract since impulse is in the same direction as the normal, which points from obj1 to obj2
-                    Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(impulse).scl(invMassA));
-                    float newAngularVelA = dynObj1.getAngularVelocity() - rA.crs(impulse) * invInertiaA;
-                    dynObj1.setLinearVelocity(newLinearVelA);
-                    dynObj1.setAngularVelocity(newAngularVelA);
-                }
-                // Apply impulse to obj2
-                if (obj2 instanceof DynamicObject) {
-                    DynamicObject dynObj2 = (DynamicObject) obj2;
-                    Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(impulse).scl(invMassB));
-                    float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(impulse) * invInertiaB;
-                    dynObj2.setLinearVelocity(newLinearVelB);
-                    dynObj2.setAngularVelocity(newAngularVelB);
-                }
-
-                // resolve friction
-                Vector2 tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n))).nor();
-                if(tangent.len2() > 1e-8f) tangent = tangent.nor();
-                else tangent.setZero();
-
-                if(!tangent.isZero(1e-6f)) {
-                    float effectiveTangentialMass = invMassA + invMassB + (rA.crs(tangent) * rA.crs(tangent)) * invInertiaA + (rB.crs(tangent) * rB.crs(tangent)) * invInertiaB;
-                    //impulse which would bring the relative tangential velocity to zero
-                    float jt = -relativeVel.dot(tangent) / effectiveTangentialMass;
-                    //Clamping due to Coulomb's law of friction: |jt| <= μ * j
-                    float mu = (obj1.getFriction() + obj2.getFriction()) / 2f;
-                    if (Math.abs(jt) > mu * j) {
-                        jt = mu * j * Math.signum(jt);
+                    // Check if moving apart
+                    float velN = relativeVel.dot(n);
+                    if (velN >= 0f) {
+                        continue; // Objects moving apart at this contact
                     }
-                    Gdx.app.log("Physics Resolver", "Applying friction impulse with magnitude " + jt);
-                    Vector2 frictionImpulse = new Vector2(tangent).scl(jt);
-                    if(isDebug) {
-                        DebugForce frictionImpulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(tangent).scl(0.1f)), new Vector2(frictionImpulse).scl(0.1f));
-                        frictionImpulseForceA.setColor(new Color(0f, 0f, 1f, 1f / (iteration + 1)));
-                        debugForces.add(frictionImpulseForceA);
-                        DebugForce frictionImpulseForceB = new DebugForce(new Vector2(cp).sub(new Vector2(tangent).scl(0.1f)), new Vector2(frictionImpulse).scl(-0.1f));
-                        frictionImpulseForceB.setColor(new Color(0f, 0f, 1f, 1f / (iteration + 1)));
-                        debugForces.add(frictionImpulseForceB);
+
+                    // Compute normal impulse
+                    float rACrossN = rA.crs(n);
+                    float rBCrossN = rB.crs(n);
+                    float kN = invMassA + invMassB + rACrossN * rACrossN * invInertiaA + rBCrossN * rBCrossN * invInertiaB;
+
+                    if (kN <= 0f) continue;
+
+                    float jn = -(1f + restitution) * velN / kN;
+                    // Distribute impulse over contact count for stability
+                    jn /= manifold.getPointCount();
+
+                    Vector2 impulseN = new Vector2(n).scl(jn);
+
+                    if (isDebug) {
+                        DebugForce impulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(n).scl(0.1f)), new Vector2(impulseN));
+                        impulseForceA.setColor(new Color(1f, 0f, 0f, 1f / (iteration + 1)));
+                        debugForces.add(impulseForceA);
+                        DebugForce impulseForceB = new DebugForce(new Vector2(cp).sub(new Vector2(n).scl(0.1f)), new Vector2(impulseN));
+                        impulseForceB.setColor(new Color(1f, 0f, 0f, 1f / (iteration + 1)));
+                        debugForces.add(impulseForceB);
                     }
-                    // Apply friction impulse to obj1
+
+
+                    // Apply impulse to obj1
                     if (obj1 instanceof DynamicObject) {
                         DynamicObject dynObj1 = (DynamicObject) obj1;
-                        Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(frictionImpulse).scl(invMassA));
-                        float newAngularVelA = dynObj1.getAngularVelocity() - rA.crs(frictionImpulse) * invInertiaA;
+                        //substract since impulse is in the same direction as the normal, which points from obj1 to obj2
+                        Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(impulseN).scl(invMassA));
+                        float newAngularVelA = dynObj1.getAngularVelocity() - rA.crs(impulseN) * invInertiaA;
                         dynObj1.setLinearVelocity(newLinearVelA);
                         dynObj1.setAngularVelocity(newAngularVelA);
                     }
-                    // Apply friction impulse to obj2
+                    // Apply impulse to obj2
                     if (obj2 instanceof DynamicObject) {
                         DynamicObject dynObj2 = (DynamicObject) obj2;
-                        Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(frictionImpulse).scl(invMassB));
-                        float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(frictionImpulse) * invInertiaB;
+                        Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(impulseN).scl(invMassB));
+                        float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(impulseN) * invInertiaB;
                         dynObj2.setLinearVelocity(newLinearVelB);
                         dynObj2.setAngularVelocity(newAngularVelB);
+                    }
+
+                    // Recompute relative velocity after
+                    vA = getContactVelocity(obj1, rA, obj1.getLinearVelocity(), obj1.getAngularVelocity());
+                    vB = getContactVelocity(obj2, rB, obj2.getLinearVelocity(), obj2.getAngularVelocity());
+                    relativeVel = new Vector2(vB).sub(vA);
+
+
+                    // resolve friction
+                    Vector2 tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n))).nor();
+                    if (tangent.len2() > 1e-8f) tangent = tangent.nor();
+                    else tangent.setZero();
+
+                    if (!tangent.isZero(1e-6f)) {
+                        float effectiveTangentialMass = invMassA + invMassB + (rA.crs(tangent) * rA.crs(tangent)) * invInertiaA + (rB.crs(tangent) * rB.crs(tangent)) * invInertiaB;
+                        //impulse which would bring the relative tangential velocity to zero
+                        float jt = -relativeVel.dot(tangent) / effectiveTangentialMass;
+                        //Clamping due to Coulomb's law of friction: |jt| <= μ * j
+                        float mu = (obj1.getFriction() + obj2.getFriction()) / 2f;
+                        if (Math.abs(jt) > mu * jn) {
+                            jt = mu * jn * Math.signum(jt);
+                        }
+                        //Gdx.app.log("Physics Resolver", "Applying friction impulse with magnitude " + jt);
+                        Vector2 frictionImpulse = new Vector2(tangent).scl(jt);
+                        if(isDebug) {
+                            DebugForce frictionImpulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(tangent).scl(0.1f)), new Vector2(frictionImpulse));
+                            frictionImpulseForceA.setColor(new Color(0f, 0f, 1f, 1f / (iteration + 1)));
+                            debugForces.add(frictionImpulseForceA);
+                            DebugForce frictionImpulseForceB = new DebugForce(new Vector2(cp).sub(new Vector2(tangent).scl(0.1f)), new Vector2(frictionImpulse));
+                            frictionImpulseForceB.setColor(new Color(0f, 0f, 1f, 1f / (iteration + 1)));
+                            debugForces.add(frictionImpulseForceB);
+                        }
+                        // Apply friction impulse to obj1
+                        if (obj1 instanceof DynamicObject) {
+                            DynamicObject dynObj1 = (DynamicObject) obj1;
+                            Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(frictionImpulse).scl(invMassA));
+                            float newAngularVelA = dynObj1.getAngularVelocity() - rA.crs(frictionImpulse) * invInertiaA;
+                            dynObj1.setLinearVelocity(newLinearVelA);
+                            dynObj1.setAngularVelocity(newAngularVelA);
+                        }
+                        // Apply friction impulse to obj2
+                        if (obj2 instanceof DynamicObject) {
+                            DynamicObject dynObj2 = (DynamicObject) obj2;
+                            Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(frictionImpulse).scl(invMassB));
+                            float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(frictionImpulse) * invInertiaB;
+                            dynObj2.setLinearVelocity(newLinearVelB);
+                            dynObj2.setAngularVelocity(newAngularVelB);
+                        }
                     }
                 }
                 return true;
@@ -291,38 +298,40 @@ public class PhysicsResolver {
 
     public static boolean resolvePenetrationCorrection(PhysicsObject obj1, PhysicsObject obj2) {
         if(obj1 instanceof StaticObject && obj2 instanceof StaticObject) {
-            return false; // No correction needed for two static objects
+            return false;
         }
 
-        ContactResult contact = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
+        ContactManifold contact = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
         if (!contact.isColliding()) {
-            return false; // No penetration to correct
+            return false;
         }
 
-        Gdx.app.log("Physics Resolver", "Resolving penetration");
         Vector2 n = contact.getNormal();
-        Vector2 cp = contact.getContactPoint();
-        float penetrationDepth = contact.getPenetrationDepth();
-        float slop = 0.01f; // Small slop to prevent jitter
-        float percent = 0.8f; // Percentage of penetration to correct
+        float penetrationDepth = contact.getMaxPenetration();
+        float slop = 0.01f;
+        float percent = 0.8f;
         float correction = Math.max(penetrationDepth - slop, 0f) * percent;
 
         float invMassA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getMass();
         float invMassB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getMass();
         float totalInvMass = invMassA + invMassB;
+
         if (totalInvMass <= 0f) {
-            return false; // No correction possible
+            return false;
         }
+
+        // Distribute correction across contact points
+        float correctionPerPoint = correction / contact.getPointCount();
 
         if (obj1 instanceof DynamicObject) {
             DynamicObject dynObj1 = (DynamicObject) obj1;
-            Vector2 newPositionA = new Vector2(dynObj1.getPosition()).sub(new Vector2(n).scl(correction*invMassA/totalInvMass));
+            Vector2 newPositionA = new Vector2(dynObj1.getPosition()).sub(new Vector2(n).scl(correctionPerPoint * invMassA / totalInvMass));
             dynObj1.setPosition(newPositionA);
         }
 
         if (obj2 instanceof DynamicObject) {
             DynamicObject dynObj2 = (DynamicObject) obj2;
-            Vector2 newPositionB = new Vector2(dynObj2.getPosition()).add(new Vector2(n).scl(correction*invMassB/totalInvMass));
+            Vector2 newPositionB = new Vector2(dynObj2.getPosition()).add(new Vector2(n).scl(correctionPerPoint * invMassB / totalInvMass));
             dynObj2.setPosition(newPositionB);
         }
 

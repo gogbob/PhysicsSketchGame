@@ -23,25 +23,26 @@ public final class CustomContactHandler {
     private CustomContactHandler() {
     }
 
-    public static ContactResult detect(PolygonBody a, PolygonBody b) {
+    public static ContactManifold detect(PolygonBody a, PolygonBody b) {
         if (a == null || b == null) {
-            return ContactResult.NO_CONTACT;
+            return ContactManifold.NO_CONTACT;
         }
 
         List<Vector2> worldA = a.toWorldVertices();
         List<Vector2> worldB = b.toWorldVertices();
         if (worldA.size() < 3 || worldB.size() < 3) {
-            return ContactResult.NO_CONTACT;
+            return ContactManifold.NO_CONTACT;
         }
 
         List<List<Vector2>> trianglesA = EarClippingDecomposer.decomposeToTriangles(worldA);
         List<List<Vector2>> trianglesB = EarClippingDecomposer.decomposeToTriangles(worldB);
         if (trianglesA.isEmpty() || trianglesB.isEmpty()) {
-            return ContactResult.NO_CONTACT;
+            return ContactManifold.NO_CONTACT;
         }
 
-        ContactResult best = ContactResult.NO_CONTACT;
-        float bestDepth = Float.MAX_VALUE;
+        // Collect best manifold across all triangle pairs, filtering internal edges
+        ContactManifold best = ContactManifold.NO_CONTACT;
+        float bestDepth = -Float.MAX_VALUE;
 
         for (List<Vector2> triA : trianglesA) {
             Aabb aabbA = Aabb.fromPolygon(triA);
@@ -51,14 +52,16 @@ public final class CustomContactHandler {
                     continue;
                 }
 
-                ContactResult result = SatCollision.detect(triA, triB);
-                if (!result.isColliding()) {
+                ContactManifold manifold = SatCollision.detect(triA, triB);
+                if (!manifold.isColliding()) {
                     continue;
                 }
-                float d = result.getPenetrationDepth();
-                if(d < bestDepth) {
+
+                // Prefer deeper (more stable) contacts
+                float d = manifold.getMaxPenetration();
+                if (d > bestDepth) {
                     bestDepth = d;
-                    best = result;
+                    best = manifold;
                 }
             }
         }
