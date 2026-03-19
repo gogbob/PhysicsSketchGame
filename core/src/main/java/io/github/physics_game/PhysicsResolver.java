@@ -9,6 +9,7 @@ import io.github.physics_game.collision.ContactResult;
 import io.github.physics_game.collision.CustomContactHandler;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
@@ -333,5 +334,92 @@ public class PhysicsResolver {
         // v + w x r
         Vector2 tangentialVel = new Vector2(-r.y, r.x).scl(angularVel);
         return new Vector2(linearVel).add(tangentialVel);
+    }
+
+    public static Vector2 getCenterOfMassTriangle(Vector2 a, Vector2 b, Vector2 c) {
+        return new Vector2((a.x + b.x + c.x) / 3f, (a.y + b.y + c.y) / 3f);
+    }
+    public static float getMassOfTriangle(Vector2 a, Vector2 b, Vector2 c, float density) {
+        //Area of the triangle is A = bh/2
+        //which converts to A = |(x1(y2 - y3) + x2(y3 - y1) + x3(y1 - y2)) / 2| for vertices (x1, y1), (x2, y2), (x3, y3)
+        //and M = A * density
+        return Math.abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2f) * density;
+    }
+    public static float getMomentOfInertiaTriangle(Vector2 a, Vector2 b, Vector2 c, float mass) {
+        //I_z = (m/6) * (a^2 + b^2 + c^2) where a, b, c are the distances from the center of mass to the vertices
+        float inertia = (mass *
+            (a.dst2(getCenterOfMassTriangle(a, b, c)) + b.dst2(getCenterOfMassTriangle(a, b, c)) +
+                c.dst2(getCenterOfMassTriangle(a, b, c)))) / 6f;
+        return inertia;
+    }
+
+    public static Vector2 getCenterOfMassPolygon(List<List<Vector2>> triangles, List<Float> densities) {
+        Vector2 sum = new Vector2();
+        //make a weight average of the centers of mass of triangles
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                sum.add(new Vector2(getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)))
+                    .scl(getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri)))));
+            }
+        }
+        return sum.scl(1f / triangles.size());
+    }
+
+    public static Vector2 getCenterOfMassPolygon(List<List<Vector2>> triangles) {
+        Vector2 sum = new Vector2();
+        //make a weight average of the centers of mass of triangles
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                sum.add(new Vector2(getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)))
+                    .scl(getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), 1f)));
+            }
+        }
+        return sum.scl(1f / triangles.size());
+    }
+
+    public static float getMassOfPolygon(List<List<Vector2>> triangles, List<Float> densities) {
+        float area = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                area +=getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri)));
+            }
+        }
+        return area;
+    }
+
+    public static float getMassOfPolygon(List<List<Vector2>> triangles, float density) {
+        float area = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                area +=getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density);
+            }
+        }
+        return area;
+    }
+
+    public static float getMomentOfInertiaPolygon(List<List<Vector2>> triangles, List<Float> densities) {
+        float inertia = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                //use parallel axis theorem to calculate the total moment of inertia:
+                //I_total = I_triangle + m_triangle * d^2
+                inertia += getMomentOfInertiaTriangle(tri.get(0), tri.get(1), tri.get(2),
+                    getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri))));
+            }
+        }
+        return inertia;
+    }
+
+    public static float getMomentOfInertiaPolygon(List<List<Vector2>> triangles, float density) {
+        float inertia = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                //use parallel axis theorem to calculate the total moment of inertia:
+                //I_total = I_triangle + m_triangle * d^2
+                inertia += getMomentOfInertiaTriangle(tri.get(0), tri.get(1), tri.get(2),
+                    getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density));
+            }
+        }
+        return inertia;
     }
 }

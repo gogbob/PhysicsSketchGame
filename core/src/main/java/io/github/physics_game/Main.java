@@ -63,7 +63,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f,
+        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f, 1f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
                 new Vector2(0.7f, 0.7f),
@@ -73,7 +73,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(-0.7f, -0.7f)
             ),
             5, 5, 0, world);
-        exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
+        exampleLevel = new Level(0, "Example Level", new ArrayList<>());
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
 
