@@ -20,8 +20,8 @@ public final class SatCollision {
         }
 
         float minOverlap = Float.MAX_VALUE;
-        Vector2 bestAxis = null;
         int refEdgeA = -1;
+        Vector2 bestAxis = null;
 
         EdgeTestResult fromA = testAxesWithEdge(polygonA, polygonA, polygonB, minOverlap, bestAxis);
         if (!fromA.hasCollision) {
@@ -44,12 +44,12 @@ public final class SatCollision {
         Vector2 centerB = centroid(polygonB);
         Vector2 centerDelta = new Vector2(centerB).sub(centerA);
 
-        // Choose reference edge: use polygon with minimum overlap if it's significantly smaller
+        // Choose reference polygon: use one with minimum overlap if significantly smaller
         boolean useB = (minOverlapB < minOverlap * 0.95f);
         List<Vector2> refPoly = useB ? polygonB : polygonA;
         List<Vector2> incPoly = useB ? polygonA : polygonB;
-        Vector2 normal = useB ? bestAxisB : bestAxis;
-        int refEdgeIdx = useB ? refEdgeB : refEdgeA;
+        Vector2 normal = useB ? new Vector2(bestAxisB) : new Vector2(bestAxis);
+        int refEdgeIdx = useB ? refEdgeB : refEdgeA;  // USE THE EDGE THAT PRODUCED MIN OVERLAP
         float pen = useB ? minOverlapB : minOverlap;
 
         // Ensure normal convention is always A -> B.
@@ -79,7 +79,7 @@ public final class SatCollision {
         }
     }
 
-    private static EdgeTestResult testAxesWithEdge(List<Vector2> axisSource,
+    public static EdgeTestResult testAxesWithEdge(List<Vector2> axisSource,
                                                     List<Vector2> polygonA,
                                                     List<Vector2> polygonB,
                                                     float currentMinOverlap,
@@ -97,12 +97,12 @@ public final class SatCollision {
                 continue;
             }
 
-            Vector2 axis = new Vector2(-edge.y, edge.x).nor();
+            Vector2 axis = new Vector2(edge.y, -edge.x).nor();
 
             Projection pA = projectPolygon(axis, polygonA);
             Projection pB = projectPolygon(axis, polygonB);
 
-            float overlap = Math.min(pA.max, pB.max) - Math.max(pA.min, pB.min);
+            float overlap = pA.max - pB.min;
             if (overlap <= 0f) {
                 return new EdgeTestResult(false, axis, overlap, i);
             }
@@ -206,6 +206,7 @@ public final class SatCollision {
             Vector2 edgeNormal = new Vector2(-edge.y, edge.x).nor();
 
             float dot = edgeNormal.dot(direction);
+            //use the fact that it is convex to say that the most opposite normal will be the one with the smallest dot product
             if (dot < bestDot) {
                 bestDot = dot;
                 best = i;

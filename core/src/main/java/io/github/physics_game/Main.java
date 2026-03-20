@@ -86,6 +86,24 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
 
+        //testing
+        List<Vector2> square1 = Arrays.asList(
+            new Vector2(0, 0),
+            new Vector2(0, 3),
+            new Vector2(3, 3),
+            new Vector2(3, 0)
+        );
+
+        List<Vector2> square2 = Arrays.asList(
+            new Vector2(2, 2),
+            new Vector2(2, 5),
+            new Vector2(5, 5),
+            new Vector2(5, 2)
+        );
+
+        CustomContactHandler.detect(new CustomContactHandler.PolygonBody(square1), new CustomContactHandler.PolygonBody(square2));
+
+
         // Place the body near the center of the viewport so it's visible
 //        float startX = viewport.getWorldWidth() / 2f;
 //        float startY = viewport.getWorldHeight() / 2f;
@@ -111,7 +129,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         float delta = Gdx.graphics.getDeltaTime();
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
-        else accumulator = 0.0f;
+        else accumulator = 0f;
         logTimer += delta;
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {

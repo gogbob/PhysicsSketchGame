@@ -141,6 +141,7 @@ public final class CustomContactHandler {
         }
 
         static Aabb fromPolygon(List<Vector2> polygon) {
+            //set a bounding box around the object
             float minX = polygon.get(0).x;
             float minY = polygon.get(0).y;
             float maxX = minX;
