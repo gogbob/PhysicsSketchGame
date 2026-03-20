@@ -15,9 +15,9 @@ public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
     final static int NUM_VEL_ITERATIONS = 6;
     final static int NUM_POS_ITERATIONS = 3;
-    final static Vector2 GRAVITY = new Vector2(0, -0.03f);
-    public static void step(float accumulator, ArrayList<PhysicsObject> objects) {
-        while(accumulator >= fixedStep) {
+    final static Vector2 GRAVITY = new Vector2(0, -3f);
+    public static void step(ArrayList<PhysicsObject> objects) {
+        while(Main.accumulator >= fixedStep) {
             // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.
 
             //1. Integrate forces → update velocity
@@ -80,11 +80,11 @@ public class PhysicsResolver {
                 }
             }
 
-            accumulator -= fixedStep;
+            Main.accumulator -= fixedStep;
         }
     }
 
-    public static ArrayList<DebugForce> stepWithDebug(float accumulator, ArrayList<PhysicsObject> objects) {
+    public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects) {
 
         ArrayList<DebugForce> forces = new ArrayList<>();
 
@@ -95,7 +95,7 @@ public class PhysicsResolver {
                 forces.add(velForce);
             }
         }
-        if(accumulator < fixedStep) {
+        if(Main.accumulator < fixedStep) {
             for (PhysicsObject obj : objects) {
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
@@ -104,7 +104,7 @@ public class PhysicsResolver {
             }
             return forces;
         }
-        while(accumulator >= fixedStep) {
+        while(Main.accumulator >= fixedStep) {
             //1. Integrate forces → update velocity
             //2. Detect collisions
             //3. Build contact constraints
@@ -165,7 +165,7 @@ public class PhysicsResolver {
                 }
             }
 
-            accumulator -= fixedStep;
+            Main.accumulator -= fixedStep;
         }
         return forces;
     }

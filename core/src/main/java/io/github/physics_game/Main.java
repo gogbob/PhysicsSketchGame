@@ -30,7 +30,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     World world;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
-    float accumulator = 0f;
+    public static float accumulator = 0f;
     final float GRAVITY = -1.8f;
 
     // throttle logging to once-per-second
@@ -63,7 +63,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f, 0.5f,
+        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
                 new Vector2(0.7f, 0.7f),
@@ -136,7 +136,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         if(!showDebugOverlay) {
             //Normal view
             if(runPhysics){
-                PhysicsResolver.step(accumulator, exampleLevel.getPhysicsObjects());
+                PhysicsResolver.step(exampleLevel.getPhysicsObjects());
             }
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
@@ -164,7 +164,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         } else {
             //Debug view
             debugRenderer.render(world, camera.combined);
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects());
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(exampleLevel.getPhysicsObjects());
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
@@ -178,7 +178,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             for(DebugForce f : forces) {
-                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len() * 10f, f.getColor());
+                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
             }
 
             shapeRenderer.end();
