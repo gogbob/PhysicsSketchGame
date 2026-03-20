@@ -207,7 +207,7 @@ public final class SatCollision {
 
             float dot = edgeNormal.dot(direction);
             //use the fact that it is convex to say that the most opposite normal will be the one with the smallest dot product
-            if (dot < bestDot) {
+            if (dot > bestDot) {
                 bestDot = dot;
                 best = i;
             }

@@ -81,6 +81,30 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
 
+        CustomContactHandler.PolygonBody squareBody1 = new CustomContactHandler.PolygonBody(
+            Arrays.asList(
+                new Vector2(-0.7f, 0.7f),
+                new Vector2(0.7f, 0.7f),
+                new Vector2(0.7f, -0.7f),
+                new Vector2(-0.7f, -0.7f)
+            )
+        );
+
+        CustomContactHandler.PolygonBody squareBody2 = new CustomContactHandler.PolygonBody(
+            Arrays.asList(
+                new Vector2(-0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, -0.5f),
+                new Vector2(-0.5f, -0.5f)
+            )
+        );
+        squareBody2.setPosition(0.25f, 0.25f);
+        squareBody2.setRotationRadians((float)Math.PI / 4f);
+
+        CustomContactHandler.detect(squareBody1, squareBody2);
+
+
+
         // Place the body near the center of the viewport so it's visible
 //        float startX = viewport.getWorldWidth() / 2f;
 //        float startY = viewport.getWorldHeight() / 2f;
