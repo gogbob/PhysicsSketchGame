@@ -53,11 +53,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     @Override
     public void create() {
-        Box2D.init();
-        world = new World(new Vector2(0,0), true);
-        debugRenderer = new Box2DDebugRenderer();
-
-        // Use a small world size (meters) so Box2D objects are visible with the debug renderer.
+        // Use a small world size (meters) so objects are visible with the debug renderer.
         camera = new OrthographicCamera();
         viewport = new FitViewport(10f, 7.5f, camera); // world units: 10 x 7.5
         viewport.apply(true);
@@ -163,7 +159,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             camera.update();
         } else {
             //Debug view
-            debugRenderer.render(world, camera.combined);
             ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(exampleLevel.getPhysicsObjects());
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
