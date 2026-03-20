@@ -1,5 +1,6 @@
 package io.github.physics_game;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -20,6 +21,8 @@ public abstract class PhysicsObject {
     private List<List<Vector2>> concaveLocalTriangles;
     private float startX;
     private float startY;
+    private Vector2 com = new Vector2();
+
 
     public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
         this.id = id;
@@ -30,22 +33,26 @@ public abstract class PhysicsObject {
         this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
         this.startX = startX;
         this.startY = startY;
+        this.com = PhysicsResolver.getCenterOfMassPolygon(concaveLocalTriangles);
+        setRotation(rotation);
+        setPosition(new Vector2(startX, startY));
     }
-    public abstract Vector2 getCenter();
-    public void setLocalPosition(Vector2 localPosition) {
+    public Vector2 getCenter()  {
+        //Gdx.app.log("DynamicObject", "Center of mass: " + com);
+        return new Vector2(com).add(getPosition());
+    }
+    public void setPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);
     }
-    public void setLocalRotation(float angle) {
+    public void setRotation(float angle) {
         localBody.setRotationRadians(angle);
     }
-    public Vector2 getLocalPosition() {
+    public Vector2 getPosition() {
         return new Vector2(localBody.getPosition());
     }
-    public float getLocalRotation() {
+    public float getRotation() {
         return localBody.getRotationRadians();
     }
-    public abstract void setPosition(Vector2 position);
-    public abstract void setRotation(float angle);
     public int getId() {
         return id;
     }

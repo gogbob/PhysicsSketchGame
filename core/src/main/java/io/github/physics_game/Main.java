@@ -13,7 +13,9 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import io.github.physics_game.collision.*;
+import io.github.physics_game.collision.ContactResult;
+import io.github.physics_game.collision.CustomContactHandler;
+import io.github.physics_game.collision.EarClippingDecomposer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,25 +30,27 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     World world;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
-    float accumulator = 0f;
+    public static float accumulator = 0f;
     final float GRAVITY = -1.8f;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
 
-
     // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
 
-
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
+    private ArrayList<ContactResult> customContacts;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
     private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
     private DynamicObject dynamicObject;
     private StaticObject floorObject;
     private Level exampleLevel;
+    private DrawTool drawTool;
+
+
     @Override
     public void create() {
         Box2D.init();
@@ -59,7 +63,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f,
+        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
                 new Vector2(0.7f, 0.7f),
@@ -68,41 +72,16 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(0.2f, -0.7f),
                 new Vector2(-0.7f, -0.7f)
             ),
-            3, 5, 0, world);
-
-        DynamicObject exampleObject2 = new DynamicObject(0, 0.5f, 0.5f, Arrays.asList(
-            new Vector2(-0.7f, 0.7f),
-            new Vector2(0.7f, 0.7f),
-            new Vector2(0.7f, 0.2f),
-            new Vector2(0.2f, 0.2f),
-            new Vector2(0.2f, -0.7f),
-            new Vector2(-0.7f, -0.7f)
-        ),
-            3, 7, 0 ,world);
-        exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
+            5, 5, 0, world);
+        exampleLevel = new Level(0, "Example Level", new ArrayList<>());
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
-        exampleLevel.addPhysicsObject(exampleObject2);
+
+        drawTool = new DrawTool(camera, world, exampleLevel);
+        Gdx.app.log("Main", "DrawTool created!");
+
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
-
-        //testing
-        List<Vector2> square1 = Arrays.asList(
-            new Vector2(0, 0),
-            new Vector2(0, 3),
-            new Vector2(3, 3),
-            new Vector2(3, 0)
-        );
-
-        List<Vector2> square2 = Arrays.asList(
-            new Vector2(2, 2),
-            new Vector2(2, 5),
-            new Vector2(5, 5),
-            new Vector2(5, 2)
-        );
-
-        CustomContactHandler.detect(new CustomContactHandler.PolygonBody(square1), new CustomContactHandler.PolygonBody(square2));
-
 
         // Place the body near the center of the viewport so it's visible
 //        float startX = viewport.getWorldWidth() / 2f;
@@ -128,8 +107,12 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
 
         float delta = Gdx.graphics.getDeltaTime();
+
+        drawTool.update();
+
+
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
-        else accumulator = 0f;
+        else accumulator = 0.0f;
         logTimer += delta;
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
@@ -153,7 +136,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         if(!showDebugOverlay) {
             //Normal view
             if(runPhysics){
-                PhysicsResolver.step(accumulator, exampleLevel.getPhysicsObjects());
+                PhysicsResolver.step(exampleLevel.getPhysicsObjects());
             }
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
@@ -161,13 +144,27 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
                 drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), (obj instanceof StaticObject)? Color.GRAY : Color.WHITE);
             }
+
+            // draw the drawing line
+            if (drawTool.isDrawing()) {
+                ArrayList<Vector2> pts = drawTool.getPoints();
+                if (pts.size() > 1) {
+                    shapeRenderer.setColor(Color.GREEN);
+                    for (int j = 0; j < pts.size() - 1; j++) {
+                        Vector2 p1 = pts.get(j);
+                        Vector2 p2 = pts.get(j + 1);
+                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
+                    }
+                }
+            }
+
             shapeRenderer.end();
 
             camera.update();
         } else {
             //Debug view
             debugRenderer.render(world, camera.combined);
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects());
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(exampleLevel.getPhysicsObjects());
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
@@ -181,7 +178,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             for(DebugForce f : forces) {
-                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len() * 10f, f.getColor());
+                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
             }
 
             shapeRenderer.end();
@@ -234,6 +231,23 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             Vector2 c = toWorld(tri.get(2), position, angle);
             shapeRenderer.triangle(a.x, a.y, b.x, b.y, c.x, c.y);
         }
+    }
+
+    private void drawContactNormalOverlay(ArrayList<ContactResult> contact, Color color) {
+        for(ContactResult c : contact) {
+            drawSingleContactNormal(c, color);
+        }
+    }
+
+    private void drawSingleContactNormal(ContactResult contact, Color color) {
+        if (contact == null || !contact.isColliding()) {
+            return;
+        }
+
+        Vector2 cp = contact.getContactPoint();
+        Vector2 n = contact.getNormal();
+        drawArrow(cp, n, NORMAL_DEBUG_LENGTH, color);
+        drawMarker(cp, CONTACT_MARK_HALF_SIZE, color);
     }
 
     private void drawArrow(Vector2 start, Vector2 direction, float scale, Color color) {
