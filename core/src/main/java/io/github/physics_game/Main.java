@@ -13,7 +13,6 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import io.github.physics_game.collision.ContactResult;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.collision.EarClippingDecomposer;
 
@@ -41,7 +40,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
-    private ArrayList<ContactResult> customContacts;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
     private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
@@ -233,22 +231,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         }
     }
 
-    private void drawContactNormalOverlay(ArrayList<ContactResult> contact, Color color) {
-        for(ContactResult c : contact) {
-            drawSingleContactNormal(c, color);
-        }
-    }
-
-    private void drawSingleContactNormal(ContactResult contact, Color color) {
-        if (contact == null || !contact.isColliding()) {
-            return;
-        }
-
-        Vector2 cp = contact.getContactPoint();
-        Vector2 n = contact.getNormal();
-        drawArrow(cp, n, NORMAL_DEBUG_LENGTH, color);
-        drawMarker(cp, CONTACT_MARK_HALF_SIZE, color);
-    }
 
     private void drawArrow(Vector2 start, Vector2 direction, float scale, Color color) {
         shapeRenderer.setColor(color);
