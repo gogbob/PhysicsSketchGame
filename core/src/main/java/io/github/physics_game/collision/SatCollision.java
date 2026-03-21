@@ -5,6 +5,9 @@ import com.badlogic.gdx.math.Vector2;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.lang.Math.max;
+import static java.lang.Math.min;
+
 /**
  * Convex polygon collision test using the Separating Axis Theorem (SAT).
  */
@@ -141,24 +144,26 @@ public final class SatCollision {
         clipped.add(new Vector2(incB));
 
         // Clip against left plane of reference edge
-        Vector2 leftNormal = new Vector2(-refEdge.y, refEdge.x).nor();
-        clipped = clipSegmentToPlane(clipped, refA, leftNormal);
+        // the right tangent is the tangent going inwards from the first point
+        Vector2 rightTangent = new Vector2(refEdge.x, refEdge.y).nor();
+        clipped = clipSegmentToPlane(clipped, refA, rightTangent);
         if (clipped.size() < 2) return result;
 
         // Clip against right plane of reference edge
-        Vector2 rightNormal = new Vector2(refEdge.y, -refEdge.x).nor();
-        clipped = clipSegmentToPlane(clipped, refB, rightNormal);
+        // the left tangent is the tangent going inwards from the second point
+        Vector2 leftTangent = new Vector2(-refEdge.x, -refEdge.y).nor();
+        clipped = clipSegmentToPlane(clipped, refB, leftTangent);
         if (clipped.size() < 2) return result;
 
-        // Clip against reference face plane (normal pointing into incident poly)
-        clipped = clipSegmentToPlane(clipped, refA, normal);
+        // Clip against reference face plane (always keeping in mind to pick the plane with direction going towards the inside
+        clipped = clipSegmentToPlane(clipped, refA, negNormal);
 
         // Convert clipped points to ContactPoints; keep points behind reference face
         for (Vector2 p : clipped) {
             Vector2 toPoint = new Vector2(p).sub(refA);
             float depth = -toPoint.dot(normal) + totalPenetration * 0.1f; // small bias
             if (depth >= -EPSILON) {
-                result.add(new ContactPoint(p, Math.max(0f, depth)));
+                result.add(new ContactPoint(p, max(0f, depth)));
             }
         }
 
@@ -197,13 +202,13 @@ public final class SatCollision {
      */
     private static int findIncidentEdge(List<Vector2> poly, Vector2 direction) {
         int best = 0;
-        float bestDot = Float.MAX_VALUE;
+        float bestDot = -Float.MAX_VALUE;
 
         for (int i = 0; i < poly.size(); i++) {
             Vector2 v1 = poly.get(i);
             Vector2 v2 = poly.get((i + 1) % poly.size());
             Vector2 edge = new Vector2(v2).sub(v1);
-            Vector2 edgeNormal = new Vector2(-edge.y, edge.x).nor();
+            Vector2 edgeNormal = new Vector2(edge.y, -edge.x).nor();
 
             float dot = edgeNormal.dot(direction);
             //use the fact that it is convex to say that the most opposite normal will be the one with the smallest dot product
@@ -220,15 +225,16 @@ public final class SatCollision {
      * Clip a line segment against a half-plane defined by a point and inward normal.
      * Returns the clipped segment (0, 1, or 2 points).
      */
-    private static List<Vector2> clipSegmentToPlane(List<Vector2> segment, Vector2 planePoint, Vector2 planeNormal) {
+    private static List<Vector2> clipSegmentToPlane(List<Vector2> segment, Vector2 planePoint, Vector2 planeTangent) {
         if (segment.size() < 2) return segment;
 
         List<Vector2> result = new ArrayList<>();
         Vector2 start = segment.get(0);
         Vector2 end = segment.get(1);
 
-        float dStart = new Vector2(start).sub(planePoint).dot(planeNormal);
-        float dEnd = new Vector2(end).sub(planePoint).dot(planeNormal);
+        //the plane tangent is the tangent pointing inwards from the edge, so we can use it to determine whether the points are on the correct side
+        float dStart = new Vector2(start).sub(planePoint).dot(planeTangent);
+        float dEnd = new Vector2(end).sub(planePoint).dot(planeTangent);
 
         if (dStart >= -EPSILON) {
             result.add(new Vector2(start));

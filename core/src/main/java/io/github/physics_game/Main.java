@@ -30,7 +30,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
-    final float GRAVITY = -1.8f;
+    final float GRAVITY = -9.8f;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
@@ -101,7 +101,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         squareBody2.setPosition(0.25f, 0.25f);
         squareBody2.setRotationRadians((float)Math.PI / 4f);
 
-        CustomContactHandler.detect(squareBody1, squareBody2);
+        //CustomContactHandler.detect(squareBody1, squareBody2);
 
 
 

@@ -15,7 +15,7 @@ import java.util.List;
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
     final static int NUM_VEL_ITERATIONS = 6;
-    final static int NUM_POS_ITERATIONS = 3;
+    final static int NUM_POS_ITERATIONS = 1;
     final static Vector2 GRAVITY = new Vector2(0, -3f);
     public static void step(ArrayList<PhysicsObject> objects) {
         while(Main.accumulator >= fixedStep) {
@@ -148,7 +148,7 @@ public class PhysicsResolver {
                     for (int j = i + 1; j < objects.size(); j++) {
                         PhysicsObject obj1 = objects.get(i);
                         PhysicsObject obj2 = objects.get(j);
-                        if(resolveCollision(obj1, obj2, true, forces, iteration, false)) {
+                        if(resolveCollision(obj1, obj2, true, forces, iteration, true)) {
                             anyCollision = true;
                         }
                     }
@@ -193,7 +193,6 @@ public class PhysicsResolver {
 
             ContactManifold manifold = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
             if (manifold.isColliding() && manifold.getPointCount() > 0) {
-                Gdx.app.log("PhysicsResolver", "got a manifold at " + manifold.getPoints().get(0).point + " with normal " + manifold.getNormal());
                 Vector2 n = manifold.getNormal();
                 float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
 
@@ -233,8 +232,6 @@ public class PhysicsResolver {
 
 
                     Vector2 impulseN = new Vector2(n).scl(jn);
-                    Gdx.app.log("PhysicsResolver", String.format("Applying normal impulse %.4f at contact point %s between obj%d and obj%d", jn, cp, obj1.getId(), obj2.getId()));
-
                     if (isDebug) {
                         DebugForce impulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(n).scl(0.1f)), new Vector2(impulseN));
                         impulseForceA.setColor(new Color(1f, 0f, 0f, 1f / (iteration + 1)));
@@ -326,16 +323,19 @@ public class PhysicsResolver {
         if (!contact.isColliding()) {
             return false;
         }
-        Gdx.app.log("PhysicsResolver", String.format("Resolving penetration between obj%d and obj%d with depth %.4f", obj1.getId(), obj2.getId(), contact.getMaxPenetration()));
+
+
 
         if(contact.getMaxPenetration() < 0.001f) {
             return false; // Ignore very small penetrations to prevent jitter
         }
 
+        Gdx.app.log("PhysicsResolver", "Resolving penetration between object " + obj1.getId() + " and object " + obj2.getId() + " with penetration depth " + contact.getMaxPenetration());
+
         Vector2 n = contact.getNormal();
         float penetrationDepth = contact.getMaxPenetration();
         float slop = 0.01f;
-        float percent = 0.8f;
+        float percent = 0.15f;
         float correction = Math.max(penetrationDepth - slop, 0f) * percent;
 
         float invMassA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getMass();
