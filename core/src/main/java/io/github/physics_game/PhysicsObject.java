@@ -19,6 +19,7 @@ public abstract class PhysicsObject {
     private List<Vector2> vertices;
     private CustomContactHandler.PolygonBody localBody;
     private List<List<Vector2>> concaveLocalTriangles;
+    private List<List<Vector2>> concaveLocalBest;
     private float startX;
     private float startY;
     private Vector2 com = new Vector2();
@@ -31,6 +32,22 @@ public abstract class PhysicsObject {
         this.vertices = new ArrayList<>(vertices);
         this.localBody = new CustomContactHandler.PolygonBody(vertices);
         this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
+        int prevSize = concaveLocalTriangles.size();
+
+        if(id == 100) {
+            Gdx.app.log("DynamicObject", "Initial triangles: " + concaveLocalTriangles.size());
+        }
+
+        concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalTriangles);
+        int currentSize = concaveLocalBest.size();
+
+        while(concaveLocalBest.size() < prevSize) {
+            prevSize = currentSize;
+            //continuously find if you can simplify
+            concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalBest);
+            currentSize =  concaveLocalBest.size();
+        }
+
         this.startX = startX;
         this.startY = startY;
         this.com = PhysicsResolver.getCenterOfMassPolygon(concaveLocalTriangles);
@@ -70,6 +87,9 @@ public abstract class PhysicsObject {
     }
     public List<List<Vector2>> getConcaveLocalTriangles() {
         return new ArrayList<>(concaveLocalTriangles);
+    }
+    public List<List<Vector2>> getConcaveLocalBest() {
+        return new ArrayList<>(concaveLocalBest);
     }
     public float getStartX() {
         return startX;

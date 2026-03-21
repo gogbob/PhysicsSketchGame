@@ -13,7 +13,7 @@ public class DynamicObject extends PhysicsObject {
     float density = 1f;
     float mass = 0f;
     float inertia = 0f;
-    public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, World world) {
+    public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation) {
         super(id, friction, restitution, vertices, startX, startY, rotation);
         this.density = density;
         mass = PhysicsResolver.getMassOfPolygon(getConcaveLocalTriangles(),  density);

@@ -13,9 +13,9 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import io.github.physics_game.collision.ContactResult;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.collision.EarClippingDecomposer;
+import io.github.physics_game.collision.SatCollision;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,7 +31,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
-    final float GRAVITY = -1.8f;
+    final float GRAVITY = -9.8f;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
@@ -41,7 +41,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
-    private ArrayList<ContactResult> customContacts;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
     private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
     private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
@@ -68,16 +67,42 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(0.2f, -0.7f),
                 new Vector2(-0.7f, -0.7f)
             ),
-            5, 5, 0, world);
+            5, 5, 0);
         exampleLevel = new Level(0, "Example Level", new ArrayList<>());
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
 
-        drawTool = new DrawTool(camera, world, exampleLevel);
+        drawTool = new DrawTool(camera, exampleLevel);
         Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
+
+        CustomContactHandler.PolygonBody squareBody1 = new CustomContactHandler.PolygonBody(
+            Arrays.asList(
+                new Vector2(-0.7f, 0.7f),
+                new Vector2(0.7f, 0.7f),
+                new Vector2(0.7f, -0.7f),
+                new Vector2(-0.7f, -0.7f)
+            )
+        );
+
+        CustomContactHandler.PolygonBody squareBody2 = new CustomContactHandler.PolygonBody(
+            Arrays.asList(
+                new Vector2(-0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, -0.5f),
+                new Vector2(-0.5f, -0.5f)
+            )
+        );
+        squareBody2.setPosition(0.25f, 0.25f);
+        squareBody2.setRotationRadians((float)Math.PI / 4f);
+
+
+        EarClippingDecomposer.mergePolygons(EarClippingDecomposer.decomposeToTriangles(squareBody1.getLocalVertices()));
+        //CustomContactHandler.detect(squareBody1, squareBody2);
+
+
 
         // Place the body near the center of the viewport so it's visible
 //        float startX = viewport.getWorldWidth() / 2f;
@@ -164,11 +189,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
                 if(obj instanceof DynamicObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.YELLOW);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.YELLOW);
                 } else if (obj instanceof StaticObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
                 } else {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
                 }
             }
 
@@ -210,40 +235,54 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     }
 
     private void drawEarTriangles(CustomContactHandler.PolygonBody body,
-                                  List<List<Vector2>> localTriangles,
+                                  List<List<Vector2>> concaveLocalTriangles,
                                   Color color) {
-        if (body == null || localTriangles == null || localTriangles.isEmpty()) {
+        if (body == null || concaveLocalTriangles == null || concaveLocalTriangles.isEmpty()) {
             return;
         }
-
         shapeRenderer.setColor(color);
         Vector2 position = body.getPosition();
         float angle = body.getRotationRadians();
 
-        for (List<Vector2> tri : localTriangles) {
-            Vector2 a = toWorld(tri.get(0), position, angle);
-            Vector2 b = toWorld(tri.get(1), position, angle);
-            Vector2 c = toWorld(tri.get(2), position, angle);
-            shapeRenderer.triangle(a.x, a.y, b.x, b.y, c.x, c.y);
+        for(List<Vector2> concaveLocalTriangle : concaveLocalTriangles) {
+            float[] vertices = new float[concaveLocalTriangle.size() * 2];
+            for (int i = 0; i < concaveLocalTriangle.size(); i++) {
+                Vector2 worldVertex = toWorld(concaveLocalTriangle.get(i), position, angle);
+                vertices[i * 2] = worldVertex.x;
+                vertices[i * 2 + 1] = worldVertex.y;
+            }
+
+            shapeRenderer.triangle(
+                vertices[0], vertices[1],
+                vertices[2], vertices[3],
+                vertices[4], vertices[5]
+            );
+
         }
     }
 
-    private void drawContactNormalOverlay(ArrayList<ContactResult> contact, Color color) {
-        for(ContactResult c : contact) {
-            drawSingleContactNormal(c, color);
-        }
-    }
-
-    private void drawSingleContactNormal(ContactResult contact, Color color) {
-        if (contact == null || !contact.isColliding()) {
+    private void drawPolygons(CustomContactHandler.PolygonBody body,
+                                  List<List<Vector2>> convexLocalBest,
+                                  Color color) {
+        if (body == null || convexLocalBest == null || convexLocalBest.isEmpty()) {
             return;
         }
+        shapeRenderer.setColor(color);
+        Vector2 position = body.getPosition();
+        float angle = body.getRotationRadians();
 
-        Vector2 cp = contact.getContactPoint();
-        Vector2 n = contact.getNormal();
-        drawArrow(cp, n, NORMAL_DEBUG_LENGTH, color);
-        drawMarker(cp, CONTACT_MARK_HALF_SIZE, color);
+        for (List<Vector2> poly : convexLocalBest) {
+            //convert the List<Vector2> to a float[] of vertices for shapeRenderer.polygon()
+            float[] vertices = new float[poly.size() * 2];
+            for (int i = 0; i < poly.size(); i++) {
+                Vector2 worldVertex = toWorld(poly.get(i), position, angle);
+                vertices[i * 2] = worldVertex.x;
+                vertices[i * 2 + 1] = worldVertex.y;
+            }
+            shapeRenderer.polygon(vertices);
+        }
     }
+
 
     private void drawArrow(Vector2 start, Vector2 direction, float scale, Color color) {
         shapeRenderer.setColor(color);

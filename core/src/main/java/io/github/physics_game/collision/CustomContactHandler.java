@@ -3,6 +3,7 @@ package io.github.physics_game.collision;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.PhysicsObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,47 +24,69 @@ public final class CustomContactHandler {
     private CustomContactHandler() {
     }
 
-    public static ContactResult detect(PolygonBody a, PolygonBody b) {
-        if (a == null || b == null) {
-            return ContactResult.NO_CONTACT;
+    public static ContactManifold detect(PhysicsObject a, PhysicsObject b) {
+        if (a == null || a == null) {
+            return ContactManifold.NO_CONTACT;
         }
 
-        List<Vector2> worldA = a.toWorldVertices();
-        List<Vector2> worldB = b.toWorldVertices();
-        if (worldA.size() < 3 || worldB.size() < 3) {
-            return ContactResult.NO_CONTACT;
+        List<List<Vector2>> polysA = toWorld(a);
+        List<List<Vector2>> polysB = toWorld(b);
+        if (polysA.isEmpty() || polysB.isEmpty()) {
+            return ContactManifold.NO_CONTACT;
         }
 
-        List<List<Vector2>> trianglesA = EarClippingDecomposer.decomposeToTriangles(worldA);
-        List<List<Vector2>> trianglesB = EarClippingDecomposer.decomposeToTriangles(worldB);
-        if (trianglesA.isEmpty() || trianglesB.isEmpty()) {
-            return ContactResult.NO_CONTACT;
-        }
+        // Collect best manifold across all triangle pairs, filtering internal edges
+        ContactManifold best = ContactManifold.NO_CONTACT;
+        float bestDepth = -Float.MAX_VALUE;
 
-        ContactResult best = ContactResult.NO_CONTACT;
-        float bestDepth = Float.MAX_VALUE;
-
-        for (List<Vector2> triA : trianglesA) {
-            Aabb aabbA = Aabb.fromPolygon(triA);
-            for (List<Vector2> triB : trianglesB) {
-                Aabb aabbB = Aabb.fromPolygon(triB);
+        for (List<Vector2> pA : polysA) {
+            Aabb aabbA = Aabb.fromPolygon(pA);
+            for (List<Vector2> pB : polysB) {
+                Aabb aabbB = Aabb.fromPolygon(pB);
                 if (!aabbA.overlaps(aabbB)) {
                     continue;
                 }
 
-                ContactResult result = SatCollision.detect(triA, triB);
-                if (!result.isColliding()) {
+                ContactManifold manifold = SatCollision.detect(pA, pB);
+                if (!manifold.isColliding()) {
                     continue;
                 }
-                float d = result.getPenetrationDepth();
-                if(d < bestDepth) {
+
+                // Prefer deeper (more stable) contacts
+                float d = manifold.getMaxPenetration();
+                if (d > bestDepth) {
                     bestDepth = d;
-                    best = result;
+                    best = manifold;
                 }
             }
         }
 
         return best;
+    }
+
+    public static List<List<Vector2>> toWorld(PhysicsObject object) {
+        float rotationRadians = object.getRotation();
+        Vector2 position = object.getPosition();
+
+        List<List<Vector2>> newObject = new ArrayList<>();
+        for(List<Vector2> poly : object.getConcaveLocalBest()) {
+            if (poly.size() < 3) {
+                return Collections.emptyList();
+            }
+
+            float cos = (float) Math.cos(rotationRadians);
+            float sin = (float) Math.sin(rotationRadians);
+
+            List<Vector2> out = new ArrayList<>(poly.size());
+            for (Vector2 v : poly) {
+                float x = v.x * cos - v.y * sin + position.x;
+                float y = v.x * sin + v.y * cos + position.y;
+                out.add(new Vector2(x, y));
+            }
+            newObject.add(out);
+        }
+
+        return newObject;
     }
 
     public static final class PolygonBody {
@@ -110,7 +133,10 @@ public final class CustomContactHandler {
             return out;
         }
 
-        private static List<Vector2> copyVertices(List<Vector2> vertices) {
+        public List<Vector2> getLocalVertices() {
+            return localVertices;
+        }
+        public static List<Vector2> copyVertices(List<Vector2> vertices) {
             List<Vector2> copied = new ArrayList<>();
             if (vertices == null) {
                 return copied;
@@ -138,6 +164,7 @@ public final class CustomContactHandler {
         }
 
         static Aabb fromPolygon(List<Vector2> polygon) {
+            //set a bounding box around the object
             float minX = polygon.get(0).x;
             float minY = polygon.get(0).y;
             float maxX = minX;
