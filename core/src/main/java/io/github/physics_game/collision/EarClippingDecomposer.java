@@ -1,8 +1,10 @@
 package io.github.physics_game.collision;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.Vector2;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -207,6 +209,68 @@ public final class EarClippingDecomposer {
             Vector2 c = cleaned.get(indices.get(i + 1));
             triangles.add(copyTriangle(a, b, c));
         }
+    }
+
+    public static List<List<Vector2>> mergePolygons(List<List<Vector2>> polys) {
+        List<List<Vector2>> polygons = new ArrayList<>(polys.size());
+        for (int i = 0; i < polys.size(); i++) {
+            List<Vector2> poly = polys.get(i);
+            polygons.add(new ArrayList<>(poly));
+            if(poly.size() > 3) {
+                Gdx.app.log("DynamicObject", "Merged poly: " + poly.size());
+            }
+        }
+
+        for (int i = 0; i < polygons.size(); i++) {
+            List<Vector2> currentPoly = polygons.get(i);
+            for (int j = i + 1; j < polygons.size(); j++) {
+                List<Vector2> nextPoly = polygons.get(j);
+                boolean found = false;
+                for (int k = 0; k < currentPoly.size() && !found; k++) {
+                    Vector2 a = currentPoly.get(k);
+                    Vector2 b = currentPoly.get((k + 1) % currentPoly.size());
+                    for (int l = 0; l < nextPoly.size() && !found; l++) {
+                        Vector2 c = nextPoly.get(l);
+                        Vector2 d = nextPoly.get((l + 1) % nextPoly.size());
+                        if (a.epsilonEquals(d, EPSILON) && b.epsilonEquals(c, EPSILON)) {
+                            // Found a shared edge
+                            found = true;
+
+                            //all you have to check for convexness is whether a is at convex
+                            //and b is at convex
+                            int prevIndex = ((k - 1) + currentPoly.size()) % currentPoly.size();
+                            int nextIndex = ((l - 1) + nextPoly.size()) % nextPoly.size();
+                            //keep in mind of counterClockwise order:
+                            //since a arrives before b
+                            //the point before a arrives before in the merged polygon
+                            boolean isACon = isConvex(currentPoly.get(prevIndex), a, nextPoly.get(nextIndex));
+                            prevIndex = (k + 2) % currentPoly.size();
+                            nextIndex = (l + 2) % nextPoly.size();
+                            boolean isBCon = isConvex(nextPoly.get(nextIndex), b, currentPoly.get(prevIndex));
+
+                            // if they are convex merge
+                            if(isACon && isBCon) {
+                                List<Vector2> merged = new ArrayList<>();
+                                //first go through the vertices from k + 1 until k
+                                for (int m = k + 1; m <= k + currentPoly.size() - 1; m++) {
+                                    merged.add(currentPoly.get(m % currentPoly.size()));
+                                }
+
+                                //then go from the point that is equivalent to k around the next poly until the point that is equivalent to k + 1
+                                for (int m = l + 1; m <= l + nextPoly.size() - 1; m++) {
+                                    merged.add(nextPoly.get(m % nextPoly.size()));
+                                }
+                                polygons.set(i, merged);
+                                polygons.remove(j);
+                                j--;
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+        return polygons;
     }
 }
 

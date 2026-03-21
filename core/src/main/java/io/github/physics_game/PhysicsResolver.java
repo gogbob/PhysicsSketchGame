@@ -15,7 +15,7 @@ import java.util.List;
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
     final static int NUM_VEL_ITERATIONS = 6;
-    final static int NUM_POS_ITERATIONS = 1;
+    final static int NUM_POS_ITERATIONS = 3;
     final static Vector2 GRAVITY = new Vector2(0, -3f);
     public static void step(ArrayList<PhysicsObject> objects) {
         while(Main.accumulator >= fixedStep) {
@@ -191,7 +191,7 @@ public class PhysicsResolver {
     public static boolean resolveCollision(PhysicsObject obj1, PhysicsObject obj2, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration, boolean isRun) {
         if (!(obj1 instanceof StaticObject && obj2 instanceof StaticObject)) {
 
-            ContactManifold manifold = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
+            ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
             if (manifold.isColliding() && manifold.getPointCount() > 0) {
                 Vector2 n = manifold.getNormal();
                 float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
@@ -319,7 +319,7 @@ public class PhysicsResolver {
             return false;
         }
 
-        ContactManifold contact = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
+        ContactManifold contact = CustomContactHandler.detect(obj1, obj2);
         if (!contact.isColliding()) {
             return false;
         }

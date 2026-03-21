@@ -13,13 +13,11 @@ public class DrawTool {
     private ArrayList<Vector2> points; // store drew points
     private boolean drawing; // check if it's drawing or not
     private Camera camera;
-    private World world;
     private Level level;
     private int nextId; // give id to objects
 
-    public DrawTool(Camera camera, World world, Level level) {
+    public DrawTool(Camera camera, Level level) {
         this.camera = camera;
-        this.world = world;
         this.level = level;
         this.points = new ArrayList<>();
         this.drawing = false;
@@ -109,8 +107,7 @@ public class DrawTool {
             localPoints, // shape's point
             center.x, // x position
             center.y, // y position
-            0, // rotation angle
-            world // physical world
+            0 // rotation angle
         );
 
         nextId++;  // next object ID + 1
