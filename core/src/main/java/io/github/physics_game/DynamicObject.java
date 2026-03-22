@@ -102,9 +102,20 @@ public class DynamicObject extends PhysicsObject {
         Vector2 linearVelocity = new Vector2(getLinearVelocity());
         float angle = body.getAngle() + getAngularVelocity() * delta;
         Vector2 position = new Vector2(body.getPosition()).add(linearVelocity.scl(delta));
+
+        if (position.y < 2.0f) {
+            position.y = 2.0f;
+            currentVelocity.setZero();
+            currentAngularVelocity = 0f;
+            System.out.println("Object stopped at y=2.0");
+        }
+
         setPosition(position);
         setRotation(angle);
+
     }
+
+
     public void reinitialize() {
             body.setTransform(new Vector2(getStartX(), getStartY()), 0f);
             setLocalPosition(body.getPosition());

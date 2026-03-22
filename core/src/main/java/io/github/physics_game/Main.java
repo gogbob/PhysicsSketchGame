@@ -68,7 +68,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(0.2f, -0.7f),
                 new Vector2(-0.7f, -0.7f)
             ),
-            3, 5, 0, world);
+            3, 3, 0, world);
 
         DynamicObject exampleObject2 = new DynamicObject(0, 0.5f, 0.5f, Arrays.asList(
             new Vector2(-0.7f, 0.7f),
@@ -78,7 +78,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             new Vector2(0.2f, -0.7f),
             new Vector2(-0.7f, -0.7f)
         ),
-            3, 7, 0 ,world);
+            6, 4, 0 ,world);
         exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);

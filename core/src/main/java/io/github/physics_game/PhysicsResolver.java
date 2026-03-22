@@ -63,8 +63,9 @@ public class PhysicsResolver {
                 }
             }
 
-            //correct the positions to prevent sinking due to numerical errors
 
+            //correct the positions to prevent sinking due to numerical errors
+            /*
             for(int iteration = 0; iteration < NUM_POS_ITERATIONS; iteration++) {
                 boolean anyCorrection = false;
                 for (int i = 0; i < objects.size(); i++) {
@@ -80,6 +81,8 @@ public class PhysicsResolver {
                     break;
                 }
             }
+
+             */
 
             accumulator -= fixedStep;
         }
@@ -148,6 +151,7 @@ public class PhysicsResolver {
                 }
             }
 
+            /*
             //correct the positions to prevent sinking due to numerical errors
             boolean anyCorrection = false;
             for(int iteration = 0; iteration < NUM_POS_ITERATIONS; iteration++) {
@@ -165,6 +169,8 @@ public class PhysicsResolver {
                     break;
                 }
             }
+
+             */
 
             accumulator -= fixedStep;
         }

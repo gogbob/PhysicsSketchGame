@@ -16,10 +16,24 @@ public class Level {
         this.levelId = levelId;
         this.levelName = levelName;
         physicsObjects.addAll(internalObjects);
-        List<Vector2> floorPoly = Arrays.asList(new Vector2(0, 0), new Vector2(10, 0), new Vector2(10, 1), new Vector2(0, 1));
-        StaticObject floor = new StaticObject(-1, 0.5f, 0.5f, floorPoly, 0, 0, 0, world);
 
-        List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 10), new Vector2(0, 10));
+
+        List<Vector2> floorPoly = Arrays.asList(
+            new Vector2(0, 0),
+            new Vector2(10, 0),
+            new Vector2(10, 1.0f),
+            new Vector2(0, 1.0f)
+        );
+        StaticObject floor = new StaticObject(-1, 0.5f, 0.1f, floorPoly, 0, 0.5f, 0, world);
+
+
+
+        List<Vector2> wallPoly = Arrays.asList(
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(1, 10),
+            new Vector2(0, 10)
+        );
         StaticObject leftWall = new StaticObject(-2, 0.5f, 0.5f, wallPoly, 0, 0, 0, world);
         StaticObject rightWall = new StaticObject(-3, 0.5f, 0.5f, wallPoly, 9, 0, 0, world);
 
@@ -29,8 +43,10 @@ public class Level {
     }
 
     public ArrayList<PhysicsObject> getPhysicsObjects() {
-        return new ArrayList<>(physicsObjects);
+        return physicsObjects;
+        //return new ArrayList<>(physicsObjects);
     }
+
     public void addPhysicsObject(PhysicsObject obj) {
         physicsObjects.add(obj);
     }
