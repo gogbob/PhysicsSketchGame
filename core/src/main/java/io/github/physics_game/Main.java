@@ -13,7 +13,9 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import io.github.physics_game.collision.*;
+import io.github.physics_game.collision.CustomContactHandler;
+import io.github.physics_game.collision.EarClippingDecomposer;
+import io.github.physics_game.collision.SatCollision;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,16 +30,14 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     World world;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
-    float accumulator = 0f;
-    final float GRAVITY = -1.8f;
+    public static float accumulator = 0f;
+    final float GRAVITY = -9.8f;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
 
-
     // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
-
 
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
@@ -47,6 +47,9 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     private DynamicObject dynamicObject;
     private StaticObject floorObject;
     private Level exampleLevel;
+    private DrawTool drawTool;
+
+
     @Override
     public void create() {
         Box2D.init();
@@ -59,7 +62,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
-        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.5f,
+        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
                 new Vector2(0.7f, 0.7f),
@@ -68,23 +71,42 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(0.2f, -0.7f),
                 new Vector2(-0.7f, -0.7f)
             ),
-            3, 3, 0, world);
-
-        DynamicObject exampleObject2 = new DynamicObject(0, 0.5f, 0.5f, Arrays.asList(
-            new Vector2(-0.7f, 0.7f),
-            new Vector2(0.7f, 0.7f),
-            new Vector2(0.7f, 0.2f),
-            new Vector2(0.2f, 0.2f),
-            new Vector2(0.2f, -0.7f),
-            new Vector2(-0.7f, -0.7f)
-        ),
-            6, 4, 0 ,world);
-        exampleLevel = new Level(0, "Example Level", new ArrayList<>(), world);
+            5, 5, 0);
+        exampleLevel = new Level(0, "Example Level", new ArrayList<>());
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
-        exampleLevel.addPhysicsObject(exampleObject2);
+
+        drawTool = new DrawTool(camera, exampleLevel);
+        Gdx.app.log("Main", "DrawTool created!");
+
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
+
+        CustomContactHandler.PolygonBody squareBody1 = new CustomContactHandler.PolygonBody(
+            Arrays.asList(
+                new Vector2(-0.7f, 0.7f),
+                new Vector2(0.7f, 0.7f),
+                new Vector2(0.7f, -0.7f),
+                new Vector2(-0.7f, -0.7f)
+            )
+        );
+
+        CustomContactHandler.PolygonBody squareBody2 = new CustomContactHandler.PolygonBody(
+            Arrays.asList(
+                new Vector2(-0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, -0.5f),
+                new Vector2(-0.5f, -0.5f)
+            )
+        );
+        squareBody2.setPosition(0.25f, 0.25f);
+        squareBody2.setRotationRadians((float)Math.PI / 4f);
+
+
+        EarClippingDecomposer.mergePolygons(EarClippingDecomposer.decomposeToTriangles(squareBody1.getLocalVertices()));
+        //CustomContactHandler.detect(squareBody1, squareBody2);
+
+
 
         // Place the body near the center of the viewport so it's visible
 //        float startX = viewport.getWorldWidth() / 2f;
@@ -110,6 +132,10 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
 
         float delta = Gdx.graphics.getDeltaTime();
+
+        drawTool.update();
+
+
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
         logTimer += delta;
@@ -135,7 +161,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         if(!showDebugOverlay) {
             //Normal view
             if(runPhysics){
-                PhysicsResolver.step(accumulator, exampleLevel.getPhysicsObjects());
+                PhysicsResolver.step(exampleLevel.getPhysicsObjects());
             }
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
@@ -143,27 +169,41 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
                 drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), (obj instanceof StaticObject)? Color.GRAY : Color.WHITE);
             }
+
+            // draw the drawing line
+            if (drawTool.isDrawing()) {
+                ArrayList<Vector2> pts = drawTool.getPoints();
+                if (pts.size() > 1) {
+                    shapeRenderer.setColor(Color.GREEN);
+                    for (int j = 0; j < pts.size() - 1; j++) {
+                        Vector2 p1 = pts.get(j);
+                        Vector2 p2 = pts.get(j + 1);
+                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
+                    }
+                }
+            }
+
             shapeRenderer.end();
 
             camera.update();
         } else {
             //Debug view
             debugRenderer.render(world, camera.combined);
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(accumulator, exampleLevel.getPhysicsObjects());
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(exampleLevel.getPhysicsObjects());
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
                 if(obj instanceof DynamicObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.YELLOW);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.YELLOW);
                 } else if (obj instanceof StaticObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
                 } else {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
                 }
             }
 
             for(DebugForce f : forces) {
-                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len() * 10f, f.getColor());
+                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
             }
 
             shapeRenderer.end();
@@ -200,23 +240,54 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     }
 
     private void drawEarTriangles(CustomContactHandler.PolygonBody body,
-                                  List<List<Vector2>> localTriangles,
+                                  List<List<Vector2>> concaveLocalTriangles,
                                   Color color) {
-        if (body == null || localTriangles == null || localTriangles.isEmpty()) {
+        if (body == null || concaveLocalTriangles == null || concaveLocalTriangles.isEmpty()) {
             return;
         }
-
         shapeRenderer.setColor(color);
         Vector2 position = body.getPosition();
         float angle = body.getRotationRadians();
 
-        for (List<Vector2> tri : localTriangles) {
-            Vector2 a = toWorld(tri.get(0), position, angle);
-            Vector2 b = toWorld(tri.get(1), position, angle);
-            Vector2 c = toWorld(tri.get(2), position, angle);
-            shapeRenderer.triangle(a.x, a.y, b.x, b.y, c.x, c.y);
+        for(List<Vector2> concaveLocalTriangle : concaveLocalTriangles) {
+            float[] vertices = new float[concaveLocalTriangle.size() * 2];
+            for (int i = 0; i < concaveLocalTriangle.size(); i++) {
+                Vector2 worldVertex = toWorld(concaveLocalTriangle.get(i), position, angle);
+                vertices[i * 2] = worldVertex.x;
+                vertices[i * 2 + 1] = worldVertex.y;
+            }
+
+            shapeRenderer.triangle(
+                vertices[0], vertices[1],
+                vertices[2], vertices[3],
+                vertices[4], vertices[5]
+            );
+
         }
     }
+
+    private void drawPolygons(CustomContactHandler.PolygonBody body,
+                                  List<List<Vector2>> convexLocalBest,
+                                  Color color) {
+        if (body == null || convexLocalBest == null || convexLocalBest.isEmpty()) {
+            return;
+        }
+        shapeRenderer.setColor(color);
+        Vector2 position = body.getPosition();
+        float angle = body.getRotationRadians();
+
+        for (List<Vector2> poly : convexLocalBest) {
+            //convert the List<Vector2> to a float[] of vertices for shapeRenderer.polygon()
+            float[] vertices = new float[poly.size() * 2];
+            for (int i = 0; i < poly.size(); i++) {
+                Vector2 worldVertex = toWorld(poly.get(i), position, angle);
+                vertices[i * 2] = worldVertex.x;
+                vertices[i * 2 + 1] = worldVertex.y;
+            }
+            shapeRenderer.polygon(vertices);
+        }
+    }
+
 
     private void drawArrow(Vector2 start, Vector2 direction, float scale, Color color) {
         shapeRenderer.setColor(color);

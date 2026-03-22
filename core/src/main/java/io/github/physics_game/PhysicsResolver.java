@@ -10,14 +10,15 @@ import io.github.physics_game.collision.ContactPoint;
 import io.github.physics_game.collision.CustomContactHandler;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
     final static int NUM_VEL_ITERATIONS = 6;
     final static int NUM_POS_ITERATIONS = 3;
-    final static Vector2 GRAVITY = new Vector2(0, -0.03f);
-    public static void step(float accumulator, ArrayList<PhysicsObject> objects) {
-        while(accumulator >= fixedStep) {
+    final static Vector2 GRAVITY = new Vector2(0, -3f);
+    public static void step(ArrayList<PhysicsObject> objects) {
+        while(Main.accumulator >= fixedStep) {
             // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.
 
             //1. Integrate forces → update velocity
@@ -46,7 +47,7 @@ public class PhysicsResolver {
                     for (int j = i + 1; j < objects.size(); j++) {
                         PhysicsObject obj1 = objects.get(i);
                         PhysicsObject obj2 = objects.get(j);
-                        if(resolveCollision(obj1, obj2, false, null, iteration)) {
+                        if(resolveCollision(obj1, obj2, false, null, iteration, true)) {
                             anyCollision = true;
                         }
                     }
@@ -63,9 +64,8 @@ public class PhysicsResolver {
                 }
             }
 
-
             //correct the positions to prevent sinking due to numerical errors
-            /*
+
             for(int iteration = 0; iteration < NUM_POS_ITERATIONS; iteration++) {
                 boolean anyCorrection = false;
                 for (int i = 0; i < objects.size(); i++) {
@@ -82,13 +82,11 @@ public class PhysicsResolver {
                 }
             }
 
-             */
-
-            accumulator -= fixedStep;
+            Main.accumulator -= fixedStep;
         }
     }
 
-    public static ArrayList<DebugForce> stepWithDebug(float accumulator, ArrayList<PhysicsObject> objects) {
+    public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects) {
 
         ArrayList<DebugForce> forces = new ArrayList<>();
 
@@ -99,16 +97,31 @@ public class PhysicsResolver {
                 forces.add(velForce);
             }
         }
-        if(accumulator < fixedStep) {
+        if(Main.accumulator < fixedStep) {
             for (PhysicsObject obj : objects) {
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
                     forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass())));
                 }
             }
-            return forces;
+            for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {
+                boolean anyCollision = false;
+                for (int i = 0; i < objects.size(); i++) {
+                    for (int j = i + 1; j < objects.size(); j++) {
+                        PhysicsObject obj1 = objects.get(i);
+                        PhysicsObject obj2 = objects.get(j);
+                        if(resolveCollision(obj1, obj2, true, forces, iteration, false)) {
+                            anyCollision = true;
+                        }
+                    }
+                }
+                if(!anyCollision) {
+                    break;
+                }
+            }
         }
-        while(accumulator >= fixedStep) {
+
+        while(Main.accumulator >= fixedStep) {
             //1. Integrate forces → update velocity
             //2. Detect collisions
             //3. Build contact constraints
@@ -123,6 +136,7 @@ public class PhysicsResolver {
                     Vector2 currentVelocity = dynObj.getLinearVelocity();
                     Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
                     dynObj.setLinearVelocity(newVelocity);
+                    forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass())));
                 }
             }
 
@@ -134,7 +148,7 @@ public class PhysicsResolver {
                     for (int j = i + 1; j < objects.size(); j++) {
                         PhysicsObject obj1 = objects.get(i);
                         PhysicsObject obj2 = objects.get(j);
-                        if(resolveCollision(obj1, obj2, true, forces, iteration)) {
+                        if(resolveCollision(obj1, obj2, true, forces, iteration, true)) {
                             anyCollision = true;
                         }
                     }
@@ -151,7 +165,6 @@ public class PhysicsResolver {
                 }
             }
 
-            /*
             //correct the positions to prevent sinking due to numerical errors
             boolean anyCorrection = false;
             for(int iteration = 0; iteration < NUM_POS_ITERATIONS; iteration++) {
@@ -170,17 +183,16 @@ public class PhysicsResolver {
                 }
             }
 
-             */
-
-            accumulator -= fixedStep;
+            Main.accumulator -= fixedStep;
         }
         return forces;
     }
 
-    public static boolean resolveCollision(PhysicsObject obj1, PhysicsObject obj2, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration) {
+    public static boolean resolveCollision(PhysicsObject obj1, PhysicsObject obj2, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration, boolean isRun) {
         if (!(obj1 instanceof StaticObject && obj2 instanceof StaticObject)) {
-            ContactManifold manifold = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
-            if (manifold.isColliding()) {
+
+            ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+            if (manifold.isColliding() && manifold.getPointCount() > 0) {
                 Vector2 n = manifold.getNormal();
                 float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
 
@@ -218,8 +230,8 @@ public class PhysicsResolver {
                     // Distribute impulse over contact count for stability
                     jn /= manifold.getPointCount();
 
-                    Vector2 impulseN = new Vector2(n).scl(jn);
 
+                    Vector2 impulseN = new Vector2(n).scl(jn);
                     if (isDebug) {
                         DebugForce impulseForceA = new DebugForce(new Vector2(cp).add(new Vector2(n).scl(0.1f)), new Vector2(impulseN));
                         impulseForceA.setColor(new Color(1f, 0f, 0f, 1f / (iteration + 1)));
@@ -231,7 +243,7 @@ public class PhysicsResolver {
 
 
                     // Apply impulse to obj1
-                    if (obj1 instanceof DynamicObject) {
+                    if (obj1 instanceof DynamicObject && isRun) {
                         DynamicObject dynObj1 = (DynamicObject) obj1;
                         //substract since impulse is in the same direction as the normal, which points from obj1 to obj2
                         Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(impulseN).scl(invMassA));
@@ -240,7 +252,7 @@ public class PhysicsResolver {
                         dynObj1.setAngularVelocity(newAngularVelA);
                     }
                     // Apply impulse to obj2
-                    if (obj2 instanceof DynamicObject) {
+                    if (obj2 instanceof DynamicObject && isRun) {
                         DynamicObject dynObj2 = (DynamicObject) obj2;
                         Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(impulseN).scl(invMassB));
                         float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(impulseN) * invInertiaB;
@@ -279,7 +291,7 @@ public class PhysicsResolver {
                             debugForces.add(frictionImpulseForceB);
                         }
                         // Apply friction impulse to obj1
-                        if (obj1 instanceof DynamicObject) {
+                        if (obj1 instanceof DynamicObject && isRun) {
                             DynamicObject dynObj1 = (DynamicObject) obj1;
                             Vector2 newLinearVelA = new Vector2(dynObj1.getLinearVelocity()).sub(new Vector2(frictionImpulse).scl(invMassA));
                             float newAngularVelA = dynObj1.getAngularVelocity() - rA.crs(frictionImpulse) * invInertiaA;
@@ -287,7 +299,7 @@ public class PhysicsResolver {
                             dynObj1.setAngularVelocity(newAngularVelA);
                         }
                         // Apply friction impulse to obj2
-                        if (obj2 instanceof DynamicObject) {
+                        if (obj2 instanceof DynamicObject && isRun) {
                             DynamicObject dynObj2 = (DynamicObject) obj2;
                             Vector2 newLinearVelB = new Vector2(dynObj2.getLinearVelocity()).add(new Vector2(frictionImpulse).scl(invMassB));
                             float newAngularVelB = dynObj2.getAngularVelocity() + rB.crs(frictionImpulse) * invInertiaB;
@@ -307,10 +319,24 @@ public class PhysicsResolver {
             return false;
         }
 
-        ContactManifold contact = CustomContactHandler.detect(obj1.getLocalBody(), obj2.getLocalBody());
+        ContactManifold contact = CustomContactHandler.detect(obj1, obj2);
         if (!contact.isColliding()) {
             return false;
         }
+
+        Gdx.app.log("PhysicsResolver", "Resolving penetration between object " + obj1.getId() + " and object " + obj2.getId() + " with penetration depth " + contact.getMaxPenetration());
+
+        if(contact.getMaxPenetration() > 1f) {
+            Gdx.app.log("PhysicsResolver", "Collision detected between object " + obj1.getId() + " and object " + obj2.getId() + " with penetration depth " + contact.getMaxPenetration());
+        }
+
+
+
+        if(contact.getMaxPenetration() < 0.001f) {
+            return false; // Ignore very small penetrations to prevent jitter
+        }
+
+        Gdx.app.log("PhysicsResolver", "Resolving penetration between object " + obj1.getId() + " and object " + obj2.getId() + " with penetration depth " + contact.getMaxPenetration());
 
         Vector2 n = contact.getNormal();
         float penetrationDepth = contact.getMaxPenetration();
@@ -348,5 +374,92 @@ public class PhysicsResolver {
         // v + w x r
         Vector2 tangentialVel = new Vector2(-r.y, r.x).scl(angularVel);
         return new Vector2(linearVel).add(tangentialVel);
+    }
+
+    public static Vector2 getCenterOfMassTriangle(Vector2 a, Vector2 b, Vector2 c) {
+        return new Vector2((a.x + b.x + c.x) / 3f, (a.y + b.y + c.y) / 3f);
+    }
+    public static float getMassOfTriangle(Vector2 a, Vector2 b, Vector2 c, float density) {
+        //Area of the triangle is A = bh/2
+        //which converts to A = |(x1(y2 - y3) + x2(y3 - y1) + x3(y1 - y2)) / 2| for vertices (x1, y1), (x2, y2), (x3, y3)
+        //and M = A * density
+        return Math.abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2f) * density;
+    }
+    public static float getMomentOfInertiaTriangle(Vector2 a, Vector2 b, Vector2 c, float mass) {
+        //I_z = (m/6) * (a^2 + b^2 + c^2) where a, b, c are the distances from the center of mass to the vertices
+        float inertia = (mass *
+            (a.dst2(getCenterOfMassTriangle(a, b, c)) + b.dst2(getCenterOfMassTriangle(a, b, c)) +
+                c.dst2(getCenterOfMassTriangle(a, b, c)))) / 6f;
+        return inertia;
+    }
+
+    public static Vector2 getCenterOfMassPolygon(List<List<Vector2>> triangles, List<Float> densities) {
+        Vector2 sum = new Vector2();
+        //make a weight average of the centers of mass of triangles
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                sum.add(new Vector2(getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)))
+                    .scl(getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri)))));
+            }
+        }
+        return sum.scl(1f / triangles.size());
+    }
+
+    public static Vector2 getCenterOfMassPolygon(List<List<Vector2>> triangles) {
+        Vector2 sum = new Vector2();
+        //make a weight average of the centers of mass of triangles
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                sum.add(new Vector2(getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)))
+                    .scl(getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), 1f)));
+            }
+        }
+        return sum.scl(1f / triangles.size());
+    }
+
+    public static float getMassOfPolygon(List<List<Vector2>> triangles, List<Float> densities) {
+        float area = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                area +=getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri)));
+            }
+        }
+        return area;
+    }
+
+    public static float getMassOfPolygon(List<List<Vector2>> triangles, float density) {
+        float area = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                area +=getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density);
+            }
+        }
+        return area;
+    }
+
+    public static float getMomentOfInertiaPolygon(List<List<Vector2>> triangles, List<Float> densities) {
+        float inertia = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                //use parallel axis theorem to calculate the total moment of inertia:
+                //I_total = I_triangle + m_triangle * d^2
+                inertia += getMomentOfInertiaTriangle(tri.get(0), tri.get(1), tri.get(2),
+                    getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri))));
+            }
+        }
+        return inertia;
+    }
+
+    public static float getMomentOfInertiaPolygon(List<List<Vector2>> triangles, float density) {
+        float inertia = 0f;
+        for (List<Vector2> tri : triangles) {
+            if (tri.size() == 3) {
+                //use parallel axis theorem to calculate the total moment of inertia:
+                //I_total = I_triangle + m_triangle * d^2
+                inertia += getMomentOfInertiaTriangle(tri.get(0), tri.get(1), tri.get(2),
+                    getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density));
+            }
+        }
+        return inertia;
     }
 }

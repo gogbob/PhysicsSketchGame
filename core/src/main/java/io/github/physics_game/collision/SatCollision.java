@@ -5,6 +5,9 @@ import com.badlogic.gdx.math.Vector2;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.lang.Math.max;
+import static java.lang.Math.min;
+
 /**
  * Convex polygon collision test using the Separating Axis Theorem (SAT).
  */
@@ -20,8 +23,8 @@ public final class SatCollision {
         }
 
         float minOverlap = Float.MAX_VALUE;
-        Vector2 bestAxis = null;
         int refEdgeA = -1;
+        Vector2 bestAxis = null;
 
         EdgeTestResult fromA = testAxesWithEdge(polygonA, polygonA, polygonB, minOverlap, bestAxis);
         if (!fromA.hasCollision) {
@@ -44,12 +47,12 @@ public final class SatCollision {
         Vector2 centerB = centroid(polygonB);
         Vector2 centerDelta = new Vector2(centerB).sub(centerA);
 
-        // Choose reference edge: use polygon with minimum overlap if it's significantly smaller
+        // Choose reference polygon: use one with minimum overlap if significantly smaller
         boolean useB = (minOverlapB < minOverlap * 0.95f);
         List<Vector2> refPoly = useB ? polygonB : polygonA;
         List<Vector2> incPoly = useB ? polygonA : polygonB;
-        Vector2 normal = useB ? bestAxisB : bestAxis;
-        int refEdgeIdx = useB ? refEdgeB : refEdgeA;
+        Vector2 normal = useB ? new Vector2(bestAxisB) : new Vector2(bestAxis);
+        int refEdgeIdx = useB ? refEdgeB : refEdgeA;  // USE THE EDGE THAT PRODUCED MIN OVERLAP
         float pen = useB ? minOverlapB : minOverlap;
 
         // Ensure normal convention is always A -> B.
@@ -58,7 +61,7 @@ public final class SatCollision {
         }
 
         // Generate manifold with edge clipping
-        List<ContactPoint> manifoldPoints = clipEdges(refPoly, incPoly, normal, refEdgeIdx, pen);
+        List<ContactPoint> manifoldPoints = findEdgeIntersection(refPoly, incPoly, normal, pen);
         return new ContactManifold(true, normal, manifoldPoints);
     }
 
@@ -79,7 +82,7 @@ public final class SatCollision {
         }
     }
 
-    private static EdgeTestResult testAxesWithEdge(List<Vector2> axisSource,
+    public static EdgeTestResult testAxesWithEdge(List<Vector2> axisSource,
                                                     List<Vector2> polygonA,
                                                     List<Vector2> polygonB,
                                                     float currentMinOverlap,
@@ -97,12 +100,12 @@ public final class SatCollision {
                 continue;
             }
 
-            Vector2 axis = new Vector2(-edge.y, edge.x).nor();
+            Vector2 axis = new Vector2(edge.y, -edge.x).nor();
 
             Projection pA = projectPolygon(axis, polygonA);
             Projection pB = projectPolygon(axis, polygonB);
 
-            float overlap = Math.min(pA.max, pB.max) - Math.max(pA.min, pB.min);
+            float overlap = pA.max - pB.min;
             if (overlap <= 0f) {
                 return new EdgeTestResult(false, axis, overlap, i);
             }
@@ -117,117 +120,100 @@ public final class SatCollision {
         return new EdgeTestResult(true, bestAxis, minOverlap, bestEdgeIdx);
     }
 
-    /**
-     * Clip incident edge against reference face to generate up to 2 contact points.
-     */
-    private static List<ContactPoint> clipEdges(List<Vector2> refPoly, List<Vector2> incPoly,
-                                                 Vector2 normal, int refEdgeIdx, float totalPenetration) {
-        List<ContactPoint> result = new ArrayList<>();
+    public static List<ContactPoint> findEdgeIntersection(List<Vector2> polyA, List<Vector2> polyB, Vector2 normal, float penetrationDepth) {
+        List<ContactPoint> contactPoints = new ArrayList<>();
 
-        // Reference edge vertices
-        Vector2 refA = refPoly.get(refEdgeIdx);
-        Vector2 refB = refPoly.get((refEdgeIdx + 1) % refPoly.size());
-        Vector2 refEdge = new Vector2(refB).sub(refA);
+        for (int i = 0; i < polyA.size(); i++) {
+            Vector2 a1 = polyA.get(i);
+            Vector2 a2 = polyA.get((i + 1) % polyA.size());
 
-        // Find incident edge: opposite normal direction
-        Vector2 negNormal = new Vector2(normal).scl(-1f);
-        int incEdgeIdx = findIncidentEdge(incPoly, negNormal);
-        Vector2 incA = incPoly.get(incEdgeIdx);
-        Vector2 incB = incPoly.get((incEdgeIdx + 1) % incPoly.size());
+            for(int j = 0; j < polyB.size(); j++) {
+                Vector2 b1 = polyB.get(j);
+                Vector2 b2 = polyB.get((j + 1) % polyB.size());
 
-        // Clip incident edge against reference edge side planes
-        List<Vector2> clipped = new ArrayList<>();
-        clipped.add(new Vector2(incA));
-        clipped.add(new Vector2(incB));
+                Vector2 intersection = lineSegmentIntersection(a1, a2, b1, b2);
+                if(intersection != null) {
 
-        // Clip against left plane of reference edge
-        Vector2 leftNormal = new Vector2(-refEdge.y, refEdge.x).nor();
-        clipped = clipSegmentToPlane(clipped, refA, leftNormal);
-        if (clipped.size() < 2) return result;
+                    float depth = penetrationDepth;
+                    contactPoints.add(new ContactPoint(intersection, depth));
 
-        // Clip against right plane of reference edge
-        Vector2 rightNormal = new Vector2(refEdge.y, -refEdge.x).nor();
-        clipped = clipSegmentToPlane(clipped, refB, rightNormal);
-        if (clipped.size() < 2) return result;
-
-        // Clip against reference face plane (normal pointing into incident poly)
-        clipped = clipSegmentToPlane(clipped, refA, normal);
-
-        // Convert clipped points to ContactPoints; keep points behind reference face
-        for (Vector2 p : clipped) {
-            Vector2 toPoint = new Vector2(p).sub(refA);
-            float depth = -toPoint.dot(normal) + totalPenetration * 0.1f; // small bias
-            if (depth >= -EPSILON) {
-                result.add(new ContactPoint(p, Math.max(0f, depth)));
-            }
-        }
-
-        // If we got too many or too few, pick the deepest point + one more
-        if (result.size() > 2) {
-            ContactPoint deepest = result.get(0);
-            int deepestIdx = 0;
-            for (int i = 1; i < result.size(); i++) {
-                if (result.get(i).penetration > deepest.penetration) {
-                    deepest = result.get(i);
-                    deepestIdx = i;
+                    // Only keep up to 2 contacts
+                    if (contactPoints.size() >= 2) {
+                        return contactPoints;
+                    }
                 }
             }
-            // Keep deepest and one neighbor if available
-            List<ContactPoint> pruned = new ArrayList<>();
-            pruned.add(deepest);
-            if (deepestIdx > 0) {
-                pruned.add(result.get(deepestIdx - 1));
-            } else if (result.size() > 1) {
-                pruned.add(result.get(1));
-            }
-            result = pruned;
         }
 
-        // Fallback: if no points, use original edge center estimate
-        if (result.isEmpty()) {
-            Vector2 cp = new Vector2(incA).add(incB).scl(0.5f);
-            result.add(new ContactPoint(cp, totalPenetration));
-        }
-
-        return result;
+        return contactPoints;
     }
 
-    /**
-     * Find the incident edge: the edge whose outward normal is most opposite to the given direction.
-     */
-    private static int findIncidentEdge(List<Vector2> poly, Vector2 direction) {
-        int best = 0;
-        float bestDot = Float.MAX_VALUE;
+    private static Vector2 lineSegmentIntersection(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2) {
+        float x1 =  a1.x;
+        float y1 = a1.y;
+        float x2 =  a2.x;
+        float y2 = a2.y;
+        float x3 =  b1.x;
+        float y3 = b1.y;
+        float x4 =  b2.x;
+        float y4 = b2.y;
+
+        float denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+
+        float t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+        float u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denom;
+
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            return new Vector2(x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+        }
+
+        return null;
+    }
+
+    private static float distancePointToPolygonBoundary(Vector2 point, List<Vector2> poly) {
+        float minDist = Float.MAX_VALUE;
 
         for (int i = 0; i < poly.size(); i++) {
             Vector2 v1 = poly.get(i);
             Vector2 v2 = poly.get((i + 1) % poly.size());
-            Vector2 edge = new Vector2(v2).sub(v1);
-            Vector2 edgeNormal = new Vector2(-edge.y, edge.x).nor();
 
-            float dot = edgeNormal.dot(direction);
-            if (dot < bestDot) {
-                bestDot = dot;
-                best = i;
-            }
+            // Distance from point to edge
+            float dist = distancePointToSegment(point, v1, v2);
+            minDist = Math.min(minDist, dist);
         }
 
-        return best;
+        return minDist;
     }
 
+    private static float distancePointToSegment(Vector2 p, Vector2 a, Vector2 b) {
+        Vector2 ab = new Vector2(b).sub(a);
+        Vector2 ap = new Vector2(p).sub(a);
+
+        float abLen2 = ab.len2();
+        if (abLen2 < EPSILON) {
+            return ap.len(); // a and b are the same
+        }
+
+        float t = ap.dot(ab) / abLen2;
+        t = Math.max(0, Math.min(1, t)); // Clamp to segment
+
+        Vector2 closest = new Vector2(a).add(new Vector2(ab).scl(t));
+        return new Vector2(p).sub(closest).len();
+    }
     /**
      * Clip a line segment against a half-plane defined by a point and inward normal.
      * Returns the clipped segment (0, 1, or 2 points).
      */
-    private static List<Vector2> clipSegmentToPlane(List<Vector2> segment, Vector2 planePoint, Vector2 planeNormal) {
+    private static List<Vector2> clipSegmentToPlane(List<Vector2> segment, Vector2 planePoint, Vector2 planeTangent) {
         if (segment.size() < 2) return segment;
 
         List<Vector2> result = new ArrayList<>();
         Vector2 start = segment.get(0);
         Vector2 end = segment.get(1);
 
-        float dStart = new Vector2(start).sub(planePoint).dot(planeNormal);
-        float dEnd = new Vector2(end).sub(planePoint).dot(planeNormal);
+        //the plane tangent is the tangent pointing inwards from the edge, so we can use it to determine whether the points are on the correct side
+        float dStart = new Vector2(start).sub(planePoint).dot(planeTangent);
+        float dEnd = new Vector2(end).sub(planePoint).dot(planeTangent);
 
         if (dStart >= -EPSILON) {
             result.add(new Vector2(start));
@@ -275,138 +261,7 @@ public final class SatCollision {
         return new Vector2(x / polygon.size(), y / polygon.size());
     }
 
-    private static Vector2 supportPoint(List<Vector2> polygon, Vector2 direction) {
-        Vector2 best = polygon.get(0);
-        float bestDot = best.dot(direction);
 
-        for (int i = 1; i < polygon.size(); i++) {
-            Vector2 candidate = polygon.get(i);
-            float dot = candidate.dot(direction);
-            if (dot > bestDot) {
-                bestDot = dot;
-                best = candidate;
-            }
-        }
-
-        return new Vector2(best);
-    }
-
-    private static Vector2 estimateContactPoint(List<Vector2> polygonA, List<Vector2> polygonB, Vector2 normal) {
-        List<Vector2> overlap = intersectConvexPolygons(polygonA, polygonB);
-        if (!overlap.isEmpty()) {
-            return polygonCentroid(overlap);
-        }
-
-        // Fallback for degenerate intersections (parallel/near-zero area overlap).
-        Vector2 supportA = supportPoint(polygonA, normal);
-        Vector2 supportB = supportPoint(polygonB, new Vector2(normal).scl(-1f));
-        return new Vector2(supportA).add(supportB).scl(0.5f);
-    }
-
-    /**
-     * Sutherland-Hodgman clipping for convex polygons in world space.
-     * The result is the convex overlap polygon (possibly empty).
-     */
-    private static List<Vector2> intersectConvexPolygons(List<Vector2> subject, List<Vector2> clip) {
-        List<Vector2> output = new ArrayList<>();
-        for (Vector2 v : subject) {
-            output.add(new Vector2(v));
-        }
-
-        boolean clipIsCcw = signedArea(clip) >= 0f;
-
-        for (int i = 0; i < clip.size(); i++) {
-            Vector2 clipA = clip.get(i);
-            Vector2 clipB = clip.get((i + 1) % clip.size());
-
-            List<Vector2> input = output;
-            output = new ArrayList<>();
-            if (input.isEmpty()) {
-                break;
-            }
-
-            Vector2 s = input.get(input.size() - 1);
-            for (Vector2 e : input) {
-                boolean eInside = isInsideHalfPlane(e, clipA, clipB, clipIsCcw);
-                boolean sInside = isInsideHalfPlane(s, clipA, clipB, clipIsCcw);
-
-                if (eInside) {
-                    if (!sInside) {
-                        output.add(lineIntersection(s, e, clipA, clipB));
-                    }
-                    output.add(new Vector2(e));
-                } else if (sInside) {
-                    output.add(lineIntersection(s, e, clipA, clipB));
-                }
-
-                s = e;
-            }
-        }
-
-        return output;
-    }
-
-    private static boolean isInsideHalfPlane(Vector2 p, Vector2 edgeA, Vector2 edgeB, boolean edgeCcw) {
-        Vector2 edge = new Vector2(edgeB).sub(edgeA);
-        Vector2 ap = new Vector2(p).sub(edgeA);
-        float c = cross(edge, ap);
-        return edgeCcw ? c >= -EPSILON : c <= EPSILON;
-    }
-
-    private static Vector2 lineIntersection(Vector2 s, Vector2 e, Vector2 a, Vector2 b) {
-        Vector2 r = new Vector2(e).sub(s);
-        Vector2 q = new Vector2(b).sub(a);
-        float denom = cross(r, q);
-
-        if (Math.abs(denom) <= EPSILON) {
-            // Near-parallel case; midpoint keeps output bounded for debug rendering.
-            return new Vector2(s).add(e).scl(0.5f);
-        }
-
-        Vector2 aMinusS = new Vector2(a).sub(s);
-        float t = cross(aMinusS, q) / denom;
-        return new Vector2(s).mulAdd(r, t);
-    }
-
-    private static float cross(Vector2 u, Vector2 v) {
-        return u.x * v.y - u.y * v.x;
-    }
-
-    private static float signedArea(List<Vector2> polygon) {
-        float areaTwice = 0f;
-        for (int i = 0; i < polygon.size(); i++) {
-            Vector2 c = polygon.get(i);
-            Vector2 n = polygon.get((i + 1) % polygon.size());
-            areaTwice += c.x * n.y - n.x * c.y;
-        }
-        return 0.5f * areaTwice;
-    }
-
-    private static Vector2 polygonCentroid(List<Vector2> polygon) {
-        if (polygon.size() == 1) {
-            return new Vector2(polygon.get(0));
-        }
-
-        float areaTwice = 0f;
-        float cx = 0f;
-        float cy = 0f;
-
-        for (int i = 0; i < polygon.size(); i++) {
-            Vector2 c = polygon.get(i);
-            Vector2 n = polygon.get((i + 1) % polygon.size());
-            float cross = c.x * n.y - n.x * c.y;
-            areaTwice += cross;
-            cx += (c.x + n.x) * cross;
-            cy += (c.y + n.y) * cross;
-        }
-
-        if (Math.abs(areaTwice) <= EPSILON) {
-            return centroid(polygon);
-        }
-
-        float factor = 1f / (3f * areaTwice);
-        return new Vector2(cx * factor, cy * factor);
-    }
 
     private static final class Projection {
         final float min;
