@@ -24,19 +24,15 @@ public abstract class PhysicsObject {
     private float startY;
     private Vector2 com = new Vector2();
 
-
-    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
+    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, List<List<Vector2>> triangles, float startX, float startY, float rotation) {
         this.id = id;
         this.friction = friction;
         this.restitution = restitution;
         this.vertices = new ArrayList<>(vertices);
         this.localBody = new CustomContactHandler.PolygonBody(vertices);
-        this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
+        this.concaveLocalTriangles = triangles;
         int prevSize = concaveLocalTriangles.size();
 
-        if(id == 100) {
-            Gdx.app.log("DynamicObject", "Initial triangles: " + concaveLocalTriangles.size());
-        }
 
         concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalTriangles);
         int currentSize = concaveLocalBest.size();
@@ -54,6 +50,13 @@ public abstract class PhysicsObject {
         setRotation(rotation);
         setPosition(new Vector2(startX, startY));
     }
+
+    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
+        this(id, friction, restitution, vertices, EarClippingDecomposer.decomposeToTriangles(vertices), startX, startY, rotation);
+    }
+
+
+
     public Vector2 getCenter()  {
         //Gdx.app.log("DynamicObject", "Center of mass: " + com);
         return new Vector2(com).add(getPosition());

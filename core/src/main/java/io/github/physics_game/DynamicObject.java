@@ -10,15 +10,27 @@ import java.util.List;
 public class DynamicObject extends PhysicsObject {
     private Vector2 currentVelocity = new Vector2();
     private float currentAngularVelocity = 0f;
-    float density = 1f;
+    List<Float> densities;
     float mass = 0f;
     float inertia = 0f;
+    public DynamicObject(int id, float friction, float restitution, List<Float> densities, List<Vector2> vertices, float startX, float startY, float rotation) {
+        super(id, friction, restitution, vertices, startX, startY, rotation);
+        this.densities = densities;
+        mass = PhysicsResolver.getMassOfPolygon(getConcaveLocalTriangles(), densities);
+        inertia = PhysicsResolver.getMomentOfInertiaPolygon(getConcaveLocalTriangles(), densities);
+    }
+
     public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation) {
         super(id, friction, restitution, vertices, startX, startY, rotation);
-        this.density = density;
-        mass = PhysicsResolver.getMassOfPolygon(getConcaveLocalTriangles(),  density);
-        inertia = PhysicsResolver.getMomentOfInertiaPolygon(getConcaveLocalTriangles(), density);
+
+        for(int i = 0; i < getConcaveLocalTriangles().size(); i++) {
+            densities.add(density);
+        }
+        mass = PhysicsResolver.getMassOfPolygon(getConcaveLocalTriangles(),  densities);
+        inertia = PhysicsResolver.getMomentOfInertiaPolygon(getConcaveLocalTriangles(), densities);
     }
+
+
 
     public float getMass() {
         return mass;

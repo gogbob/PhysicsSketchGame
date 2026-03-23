@@ -8,20 +8,41 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.World;
 
 import java.util.ArrayList;
+import java.util.List;
+
+import static java.lang.Math.min;
 
 public class DrawTool {
+    private static final float resolutionScale = 0.01f;
+
     private ArrayList<Vector2> points; // store drew points
     private boolean drawing; // check if it's drawing or not
     private Camera camera;
     private Level level;
     private int nextId; // give id to objects
+    private List<Vector2> circleShape;
+    private float toolWidth = 0.1f; // the width of the tool (the radius of the circle)
+    private Vector2 prevPosition;
+    private List<List<Float>> gridField;
+    private Vector2 referencePoint;
+    private int minX = -50;
+    private int maxX = 50;
+    private int minY = -50;
+    private int maxY = 50;
 
-    public DrawTool(Camera camera, Level level) {
+
+    public DrawTool(Camera camera, Level level, float toolWidth) {
         this.camera = camera;
         this.level = level;
         this.points = new ArrayList<>();
         this.drawing = false;
         this.nextId = 100;  // object drew by player = start from 100
+
+        this.toolWidth = toolWidth;
+    }
+
+    public DrawTool(Camera camera, Level level) {
+        this(camera, level, 0.1f);
     }
 
     // call the method each frame
@@ -42,27 +63,85 @@ public class DrawTool {
         }
     }
 
-    // start drawing method
+    // start drawing method (make a circle)
     private void startDrawing() {
         drawing = true;
         points.clear();
         Vector2 pos = getMousePosition();
-        points.add(pos);
+        for (Vector2 localPoint : circleShape) {
+            points.add(new Vector2(pos).add(localPoint));
+        }
+
+        referencePoint = pos;
+
+        prevPosition = pos;
     }
 
     // add point method
     private void addPoint() {
         Vector2 pos = getMousePosition();
+        Vector2 delta = new Vector2(pos).sub(prevPosition);
+        addPixelValues(pos, delta);
+    }
 
-        // add when it is far from the las point
-        if (points.size() == 0) {
-            points.add(pos);
-        } else {
-            Vector2 lastPoint = points.get(points.size() - 1);
-            float distance = pos.dst(lastPoint);
-            if (distance > 0.1f) {  // add when the distance is bigger than 0.1
-                points.add(pos);
+    private void addPixelValues(Vector2 pos, Vector2 delta) {
+        Vector2 localPos = new Vector2(pos).sub(referencePoint);
+        rescaleGridFromPoint(localPos);
+
+
+
+    }
+
+    private void rescaleGridFromPoint(Vector2 pos) {
+        if(minX >= pos.x - toolWidth / resolutionScale) {
+            //found new low
+            for(int j = minY; j < maxY; j++) {
+                ArrayList<Float> newRow = new ArrayList<>();
+                for(int i = minX; i > pos.x - toolWidth / resolutionScale - 2; i--) {
+                    newRow.add(0f);
+                }
+                gridField.add(newRow);
             }
+
+            minX = (int) ((pos.x - toolWidth / resolutionScale) * resolutionScale);
+
+        }
+
+        if(minY >= pos.y - toolWidth / resolutionScale) {
+            //found new low
+            for(int j = minY; j > pos.y - toolWidth / resolutionScale - 2; j--) {
+                ArrayList<Float> newRow = new ArrayList<>();
+                for(int i = minX; i < maxX; i++) {
+                    newRow.add(0f);
+                }
+                gridField.add(newRow);
+            }
+
+            minY = (int) ((pos.y - toolWidth / resolutionScale) * resolutionScale);
+        }
+
+        if(maxX <= pos.x + toolWidth / resolutionScale) {
+            //found new high
+            for(int j = minY; j < maxY; j++) {
+                for(int i = maxX; i < pos.x + toolWidth / resolutionScale + 2; i++) {
+                    gridField.get(j - minY).add(0f);
+                }
+            }
+
+            maxX = (int) ((pos.x + toolWidth / resolutionScale) * resolutionScale);
+        }
+
+        if(maxY <= pos.y + toolWidth / resolutionScale) {
+            //found new high
+            for(int j = maxY; j < pos.y + toolWidth / resolutionScale + 2; j++) {
+                ArrayList<Float> newRow = new ArrayList<>();
+                for(int i = minX; i < maxX; i++) {
+                    newRow.add(0f);
+                }
+                gridField.add(newRow);
+            }
+
+            maxY = (int) ((pos.y + toolWidth / resolutionScale) * resolutionScale);
         }
     }
 
