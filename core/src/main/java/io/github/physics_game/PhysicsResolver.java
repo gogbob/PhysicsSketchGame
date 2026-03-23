@@ -16,7 +16,7 @@ public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
     final static int NUM_VEL_ITERATIONS = 6;
     final static int NUM_POS_ITERATIONS = 3;
-    final static Vector2 GRAVITY = new Vector2(0, -3f);
+    final static Vector2 GRAVITY = new Vector2(0, -6f);
     public static void step(ArrayList<PhysicsObject> objects) {
         while(Main.accumulator >= fixedStep) {
             // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.
@@ -324,19 +324,9 @@ public class PhysicsResolver {
             return false;
         }
 
-        Gdx.app.log("PhysicsResolver", "Resolving penetration between object " + obj1.getId() + " and object " + obj2.getId() + " with penetration depth " + contact.getMaxPenetration());
-
-        if(contact.getMaxPenetration() > 1f) {
-            Gdx.app.log("PhysicsResolver", "Collision detected between object " + obj1.getId() + " and object " + obj2.getId() + " with penetration depth " + contact.getMaxPenetration());
-        }
-
-
-
         if(contact.getMaxPenetration() < 0.001f) {
             return false; // Ignore very small penetrations to prevent jitter
         }
-
-        Gdx.app.log("PhysicsResolver", "Resolving penetration between object " + obj1.getId() + " and object " + obj2.getId() + " with penetration depth " + contact.getMaxPenetration());
 
         Vector2 n = contact.getNormal();
         float penetrationDepth = contact.getMaxPenetration();

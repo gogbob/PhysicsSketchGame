@@ -216,9 +216,6 @@ public final class EarClippingDecomposer {
         for (int i = 0; i < polys.size(); i++) {
             List<Vector2> poly = polys.get(i);
             polygons.add(new ArrayList<>(poly));
-            if(poly.size() > 3) {
-                Gdx.app.log("DynamicObject", "Merged poly: " + poly.size());
-            }
         }
 
         for (int i = 0; i < polygons.size(); i++) {

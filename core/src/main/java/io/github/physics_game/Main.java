@@ -54,7 +54,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void create() {
         // Use a small world size (meters) so objects are visible with the debug renderer.
         camera = new OrthographicCamera();
-        viewport = new FitViewport(10f, 7.5f, camera); // world units: 10 x 7.5
+        viewport = new FitViewport(20f, 15f, camera); // world units: 20 x 15
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
@@ -68,7 +68,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(-0.7f, -0.7f)
             ),
             5, 5, 0);
-        exampleLevel = new Level(0, "Example Level", new ArrayList<>());
+        exampleLevel = new Level(0, "Example Level", new ArrayList<>(), viewport.getWorldWidth(), viewport.getWorldHeight());
         //exampleObject.setRotation((float)Math.PI);
         exampleLevel.addPhysicsObject(exampleObject);
 
@@ -78,28 +78,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
 
-        CustomContactHandler.PolygonBody squareBody1 = new CustomContactHandler.PolygonBody(
-            Arrays.asList(
-                new Vector2(-0.7f, 0.7f),
-                new Vector2(0.7f, 0.7f),
-                new Vector2(0.7f, -0.7f),
-                new Vector2(-0.7f, -0.7f)
-            )
-        );
-
-        CustomContactHandler.PolygonBody squareBody2 = new CustomContactHandler.PolygonBody(
-            Arrays.asList(
-                new Vector2(-0.5f, 0.5f),
-                new Vector2(0.5f, 0.5f),
-                new Vector2(0.5f, -0.5f),
-                new Vector2(-0.5f, -0.5f)
-            )
-        );
-        squareBody2.setPosition(0.25f, 0.25f);
-        squareBody2.setRotationRadians((float)Math.PI / 4f);
-
-
-        EarClippingDecomposer.mergePolygons(EarClippingDecomposer.decomposeToTriangles(squareBody1.getLocalVertices()));
         //CustomContactHandler.detect(squareBody1, squareBody2);
 
 
