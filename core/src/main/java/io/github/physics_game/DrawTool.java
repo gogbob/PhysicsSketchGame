@@ -8,9 +8,9 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.World;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-
-import static java.lang.Math.min;
+import static java.lang.Math.*;
 
 public class DrawTool {
     private static final float resolutionScale = 0.01f;
@@ -37,7 +37,6 @@ public class DrawTool {
         this.points = new ArrayList<>();
         this.drawing = false;
         this.nextId = 100;  // object drew by player = start from 100
-
         this.toolWidth = toolWidth;
     }
 
@@ -86,63 +85,73 @@ public class DrawTool {
 
     private void addPixelValues(Vector2 pos, Vector2 delta) {
         Vector2 localPos = new Vector2(pos).sub(referencePoint);
-        rescaleGridFromPoint(localPos);
+        List<Integer> bounds = getBounds(pos, delta);
+        updateGlobalBounds(bounds.get(0), bounds.get(1), bounds.get(2), bounds.get(3));
 
+        for(int i = bounds.get(0); i < bounds.get(2); i++) {
+            for(int j =  bounds.get(1); j < bounds.get(3); j++) {
+                Vector2 pixelPos = new Vector2(i / resolutionScale, j / resolutionScale);
+                Vector2 AP = new Vector2(pixelPos).sub(localPos);
+                //this rectBound variable tells you whether the point between the start and end of the line segment
+                //if it is between 0 and 1
+                float rectBound = AP.dot(delta) / delta.dot(delta);
 
-
+                //if within the rect or within one of the ends
+                if((rectBound >= 0 && rectBound <= 1) ||
+                    (new Vector2(pixelPos).sub(localPos)).len() <= toolWidth ||
+                    (new Vector2(pixelPos).sub(new Vector2(localPos).add(delta))).len() <= toolWidth) {
+                    //if the point is within the tool width of the line segment, add it to the grid field
+                    Vector2 tangent = new Vector2(delta).scl(AP.dot(delta)/delta.len());
+                    Vector2 perpendicular = new Vector2(pixelPos).sub(new Vector2(localPos).add(tangent));
+                    if(perpendicular.len() <= toolWidth) {
+                        int gridX = i - minX;
+                        int gridY = j - minY;
+                        gridField.get(gridY).set(gridX, gridField.get(gridY).get(gridX) + 1f);
+                    }
+                }
+            }
+        }
     }
 
-    private void rescaleGridFromPoint(Vector2 pos) {
-        if(minX >= pos.x - toolWidth / resolutionScale) {
-            //found new low
-            for(int j = minY; j < maxY; j++) {
-                ArrayList<Float> newRow = new ArrayList<>();
-                for(int i = minX; i > pos.x - toolWidth / resolutionScale - 2; i--) {
-                    newRow.add(0f);
-                }
-                gridField.add(newRow);
-            }
+    private void updateGlobalBounds(int miX, int miY, int maX, int maY) {
 
-            minX = (int) ((pos.x - toolWidth / resolutionScale) * resolutionScale);
-
-        }
-
-        if(minY >= pos.y - toolWidth / resolutionScale) {
-            //found new low
-            for(int j = minY; j > pos.y - toolWidth / resolutionScale - 2; j--) {
-                ArrayList<Float> newRow = new ArrayList<>();
-                for(int i = minX; i < maxX; i++) {
-                    newRow.add(0f);
-                }
-                gridField.add(newRow);
-            }
-
-            minY = (int) ((pos.y - toolWidth / resolutionScale) * resolutionScale);
-        }
-
-        if(maxX <= pos.x + toolWidth / resolutionScale) {
-            //found new high
-            for(int j = minY; j < maxY; j++) {
-                for(int i = maxX; i < pos.x + toolWidth / resolutionScale + 2; i++) {
-                    gridField.get(j - minY).add(0f);
+        if(miX < minX) {
+            for(int i = minY; i <= maxY; i++) {
+                for(int j = miX; j < minX; j++) {
+                    gridField.get(i).add(0, 0f);
                 }
             }
-
-            maxX = (int) ((pos.x + toolWidth / resolutionScale) * resolutionScale);
+            minX = miX;
         }
-
-        if(maxY <= pos.y + toolWidth / resolutionScale) {
-            //found new high
-            for(int j = maxY; j < pos.y + toolWidth / resolutionScale + 2; j++) {
-                ArrayList<Float> newRow = new ArrayList<>();
-                for(int i = minX; i < maxX; i++) {
-                    newRow.add(0f);
-                }
-                gridField.add(newRow);
+        if(miY < minY) {
+            for(int i = miY; i < minY; i++) {
+                gridField.add(0, new ArrayList<>(maxX - minX + 1));
             }
-
-            maxY = (int) ((pos.y + toolWidth / resolutionScale) * resolutionScale);
+            minY = miY;
         }
+        if(maX > maxX) {
+            for(int i = minY; i <= maxY; i++) {
+                for(int j = maxX + 1; j <= maX; j++) {
+                    gridField.get(i).add(0f);
+                }
+            }
+            maxX = maX;
+        }
+        if(maY > maxY) {
+            for(int i = maxY + 1; i <= maY; i++) {
+                gridField.add(new ArrayList<>(maxX - minX + 1));
+            }
+            maxY = maY;
+        }
+    }
+
+    private List<Integer> getBounds(Vector2 pos, Vector2 delta) {
+        int minX = (int)(min(pos.x - toolWidth - 1, pos.x + delta.x - toolWidth - 1)/ resolutionScale);
+        int maxX = (int)(max(pos.x + toolWidth + 1, pos.x + delta.x + toolWidth + 1) / resolutionScale);
+        int minY = (int)(min(pos.y - toolWidth - 1, pos.y + delta.y - toolWidth - 1) / resolutionScale);
+        int maxY = (int)(max(pos.y + toolWidth + 1, pos.y + delta.y + toolWidth + 1) / resolutionScale);
+
+        return Arrays.asList(minX, maxX, minY, maxY);
     }
 
     // finish drawing + create object method
