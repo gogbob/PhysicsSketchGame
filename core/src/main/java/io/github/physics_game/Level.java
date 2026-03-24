@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class Level {
+public abstract class Level {
     private int levelId;
     private String levelName;
     private ArrayList<PhysicsObject> physicsObjects = new ArrayList<>();
@@ -41,5 +41,6 @@ public class Level {
         return levelName;
     }
 
-
+    public abstract void isComplete();
+    public abstract void tick(float deltaTime);
 }

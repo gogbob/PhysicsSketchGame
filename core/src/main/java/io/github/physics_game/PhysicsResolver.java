@@ -47,6 +47,27 @@ public class PhysicsResolver {
                     for (int j = i + 1; j < objects.size(); j++) {
                         PhysicsObject obj1 = objects.get(i);
                         PhysicsObject obj2 = objects.get(j);
+                        if(iteration == 0) {
+                            if(((obj1 instanceof TriggerObject || obj1 instanceof DynamicTriggerObject) && obj2 instanceof DynamicObject)
+                                || ((obj2 instanceof TriggerObject || obj2 instanceof DynamicTriggerObject) && obj1 instanceof DynamicObject)) {
+                                //check if a body is triggering a field
+                                ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+                                if(manifold.isColliding()) {
+                                    if (obj1 instanceof TriggerObject) {
+                                        ((TriggerObject) obj1).addTriggered(obj2.getId());
+                                    } else if(obj2 instanceof TriggerObject) {
+                                        ((TriggerObject) obj2).addTriggered(obj1.getId());
+                                    }
+                                    //dynamic trigger objects can also trigger other trigger objects so are independent
+                                    if(obj1 instanceof DynamicTriggerObject) {
+                                        ((DynamicTriggerObject) obj1).addTriggered(obj2.getId());
+                                    }
+                                    if(obj2 instanceof DynamicTriggerObject) {
+                                        ((DynamicTriggerObject) obj2).addTriggered(obj1.getId());
+                                    }
+                                }
+                            }
+                        }
                         if(resolveCollision(obj1, obj2, false, null, iteration, true)) {
                             anyCollision = true;
                         }
@@ -61,6 +82,9 @@ public class PhysicsResolver {
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
                     dynObj.updatePosition(fixedStep);
+                }
+                if(obj instanceof FollowingTriggerObject) {
+                    ((FollowingTriggerObject) obj).updatePosition();
                 }
             }
 
@@ -148,6 +172,27 @@ public class PhysicsResolver {
                     for (int j = i + 1; j < objects.size(); j++) {
                         PhysicsObject obj1 = objects.get(i);
                         PhysicsObject obj2 = objects.get(j);
+                        if(iteration == 0) {
+                            if(((obj1 instanceof TriggerObject || obj1 instanceof DynamicTriggerObject) && obj2 instanceof DynamicObject)
+                                || ((obj2 instanceof TriggerObject || obj2 instanceof DynamicTriggerObject) && obj1 instanceof DynamicObject)) {
+                                //check if a body is triggering a field
+                                ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+                                if(manifold.isColliding()) {
+                                    if (obj1 instanceof TriggerObject) {
+                                        ((TriggerObject) obj1).addTriggered(obj2.getId());
+                                    } else if(obj2 instanceof TriggerObject) {
+                                        ((TriggerObject) obj2).addTriggered(obj1.getId());
+                                    }
+                                    //dynamic trigger objects can also trigger other trigger objects so are independent
+                                    if(obj1 instanceof DynamicTriggerObject) {
+                                        ((DynamicTriggerObject) obj1).addTriggered(obj2.getId());
+                                    }
+                                    if(obj2 instanceof DynamicTriggerObject) {
+                                        ((DynamicTriggerObject) obj2).addTriggered(obj1.getId());
+                                    }
+                                }
+                            }
+                        }
                         if(resolveCollision(obj1, obj2, true, forces, iteration, true)) {
                             anyCollision = true;
                         }
@@ -162,6 +207,9 @@ public class PhysicsResolver {
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
                     dynObj.updatePosition(fixedStep);
+                }
+                if(obj instanceof FollowingTriggerObject) {
+                    ((FollowingTriggerObject) obj).updatePosition();
                 }
             }
 
@@ -189,7 +237,7 @@ public class PhysicsResolver {
     }
 
     public static boolean resolveCollision(PhysicsObject obj1, PhysicsObject obj2, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration, boolean isRun) {
-        if (!(obj1 instanceof StaticObject && obj2 instanceof StaticObject)) {
+        if ((!((obj1 instanceof StaticObject) && obj2 instanceof StaticObject)) && !(obj1 instanceof TriggerObject || obj2 instanceof TriggerObject)) {
 
             ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
             if (manifold.isColliding() && manifold.getPointCount() > 0) {
@@ -315,7 +363,7 @@ public class PhysicsResolver {
     }
 
     public static boolean resolvePenetrationCorrection(PhysicsObject obj1, PhysicsObject obj2) {
-        if(obj1 instanceof StaticObject && obj2 instanceof StaticObject) {
+        if((obj1 instanceof StaticObject && obj2 instanceof StaticObject) || (obj1 instanceof TriggerObject || obj2 instanceof TriggerObject)) {
             return false;
         }
 
@@ -334,8 +382,8 @@ public class PhysicsResolver {
         float percent = 0.8f;
         float correction = Math.max(penetrationDepth - slop, 0f) * percent;
 
-        float invMassA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getMass();
-        float invMassB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getMass();
+        float invMassA = (obj1 instanceof DynamicObject) ? 1f / ((DynamicObject) obj1).getMass() : 0f;
+        float invMassB = (obj2 instanceof DynamicObject) ? 1f / ((DynamicObject) obj2).getMass() : 0f;
         float totalInvMass = invMassA + invMassB;
 
         if (totalInvMass <= 0f) {
@@ -451,5 +499,14 @@ public class PhysicsResolver {
             }
         }
         return inertia;
+    }
+
+    public static List<Vector2> getCircleVertices(int numSegments, float radius) {
+        List<Vector2> vertices = new ArrayList<>();
+        for (int i = 0; i < numSegments; i++) {
+            float angle = (float) (2 * Math.PI * i / numSegments);
+            vertices.add(new Vector2(radius * (float) Math.cos(angle), radius * (float) Math.sin(angle)));
+        }
+        return vertices;
     }
 }

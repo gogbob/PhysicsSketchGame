@@ -68,11 +68,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(-0.7f, -0.7f)
             ),
             5, 5, 0);
-        exampleLevel = new Level(0, "Example Level", new ArrayList<>(), viewport.getWorldWidth(), viewport.getWorldHeight());
-        //exampleObject.setRotation((float)Math.PI);
-        exampleLevel.addPhysicsObject(exampleObject);
+        TutorialLevel tutorialLevel = new TutorialLevel();
+        //exampleObject.setRotation((float)Math.PI);\
 
-        drawTool = new DrawTool(camera, exampleLevel);
+        drawTool = new DrawTool(camera, tutorialLevel);
+        exampleLevel = tutorialLevel;
         Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
@@ -141,7 +141,13 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
-                drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), (obj instanceof StaticObject)? Color.GRAY : Color.WHITE);
+                if(obj instanceof DynamicTriggerObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.BLUE);
+                } else if(obj instanceof DynamicObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                } else if (obj instanceof StaticObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.GRAY);
+                }
             }
 
             // draw the drawing line
@@ -166,12 +172,14 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
-                if(obj instanceof DynamicObject) {
+                if(obj instanceof DynamicTriggerObject) {
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.GOLD);
+                } else if(obj instanceof DynamicObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.YELLOW);
                 } else if (obj instanceof StaticObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
-                } else {
-                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                } else if (obj instanceof TriggerObject) {
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.RED);
                 }
             }
 
