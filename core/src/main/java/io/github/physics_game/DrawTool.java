@@ -29,7 +29,30 @@ public class DrawTool {
     private int maxX = 50;
     private int minY = -50;
     private int maxY = 50;
+    //make it in anticlockwise order
+    private static final int[][] edgeTable = {
+        {-1,-1,-1,-1},        // 0 0000
 
+        {0,3,-1,-1},          // 1 0001
+        {1,0,-1,-1},          // 2 0010
+        {1,3,-1,-1},          // 3 0011
+
+        {2,1,-1,-1},          // 4 0100
+        {1,0, 2,3},           // 5 0101 (ambiguous → 2 segments)
+        {2,0,-1,-1},          // 6 0110
+        {2,3,-1,-1},          // 7 0111
+
+        {3,2,-1,-1},          // 8 1000
+        {2,0,-1,-1},          // 9 1001
+        {2,0, 3,1},           // 10 1010 (ambiguous)
+        {1,2,-1,-1},          // 11 1011
+
+        {3,1,-1,-1},          // 12 1100
+        {1,0,-1,-1},          // 13 1101
+        {3,0,-1,-1},          // 14 1110
+
+        {-1,-1,-1,-1}         // 15 1111
+    };
 
     public DrawTool(Camera camera, Level level, float toolWidth) {
         this.camera = camera;
@@ -64,6 +87,7 @@ public class DrawTool {
 
     // start drawing method (make a circle)
     private void startDrawing() {
+
         drawing = true;
         points.clear();
         Vector2 pos = getMousePosition();
@@ -84,6 +108,7 @@ public class DrawTool {
     }
 
     private void addPixelValues(Vector2 pos, Vector2 delta) {
+
         Vector2 localPos = new Vector2(pos).sub(referencePoint);
         List<Integer> bounds = getBounds(pos, delta);
         updateGlobalBounds(bounds.get(0), bounds.get(1), bounds.get(2), bounds.get(3));
@@ -96,10 +121,11 @@ public class DrawTool {
                 //if it is between 0 and 1
                 float rectBound = AP.dot(delta) / delta.dot(delta);
 
-                //if within the rect or within one of the ends
-                if((rectBound >= 0 && rectBound <= 1) ||
-                    (new Vector2(pixelPos).sub(localPos)).len() <= toolWidth ||
-                    (new Vector2(pixelPos).sub(new Vector2(localPos).add(delta))).len() <= toolWidth) {
+                //if within the rect or within the end
+                //but not within the start because it should already be drawn
+                if(((rectBound >= 0 && rectBound <= 1) ||
+                    (new Vector2(pixelPos).sub(new Vector2(localPos.add(delta))).len() <= toolWidth) &&
+                    !((new Vector2(pixelPos).sub(localPos)).len() <= toolWidth))) {
                     //if the point is within the tool width of the line segment, add it to the grid field
                     Vector2 tangent = new Vector2(delta).scl(AP.dot(delta)/delta.len());
                     Vector2 perpendicular = new Vector2(pixelPos).sub(new Vector2(localPos).add(tangent));
@@ -152,6 +178,52 @@ public class DrawTool {
         int maxY = (int)(max(pos.y + toolWidth + 1, pos.y + delta.y + toolWidth + 1) / resolutionScale);
 
         return Arrays.asList(minX, maxX, minY, maxY);
+    }
+
+    private List<Vector2> performMarchingSquares() {
+        return null;
+    }
+
+    private void createPixelatedEdges() {
+        for(int y = 0; y < gridField.size() - 1; y++) {
+            for(int x = 0; x < gridField.get(y).size() - 1; x++) {
+                float v0 = gridField.get(y).get(x);
+                float v1 = gridField.get(y).get(x+1);
+                float v2 = gridField.get(y+1).get(x+1);
+                float v3 = gridField.get(y+1).get(x);
+
+                int caseIndex = 0;
+                if(v0 > 0) caseIndex |= 1;
+                if(v1 > 0) caseIndex |= 2;
+                if(v2 > 0) caseIndex |= 4;
+                if(v3 > 0) caseIndex |= 8;
+
+
+            }
+        }
+    }
+
+    private List<Vector2> drawFromLookUp(int caseIndex, int x, int y) {
+        int[] edgeKey = edgeTable[caseIndex];
+        List<Vector2> edgePoints = new ArrayList<>();
+        for(int i = 0; i < edgeKey.length; i+=2) {
+            if(edgeKey[i] == -1) break;
+            switch(edgeKey[i]) {
+                case 0:
+                    edgePoints.add(new Vector2(x + 0.5f, y));
+                    break;
+                case 1:
+                    edgePoints.add(new Vector2(x + 1, y + 0.5f));
+                    break;
+                case 2:
+                    edgePoints.add(new Vector2(x + 0.5f, y + 1));
+                    break;
+                case 3:
+                    edgePoints.add(new Vector2(x, y + 0.5f));
+                    break;
+            }
+        }
+        return edgePoints;
     }
 
     // finish drawing + create object method
