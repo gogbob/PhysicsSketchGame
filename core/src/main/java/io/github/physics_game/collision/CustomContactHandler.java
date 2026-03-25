@@ -36,8 +36,9 @@ public final class CustomContactHandler {
         }
 
         // Collect best manifold across all triangle pairs, filtering internal edges
-        ContactManifold best = ContactManifold.NO_CONTACT;
+        ContactManifold globalManifold = ContactManifold.NO_CONTACT;
         float bestDepth = -Float.MAX_VALUE;
+        Vector2 bestPenetration = new Vector2();
 
         for (List<Vector2> pA : polysA) {
             Aabb aabbA = Aabb.fromPolygon(pA);
@@ -47,21 +48,23 @@ public final class CustomContactHandler {
                     continue;
                 }
 
-                ContactManifold manifold = SatCollision.detect(pA, pB);
-                if (!manifold.isColliding()) {
+                ContactPoint midPointCon = SatCollision.detect(pA, pB);
+                if (midPointCon == ContactPoint.NO_CONTACT_POINT) {
                     continue;
                 }
 
                 // Prefer deeper (more stable) contacts
-                float d = manifold.getMaxPenetration();
+                float d = midPointCon.penetration;
                 if (d > bestDepth) {
                     bestDepth = d;
-                    best = manifold;
+                    bestPenetration = new Vector2(midPointCon.normal).scl(d);
+                    globalManifold.addPoint(midPointCon);
                 }
             }
         }
+        globalManifold.setBestPenetration(bestPenetration);
 
-        return best;
+        return globalManifold;
     }
 
     public static List<List<Vector2>> toWorld(PhysicsObject object) {

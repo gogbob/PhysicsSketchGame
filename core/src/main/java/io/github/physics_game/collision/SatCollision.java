@@ -17,9 +17,9 @@ public final class SatCollision {
     private SatCollision() {
     }
 
-    public static ContactManifold detect(List<Vector2> polygonA, List<Vector2> polygonB) {
+    public static ContactPoint detect(List<Vector2> polygonA, List<Vector2> polygonB) {
         if (polygonA == null || polygonB == null || polygonA.size() < 3 || polygonB.size() < 3) {
-            return ContactManifold.NO_CONTACT;
+            return ContactPoint.NO_CONTACT_POINT;
         }
 
         float minOverlap = Float.MAX_VALUE;
@@ -28,7 +28,7 @@ public final class SatCollision {
 
         EdgeTestResult fromA = testAxesWithEdge(polygonA, polygonA, polygonB, minOverlap, bestAxis);
         if (!fromA.hasCollision) {
-            return ContactManifold.NO_CONTACT;
+            return ContactPoint.NO_CONTACT_POINT;
         }
         minOverlap = fromA.overlap;
         bestAxis = fromA.axis;
@@ -36,7 +36,7 @@ public final class SatCollision {
 
         EdgeTestResult fromB = testAxesWithEdge(polygonB, polygonA, polygonB, minOverlap, bestAxis);
         if (!fromB.hasCollision) {
-            return ContactManifold.NO_CONTACT;
+            return ContactPoint.NO_CONTACT_POINT;
         }
 
         float minOverlapB = fromB.overlap;
@@ -61,8 +61,8 @@ public final class SatCollision {
         }
 
         // Generate manifold with edge clipping
-        List<ContactPoint> manifoldPoints = findEdgeIntersection(refPoly, incPoly, normal, pen);
-        return new ContactManifold(true, normal, manifoldPoints);
+        ContactPoint findIntersectionMidpoints = findEdgeIntersectionMidPoint(refPoly, incPoly, normal, pen);
+        return findIntersectionMidpoints;
     }
 
     /**
@@ -120,8 +120,8 @@ public final class SatCollision {
         return new EdgeTestResult(true, bestAxis, minOverlap, bestEdgeIdx);
     }
 
-    public static List<ContactPoint> findEdgeIntersection(List<Vector2> polyA, List<Vector2> polyB, Vector2 normal, float penetrationDepth) {
-        List<ContactPoint> contactPoints = new ArrayList<>();
+    public static ContactPoint findEdgeIntersectionMidPoint(List<Vector2> polyA, List<Vector2> polyB, Vector2 normal, float penetrationDepth) {
+        List<Vector2> contactPoints = new ArrayList<>();
 
         for (int i = 0; i < polyA.size(); i++) {
             Vector2 a1 = polyA.get(i);
@@ -134,18 +134,26 @@ public final class SatCollision {
                 Vector2 intersection = lineSegmentIntersection(a1, a2, b1, b2);
                 if(intersection != null) {
 
-                    float depth = penetrationDepth;
-                    contactPoints.add(new ContactPoint(intersection, depth));
+                    contactPoints.add(new Vector2());
 
                     // Only keep up to 2 contacts
                     if (contactPoints.size() >= 2) {
-                        return contactPoints;
+                        Vector2 midPoint = new Vector2((contactPoints.get(0).x + contactPoints.get(1).x)/2, (contactPoints.get(0).y + contactPoints.get(1).y)/2);
+                        return new ContactPoint(midPoint, penetrationDepth, normal);
                     }
                 }
             }
         }
 
-        return contactPoints;
+        if(contactPoints.size() >= 2) {
+            Vector2 midPoint = new Vector2((contactPoints.get(0).x + contactPoints.get(1).x)/2, (contactPoints.get(0).y + contactPoints.get(1).y)/2);
+            return new ContactPoint(midPoint, penetrationDepth, normal);
+        } else if (contactPoints.size() == 1) {
+            return new ContactPoint(contactPoints.get(0), penetrationDepth, normal);
+        } else {
+            // No intersection points found, return a contact point at the centroid of the overlap region
+            return ContactPoint.NO_CONTACT_POINT;
+        }
     }
 
     private static Vector2 lineSegmentIntersection(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2) {

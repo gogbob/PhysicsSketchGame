@@ -50,6 +50,7 @@ public class PhysicsResolver {
                         if(iteration == 0) {
                             if(((obj1 instanceof TriggerObject || obj1 instanceof DynamicTriggerObject) && obj2 instanceof DynamicObject)
                                 || ((obj2 instanceof TriggerObject || obj2 instanceof DynamicTriggerObject) && obj1 instanceof DynamicObject)) {
+                                Gdx.app.log("PhysicsResolver", "Collision detection between" + obj1.getId() + " and " + obj2.getId());
                                 //check if a body is triggering a field
                                 ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
                                 if(manifold.isColliding()) {
@@ -390,8 +391,7 @@ public class PhysicsResolver {
             return false;
         }
 
-        // Distribute correction across contact points
-        float correctionPerPoint = correction / contact.getPointCount();
+        float correctionPerPoint = correction;
 
         if (obj1 instanceof DynamicObject) {
             DynamicObject dynObj1 = (DynamicObject) obj1;
