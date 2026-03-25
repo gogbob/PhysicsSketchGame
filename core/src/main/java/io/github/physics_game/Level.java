@@ -41,6 +41,6 @@ public abstract class Level {
         return levelName;
     }
 
-    public abstract void isComplete();
+    public abstract boolean isComplete();
     public abstract void tick(float deltaTime);
 }
