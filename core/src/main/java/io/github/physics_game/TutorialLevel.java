@@ -12,6 +12,7 @@ public class TutorialLevel extends  Level {
     private float elapsedTimeOutside = timeToComplete;
     private FollowingTriggerObject cupInside;
     private DynamicObject ball;
+    private boolean isComplete;
 
     public TutorialLevel() {
         super(0, "Tutorial Level", new ArrayList<>(), 20f, 15f);
@@ -22,8 +23,8 @@ public class TutorialLevel extends  Level {
                 new Vector2(3f, 0),
                 new Vector2(3.6f, 5f),
                 new Vector2(3.3f, 5f),
-                new Vector2(2.7f, 1f),
-                new Vector2(0.3f, 1f),
+                new Vector2(2.7f, 0.4f),
+                new Vector2(0.3f, 0.4f),
                 new Vector2(-0.3f, 5f),
                 new Vector2(-0.6f, 5f)
             )
@@ -31,10 +32,10 @@ public class TutorialLevel extends  Level {
 
         List<Vector2> cupInsideVertices = new ArrayList<>(
             Arrays.asList(
-                new Vector2(2.7f, 1f),
+                new Vector2(2.7f, 0.4f),
                 new Vector2(3.5f, 5f),
                 new Vector2(-0.5f, 5f),
-                new Vector2(0.3f, 1f)
+                new Vector2(0.3f, 0.4f)
             )
         );
 
@@ -50,17 +51,18 @@ public class TutorialLevel extends  Level {
     }
 
     @Override
-    public void isComplete() {
-        // Implement logic to check if the tutorial level is complete
+    public boolean isComplete() {
+        return isComplete;
     }
 
     @Override
     public void tick(float deltaTime) {
         // Implement any necessary updates for the tutorial level
-        if(!cupInside.getTriggeredObjectIds().contains(ball)) {
+        if(!cupInside.getTriggeredObjectIds().contains(ball.getId())) {
             elapsedTimeOutside -= deltaTime;
             if (elapsedTimeOutside <= 0) {
                 System.out.println("Ball has been outside the cup for long enough! You win");
+                isComplete = true;
             }
         } else {
             System.out.println("Ball is inside the cup!");
