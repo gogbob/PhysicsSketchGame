@@ -340,8 +340,10 @@ public class PhysicsResolver {
 
         Vector2 n = contact.getNormal();
         float penetrationDepth = contact.getMaxPenetration();
-        float slop = 0.01f;
-        float percent = 0.8f;
+
+        float slop = 0.05f;
+        float percent = 0.3f;
+
         float correction = Math.max(penetrationDepth - slop, 0f) * percent;
 
         float invMassA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getMass();

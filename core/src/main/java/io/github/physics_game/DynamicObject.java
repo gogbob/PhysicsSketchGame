@@ -48,9 +48,12 @@ public class DynamicObject extends PhysicsObject {
         Vector2 linearVelocity = new Vector2(getLinearVelocity());
         float angle = getRotation() + getAngularVelocity() * delta;
         Vector2 position = new Vector2(getPosition()).add(linearVelocity.scl(delta));
+
         setPosition(position);
         setRotation(angle);
     }
+
+
     public void reinitialize() {
             setPosition(new Vector2(getStartX(), getStartY()));
             setRotation(0f);
