@@ -173,13 +173,13 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
                 if(obj instanceof DynamicTriggerObject) {
-                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.GOLD);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.GOLD);
                 } else if(obj instanceof DynamicObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.YELLOW);
                 } else if (obj instanceof StaticObject) {
-                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.CYAN);
                 } else if (obj instanceof TriggerObject) {
-                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.RED);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.RED);
                 }
             }
 

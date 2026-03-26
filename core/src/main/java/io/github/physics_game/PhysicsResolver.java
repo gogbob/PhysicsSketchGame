@@ -390,8 +390,7 @@ public class PhysicsResolver {
             return false;
         }
 
-        // Distribute correction across contact points
-        float correctionPerPoint = correction / contact.getPointCount();
+        float correctionPerPoint = correction;
 
         if (obj1 instanceof DynamicObject) {
             DynamicObject dynObj1 = (DynamicObject) obj1;
