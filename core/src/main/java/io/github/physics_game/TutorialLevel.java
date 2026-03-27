@@ -7,12 +7,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
 
-public class TutorialLevel extends  Level {
+public class TutorialLevel extends Level {
     private final float timeToComplete = 5f; // Time in seconds to complete the level
     private float elapsedTimeOutside = timeToComplete;
     private FollowingTriggerObject cupInside;
     private DynamicObject ball;
     private boolean isComplete;
+    private static final int ShapePenalty = 10; // Each shape took off 10 points
+    private static final float TIME_PENALTY = 1.0f;
 
     public TutorialLevel() {
         super(0, "Tutorial Level", new ArrayList<>(), 20f, 15f);
