@@ -10,16 +10,18 @@ import java.util.List;
  * Represents stable multi-point resting contact or single collision.
  */
 public final class ContactManifold {
-    public static final ContactManifold NO_CONTACT = new ContactManifold(false, new Vector2(), new ArrayList<>());
+    public static final ContactManifold NO_CONTACT = new ContactManifold(false, new Vector2(), new ArrayList<>(), 0f);
 
     private final boolean colliding;
     private final Vector2 normal; // A -> B
     private final List<ContactPoint> points; // 0..2 points
+    private final float penetration;
 
-    public ContactManifold(boolean colliding, Vector2 normal, List<ContactPoint> points) {
+    public ContactManifold(boolean colliding, Vector2 normal, List<ContactPoint> points, float penetration) {
         this.colliding = colliding;
         this.normal = new Vector2(normal);
         this.points = new ArrayList<>(points);
+        this.penetration = penetration;
     }
 
     public boolean isColliding() {
@@ -38,12 +40,8 @@ public final class ContactManifold {
         return points.size();
     }
 
-    public float getMaxPenetration() {
-        float max = 0f;
-        for (ContactPoint p : points) {
-            max = Math.max(max, p.penetration);
-        }
-        return max;
+    public float getPenetration() {
+        return penetration;
     }
 
     public float getAveragePenetration() {
@@ -57,7 +55,7 @@ public final class ContactManifold {
 
     @Override
     public String toString() {
-        return String.format("ContactManifold(colliding=%s, points=%d, depth=%.4f)", colliding, points.size(), getMaxPenetration());
+        return String.format("ContactManifold(colliding=%s, points=%d, depth=%.4f)", colliding, points.size(), getPenetration());
     }
 }
 

@@ -1,12 +1,13 @@
 package io.github.physics_game.collision;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.Vector2;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-import static java.lang.Math.max;
-import static java.lang.Math.min;
+import static java.lang.Math.*;
 
 /**
  * Convex polygon collision test using the Separating Axis Theorem (SAT).
@@ -20,6 +21,33 @@ public final class SatCollision {
     public static ContactManifold detect(List<Vector2> polygonA, List<Vector2> polygonB) {
         if (polygonA == null || polygonB == null || polygonA.size() < 3 || polygonB.size() < 3) {
             return ContactManifold.NO_CONTACT;
+        }
+
+        //make a test to see if both polygons are convex
+        for(int i = 0; i < polygonA.size(); ++i) {
+            Vector2 v1 = polygonA.get(i);
+            Vector2 v2 = polygonA.get((i + 1) % polygonA.size());
+            Vector2 v3 = polygonA.get((i + 2) % polygonA.size());
+
+            Vector2 edge1 = new Vector2(v2).sub(v1);
+            Vector2 edge2 = new Vector2(v3).sub(v2);
+
+            if (new Vector2(edge1).nor().crs(edge2) < -EPSILON) {
+                //Gdx.app.log("SatCollision", "Polygon A is not convex by " + new Vector2(edge1).nor().crs(edge2));
+            }
+        }
+
+        for(int i = 0; i < polygonB.size(); ++i) {
+            Vector2 v1 = polygonB.get(i);
+            Vector2 v2 = polygonB.get((i + 1) % polygonB.size());
+            Vector2 v3 = polygonB.get((i + 2) % polygonB.size());
+
+            Vector2 edge1 = new Vector2(v2).sub(v1);
+            Vector2 edge2 = new Vector2(v3).sub(v2);
+
+            if (new Vector2(edge1).nor().crs(edge2) < -EPSILON) {
+                //Gdx.app.log("SatCollision", "Polygon B is not convex by " + new Vector2(edge1).nor().crs(edge2));
+            }
         }
 
         float minOverlap = Float.MAX_VALUE;
@@ -61,8 +89,7 @@ public final class SatCollision {
         }
 
         // Generate manifold with edge clipping
-        List<ContactPoint> manifoldPoints = findEdgeIntersection(refPoly, incPoly, normal, pen);
-        return new ContactManifold(true, normal, manifoldPoints);
+        return findEdgeClipping(polygonA, polygonB, normal, pen);
     }
 
     /**
@@ -82,71 +109,122 @@ public final class SatCollision {
         }
     }
 
-    public static EdgeTestResult testAxesWithEdge(List<Vector2> axisSource,
-                                                    List<Vector2> polygonA,
-                                                    List<Vector2> polygonB,
-                                                    float currentMinOverlap,
-                                                    Vector2 currentBestAxis) {
-        float minOverlap = currentMinOverlap;
-        Vector2 bestAxis = currentBestAxis == null ? new Vector2() : new Vector2(currentBestAxis);
-        int bestEdgeIdx = -1;
+    public static ContactManifold findEdgeClipping(List<Vector2> polygonA, List<Vector2> polygonB, Vector2 normal, float penetration) {
+        List<ContactPoint> manifoldPoints = new ArrayList<>();
 
-        for (int i = 0; i < axisSource.size(); i++) {
-            Vector2 v1 = axisSource.get(i);
-            Vector2 v2 = axisSource.get((i + 1) % axisSource.size());
+        int edgeIdxA = findBestEdge(polygonA, normal);
+        int edgeIdxB = findBestEdge(polygonB, new Vector2(normal).scl(-1f));
+
+        Vector2 edgeA = new Vector2(polygonA.get((edgeIdxA + 1) % polygonA.size())).sub(polygonA.get(edgeIdxA));
+        Vector2 edgeB = new Vector2(polygonB.get((edgeIdxB + 1) % polygonB.size())).sub(polygonB.get(edgeIdxB));
+        Vector2 edgeNormalA = new Vector2(edgeA.y, -edgeA.x).nor();
+        Vector2 edgeNormalB = new Vector2(edgeB.y, -edgeB.x).nor();
+        int refEdgeIdx = edgeIdxA;
+        int incEdgeIdx = edgeIdxB;
+        List<Vector2> refPoly = polygonA;
+        List<Vector2> incPoly = polygonB;
+        Vector2 newNormal = new Vector2(normal);
+        //unless the edge from B is significantly better, use the edge from A as reference
+        if (Math.abs(normal.dot(edgeNormalA)) < Math.abs(normal.dot(edgeNormalB))) {
+            refEdgeIdx = edgeIdxB;
+            incEdgeIdx = edgeIdxA;
+            refPoly = polygonB;
+            incPoly = polygonA;
+            newNormal.scl(-1f);
+        }
+
+        Vector2 refV1 = refPoly.get(refEdgeIdx);
+        Vector2 refV2 = refPoly.get((refEdgeIdx + 1) % refPoly.size());
+        Vector2 incV1 = incPoly.get(incEdgeIdx);
+        Vector2 incV2 = incPoly.get((incEdgeIdx + 1) % incPoly.size());
+
+        // Clip incident edge to reference edge side planes
+        Vector2 refEdge = new Vector2(refV2).sub(refV1).nor();
+        Vector2 sideNormal1 = new Vector2(refEdge);
+        Vector2 sideNormal2 = new Vector2(refEdge).scl(-1f);
+
+        float offset1 = sideNormal1.dot(refV1);
+        float offset2 = sideNormal2.dot(refV2);
+
+        List<Vector2> clipPoints = clipSegmentToLine(incV1, incV2, sideNormal1, offset1);
+        if(clipPoints.size()<2){
+            //use fallback
+            ContactPoint fallback = new ContactPoint(new Vector2(incV1)
+                .add(incV2)
+                .add(refV1)
+                .add(refV2)
+                .scl(0.25f), penetration);
+            return new ContactManifold(true, normal, Arrays.asList(fallback), penetration);
+        }
+
+        clipPoints = clipSegmentToLine(clipPoints.get(0), clipPoints.get(1), sideNormal2, offset2);
+
+        if(clipPoints.size()<2){
+            ContactPoint fallback = new ContactPoint(new Vector2(incV1)
+                .add(incV2)
+                .add(refV1)
+                .add(refV2)
+                .scl(0.25f), penetration);
+            return new ContactManifold(true, normal, Arrays.asList(fallback), penetration);
+        }
+
+        Vector2 refNormal = new Vector2(refEdge.y, -refEdge.x);
+        float refOffset = refNormal.dot(refV1);
+
+        for (Vector2 cp : clipPoints) {
+            float penetrationDepth = refNormal.dot(cp) - refOffset;
+            if (penetrationDepth <= 0.01f) {
+                manifoldPoints.add(new ContactPoint(cp, -penetrationDepth));
+            }
+        }
+
+        return new ContactManifold(true, normal, manifoldPoints, penetration);
+    }
+
+    private static int findBestEdge(List<Vector2> polygon, Vector2 normal) {
+        int bestEdge = -1;
+        float maxDot = Float.NEGATIVE_INFINITY;
+
+        for (int i = 0; i < polygon.size(); i++) {
+            Vector2 v1 = polygon.get(i);
+            Vector2 v2 = polygon.get((i + 1) % polygon.size());
             Vector2 edge = new Vector2(v2).sub(v1);
+            Vector2 edgeNormal = new Vector2(edge.y, -edge.x).nor();
 
-            if (edge.len2() <= EPSILON) {
-                continue;
-            }
-
-            Vector2 axis = new Vector2(edge.y, -edge.x).nor();
-
-            Projection pA = projectPolygon(axis, polygonA);
-            Projection pB = projectPolygon(axis, polygonB);
-
-            float overlap = pA.max - pB.min;
-            if (overlap <= 0f) {
-                return new EdgeTestResult(false, axis, overlap, i);
-            }
-
-            if (overlap < minOverlap) {
-                minOverlap = overlap;
-                bestAxis = axis;
-                bestEdgeIdx = i;
+            float dot = edgeNormal.dot(normal);
+            if (dot > maxDot) {
+                maxDot = dot;
+                bestEdge = i;
             }
         }
 
-        return new EdgeTestResult(true, bestAxis, minOverlap, bestEdgeIdx);
+        return bestEdge;
     }
 
-    public static List<ContactPoint> findEdgeIntersection(List<Vector2> polyA, List<Vector2> polyB, Vector2 normal, float penetrationDepth) {
-        List<ContactPoint> contactPoints = new ArrayList<>();
+    private static List<Vector2> clipSegmentToLine(Vector2 v1, Vector2 v2, Vector2 edgeNormal, float offset) {
+        List<Vector2> result = new ArrayList<>();
 
-        for (int i = 0; i < polyA.size(); i++) {
-            Vector2 a1 = polyA.get(i);
-            Vector2 a2 = polyA.get((i + 1) % polyA.size());
+        float d1 = edgeNormal.dot(v1) - offset;
+        float d2 = edgeNormal.dot(v2) - offset;
 
-            for(int j = 0; j < polyB.size(); j++) {
-                Vector2 b1 = polyB.get(j);
-                Vector2 b2 = polyB.get((j + 1) % polyB.size());
+        if (d1 >= -EPSILON) {
+            result.add(v1);
+        }
+        if (d2 >= -EPSILON) {
+            result.add(v2);
+        }
 
-                Vector2 intersection = lineSegmentIntersection(a1, a2, b1, b2);
-                if(intersection != null) {
-
-                    float depth = penetrationDepth;
-                    contactPoints.add(new ContactPoint(intersection, depth));
-
-                    // Only keep up to 2 contacts
-                    if (contactPoints.size() >= 2) {
-                        return contactPoints;
-                    }
-                }
+        if (d1 * d2 < 0) {
+            float t = d1 / (d1 - d2);
+            Vector2 intersection = new Vector2(v1).mulAdd(new Vector2(v2).sub(v1), t);
+            if (intersection != null) {
+                result.add(intersection);
             }
         }
 
-        return contactPoints;
+        return result;
     }
+
 
     private static Vector2 lineSegmentIntersection(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2) {
         float x1 =  a1.x;
@@ -232,6 +310,44 @@ public final class SatCollision {
         }
 
         return result;
+    }
+
+    public static EdgeTestResult testAxesWithEdge(List<Vector2> axisSource,
+                                                  List<Vector2> polygonA,
+                                                  List<Vector2> polygonB,
+                                                  float currentMinOverlap,
+                                                  Vector2 currentBestAxis) {
+        float minOverlap = currentMinOverlap;
+        Vector2 bestAxis = currentBestAxis == null ? new Vector2() : new Vector2(currentBestAxis);
+        int bestEdgeIdx = -1;
+
+        for (int i = 0; i < axisSource.size(); i++) {
+            Vector2 v1 = axisSource.get(i);
+            Vector2 v2 = axisSource.get((i + 1) % axisSource.size());
+            Vector2 edge = new Vector2(v2).sub(v1);
+
+            if (edge.len2() <= EPSILON) {
+                continue;
+            }
+
+            Vector2 axis = new Vector2(edge.y, -edge.x).nor();
+
+            Projection pA = projectPolygon(axis, polygonA);
+            Projection pB = projectPolygon(axis, polygonB);
+
+            float overlap = Math.min(pA.max, pB.max) - Math.max(pB.min, pA.min);
+            if (overlap <= 0f) {
+                return new EdgeTestResult(false, axis, overlap, i);
+            }
+
+            if (overlap < minOverlap) {
+                minOverlap = overlap;
+                bestAxis = axis;
+                bestEdgeIdx = i;
+            }
+        }
+
+        return new EdgeTestResult(true, bestAxis, minOverlap, bestEdgeIdx);
     }
 
     private static Projection projectPolygon(Vector2 axis, List<Vector2> polygon) {

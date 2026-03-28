@@ -14,8 +14,8 @@ import java.util.List;
 
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
-    final static int NUM_VEL_ITERATIONS = 6;
-    final static int NUM_POS_ITERATIONS = 3;
+    final static int NUM_VEL_ITERATIONS = 20;
+    final static int NUM_POS_ITERATIONS = 10;
     final static Vector2 GRAVITY = new Vector2(0, -6f);
     public static void step(ArrayList<PhysicsObject> objects) {
         while(Main.accumulator >= fixedStep) {
@@ -263,7 +263,7 @@ public class PhysicsResolver {
 
                     // Check if moving apart
                     float velN = relativeVel.dot(n);
-                    if (velN >= 0f) {
+                    if (velN > 0f && contact.penetration < 0.01f) {
                         continue; // Objects moving apart at this contact
                     }
 
@@ -276,8 +276,6 @@ public class PhysicsResolver {
 
                     float jn = -(1f + restitution) * velN / kN;
                     // Distribute impulse over contact count for stability
-                    jn /= manifold.getPointCount();
-
 
                     Vector2 impulseN = new Vector2(n).scl(jn);
                     if (isDebug) {
@@ -372,14 +370,14 @@ public class PhysicsResolver {
             return false;
         }
 
-        if(contact.getMaxPenetration() < 0.001f) {
+        if(contact.getPenetration() < 0.001f) {
             return false; // Ignore very small penetrations to prevent jitter
         }
 
         Vector2 n = contact.getNormal();
-        float penetrationDepth = contact.getMaxPenetration();
+        float penetrationDepth = contact.getPenetration();
         float slop = 0.01f;
-        float percent = 0.8f;
+        float percent = 0.2f;
         float correction = Math.max(penetrationDepth - slop, 0f) * percent;
 
         float invMassA = (obj1 instanceof DynamicObject) ? 1f / ((DynamicObject) obj1).getMass() : 0f;
@@ -390,17 +388,15 @@ public class PhysicsResolver {
             return false;
         }
 
-        float correctionPerPoint = correction;
-
         if (obj1 instanceof DynamicObject) {
             DynamicObject dynObj1 = (DynamicObject) obj1;
-            Vector2 newPositionA = new Vector2(dynObj1.getPosition()).sub(new Vector2(n).scl(correctionPerPoint * invMassA / totalInvMass));
+            Vector2 newPositionA = new Vector2(dynObj1.getPosition()).sub(new Vector2(n).scl(correction * invMassA / totalInvMass));
             dynObj1.setPosition(newPositionA);
         }
 
         if (obj2 instanceof DynamicObject) {
             DynamicObject dynObj2 = (DynamicObject) obj2;
-            Vector2 newPositionB = new Vector2(dynObj2.getPosition()).add(new Vector2(n).scl(correctionPerPoint * invMassB / totalInvMass));
+            Vector2 newPositionB = new Vector2(dynObj2.getPosition()).add(new Vector2(n).scl(correction * invMassB / totalInvMass));
             dynObj2.setPosition(newPositionB);
         }
 
