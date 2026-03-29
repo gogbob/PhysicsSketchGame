@@ -15,7 +15,7 @@ import java.util.List;
 
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
-    final static int NUM_VEL_ITERATIONS = 20;
+    final static int NUM_VEL_ITERATIONS = 6;
     final static int NUM_POS_ITERATIONS = 10;
     final static Vector2 GRAVITY = new Vector2(0, -6f);
     public static void step(ArrayList<PhysicsObject> objects) {
@@ -242,7 +242,7 @@ public class PhysicsResolver {
 
             ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
             if (manifold.isColliding() && manifold.getPointCount() > 0) {
-                Vector2 n = manifold.getNormal();
+                Vector2 n = manifold.getNormal().nor();
                 float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
 
                 // Pre-compute inverse masses and inertias once per manifold
@@ -346,7 +346,7 @@ public class PhysicsResolver {
 
         // Check if moving apart
         float velN = relativeVel.dot(n);
-        if (velN > 0f && contact.penetration < 0.01f) {
+        if (velN > 0f || contact.penetration < 0.01f) {
             return null;
         }
 
@@ -356,22 +356,40 @@ public class PhysicsResolver {
         float invInertiaB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getInertia();
 
         // Compute normal impulse
-        float rACrossN = rA.crs(n);
-        float rBCrossN = rB.crs(n);
-        float kN = invMassA + invMassB + rACrossN * rACrossN * invInertiaA + rBCrossN * rBCrossN * invInertiaB;
-
+        float rACrossN = n.crs(rA);
+        float rBCrossN = n.crs(rB);
+        float kN = invMassA + invMassB + new Vector2(-rACrossN * rA.y, rACrossN * rA.x).scl(invInertiaA).add(new Vector2(-rBCrossN * rB.y, rBCrossN * rB.x).scl(invInertiaB)).dot(n);
+        kN = invMassA + invMassB + Math.abs((2*n.y*n.x*rA.y*rA.x - n.x*n.x*rA.y*rA.y  - n.y*n.y*rA.x*rA.x)*invInertiaA + (2*n.y*n.x*rB.y*rB.x - n.x*n.x*rB.y*rB.y  - n.y*n.y*rB.x*rB.x)*invInertiaB);
         if (kN <= 0f) return null;
 
         float jn = -(1f + restitution) * velN / kN;
+
+
+
         // Distribute impulse over contact count for stability
 
         Vector2 impulseN = new Vector2(n).scl(jn);
+
+        Vector2 oldRelativeVel = new Vector2(relativeVel);
+
+        if(obj1.getId() == 0 || obj2.getId() == 0) {
+            int a = 0; // is ball
+        }
 
         // Apply impulse to obj1
         DebugForce df = applyImpulse(obj1, new Vector2(impulseN).scl(-1f), cp, new Color(1f, 0f, 0f, 1f / (iteration + 1)), isRun, isDebug);
         if(df != null) debugForces.add(df);
         df = applyImpulse(obj2, new Vector2(impulseN), cp, new Color(1f, 0f, 0f, 1f / (iteration + 1)), isRun, isDebug);
         if(df != null) debugForces.add(df);
+
+        //do check of general equation to see if the impulse value fits
+        vA = getContactVelocity(obj1, rA, obj1.getLinearVelocity(), obj1.getAngularVelocity());
+        vB = getContactVelocity(obj2, rB, obj2.getLinearVelocity(), obj2.getAngularVelocity());
+        relativeVel = new Vector2(vB).sub(vA);
+
+        if(relativeVel.dot(n) > -restitution*(oldRelativeVel.dot(n)) + 0.01f || relativeVel.dot(n) < -restitution*(oldRelativeVel.dot(n)) - 0.01f)
+            return null;
+
         return impulseN;
     }
 
@@ -392,7 +410,7 @@ public class PhysicsResolver {
 
 
         // resolve friction
-        Vector2 tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n))).nor();
+        Vector2 tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n)));
         if (tangent.len2() > 1e-8f) tangent = tangent.nor();
         else tangent.setZero();
 
