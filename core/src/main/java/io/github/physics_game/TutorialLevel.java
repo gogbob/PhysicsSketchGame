@@ -42,13 +42,13 @@ public class TutorialLevel extends Level {
         );
 
         List<Vector2> circleVertices = PhysicsResolver.getCircleVertices(12, 0.5f);
-        this.ball = new DynamicObject(0, 0.5f, 0.5f, 1f, circleVertices, 6f, 4f, 0f);
+        this.ball = new DynamicObject(0, 0.5f, 0.8f, 1f, circleVertices, 6f, 4f, 0f);
         addPhysicsObject(ball);
 
-        DynamicObject cup = new DynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 2f, 0f);
+        DynamicObject cup = new DynamicObject(1, 0.5f, 0.2f, 1f, cupVertices, 5f, 2f, 0f);
         addPhysicsObject(cup);
 
-        this.cupInside = new FollowingTriggerObject(2, 0.5f, 0.5f, cupInsideVertices, 5f, 2f, 0f, cup);
+        this.cupInside = new FollowingTriggerObject(2, 0.5f, 0.2f, cupInsideVertices, 5f, 2f, 0f, cup);
         addPhysicsObject(cupInside);
     }
 

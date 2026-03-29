@@ -102,7 +102,7 @@ public class DrawTool {
         DynamicObject obj = new DynamicObject(
             nextId, // ID
             0.5f, // friction
-            0.3f, // bouncy
+            0.4f, // bouncy
             1f, // density
             localPoints, // shape's point
             center.x, // x position
