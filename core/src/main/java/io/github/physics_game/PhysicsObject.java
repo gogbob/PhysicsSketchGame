@@ -22,7 +22,9 @@ public abstract class PhysicsObject {
     private List<List<Vector2>> concaveLocalBest;
     private float startX;
     private float startY;
+    private float startRotation;
     private Vector2 com = new Vector2();
+    private Vector2 relativePosition = new Vector2();
 
 
     public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
@@ -51,12 +53,17 @@ public abstract class PhysicsObject {
         this.startX = startX;
         this.startY = startY;
         this.com = PhysicsResolver.getCenterOfMassPolygon(concaveLocalTriangles);
+        this.relativePosition = new Vector2(this.com).sub(getPosition());
         setRotation(rotation);
+        this.startRotation = rotation;
         setPosition(new Vector2(startX, startY));
+
     }
     public Vector2 getCenter()  {
         //Gdx.app.log("DynamicObject", "Center of mass: " + com);
-        return new Vector2(com).add(getPosition());
+        float x = relativePosition.x * (float)Math.cos(getRotation() - startRotation) - relativePosition.y * (float)Math.sin(getRotation() - startRotation) + getPosition().x;
+        float y = relativePosition.x * (float)Math.sin(getRotation() - startRotation) + relativePosition.y * (float)Math.cos(getRotation() - startRotation)  + getPosition().y;
+        return new Vector2(x, y);
     }
     public void setPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);

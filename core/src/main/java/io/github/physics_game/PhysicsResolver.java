@@ -243,18 +243,10 @@ public class PhysicsResolver {
             ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
             if (manifold.isColliding() && manifold.getPointCount() > 0) {
                 Vector2 n = manifold.getNormal().nor();
-                float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
-
-                // Pre-compute inverse masses and inertias once per manifold
-                float invMassA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getMass();
-                float invMassB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getMass();
-                float invInertiaA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getInertia();
-                float invInertiaB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getInertia();
-
                 // Solve impulse for each contact point
                 for (ContactPoint contact : manifold.getPoints()) {
 
-                    Vector2 impulseN = resolveNormalMotion(obj1, obj2, contact, n, debugForces, iteration, isRun, isDebug);
+                    Vector2 impulseN = resolveNormalMotion(obj1, obj2, contact, n, contact.penetration, debugForces, iteration, isRun, isDebug);
                     if(impulseN == null) {
                         continue; // No impulse applied, skip friction
                     }
@@ -334,9 +326,9 @@ public class PhysicsResolver {
         return null;
     }
 
-    public static Vector2 resolveNormalMotion(PhysicsObject obj1, PhysicsObject obj2, ContactPoint contact, Vector2 n, List<DebugForce> debugForces, int iteration, boolean isRun, boolean isDebug) {
+    public static Vector2 resolveNormalMotion(PhysicsObject obj1, PhysicsObject obj2, ContactPoint contact, Vector2 n, float penetration, List<DebugForce> debugForces, int iteration, boolean isRun, boolean isDebug) {
         Vector2 cp = contact.point;
-        float restitution = Math.min(obj1.getRestitution(), obj2.getRestitution());
+        float restitution = Math.max(obj1.getRestitution(), obj2.getRestitution());
         Vector2 rA = new Vector2(cp).sub(obj1.getCenter());
         Vector2 rB = new Vector2(cp).sub(obj2.getCenter());
 
@@ -361,8 +353,11 @@ public class PhysicsResolver {
         float kN = invMassA + invMassB + new Vector2(-rACrossN * rA.y, rACrossN * rA.x).scl(invInertiaA).add(new Vector2(-rBCrossN * rB.y, rBCrossN * rB.x).scl(invInertiaB)).dot(n);
         kN = invMassA + invMassB + Math.abs((2*n.y*n.x*rA.y*rA.x - n.x*n.x*rA.y*rA.y  - n.y*n.y*rA.x*rA.x)*invInertiaA + (2*n.y*n.x*rB.y*rB.x - n.x*n.x*rB.y*rB.y  - n.y*n.y*rB.x*rB.x)*invInertiaB);
         if (kN <= 0f) return null;
+        float slop = 0.01f;
+        float beta = 0.1f;
+        float vBias = beta /  fixedStep * Math.max(0, penetration - slop);
 
-        float jn = -(1f + restitution) * velN / kN;
+        float jn = (-(1f + restitution) * velN + vBias) / kN;
 
 
 
