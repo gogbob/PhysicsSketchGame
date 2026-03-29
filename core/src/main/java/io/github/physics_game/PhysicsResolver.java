@@ -350,8 +350,7 @@ public class PhysicsResolver {
         // Compute normal impulse
         float rACrossN = n.crs(rA);
         float rBCrossN = n.crs(rB);
-        float kN = invMassA + invMassB + new Vector2(-rACrossN * rA.y, rACrossN * rA.x).scl(invInertiaA).add(new Vector2(-rBCrossN * rB.y, rBCrossN * rB.x).scl(invInertiaB)).dot(n);
-        kN = invMassA + invMassB + Math.abs((2*n.y*n.x*rA.y*rA.x - n.x*n.x*rA.y*rA.y  - n.y*n.y*rA.x*rA.x)*invInertiaA + (2*n.y*n.x*rB.y*rB.x - n.x*n.x*rB.y*rB.y  - n.y*n.y*rB.x*rB.x)*invInertiaB);
+        float kN = invMassA + invMassB + Math.abs((2*n.y*n.x*rA.y*rA.x - n.x*n.x*rA.y*rA.y  - n.y*n.y*rA.x*rA.x)*invInertiaA + (2*n.y*n.x*rB.y*rB.x - n.x*n.x*rB.y*rB.y  - n.y*n.y*rB.x*rB.x)*invInertiaB);
         if (kN <= 0f) return null;
         float slop = 0.01f;
         float beta = 0.1f;
@@ -410,7 +409,8 @@ public class PhysicsResolver {
         else tangent.setZero();
 
         if (!tangent.isZero(1e-6f)) {
-            float effectiveTangentialMass = invMassA + invMassB + (rA.crs(tangent) * rA.crs(tangent)) * invInertiaA + (rB.crs(tangent) * rB.crs(tangent)) * invInertiaB;
+            float effectiveTangentialMass = invMassA + invMassB + Math.abs((2*rA.x*rA.y*tangent.y*tangent.x - rA.y*rA.y*tangent.x* tangent.x - rA.x * rA.x*tangent.y * tangent.y) * invInertiaA +
+                (2*rB.x*rB.y*tangent.y*tangent.x - rB.y*rB.y*tangent.x* tangent.x - rB.x * rB.x*tangent.y * tangent.y) * invInertiaB);
             //impulse which would bring the relative tangential velocity to zero
             float jt = -relativeVel.dot(tangent) / effectiveTangentialMass;
             //Clamping due to Coulomb's law of friction: |jt| <= μ * j
