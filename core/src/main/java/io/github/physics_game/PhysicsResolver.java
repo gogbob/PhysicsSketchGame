@@ -405,11 +405,10 @@ public class PhysicsResolver {
 
         // resolve friction
         Vector2 tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n)));
-        if (tangent.len2() > 1e-8f) tangent = tangent.nor();
-        else tangent.setZero();
 
-        if (!tangent.isZero(1e-6f)) {
-            float effectiveTangentialMass = invMassA + invMassB + Math.abs((2*rA.x*rA.y*tangent.y*tangent.x - rA.y*rA.y*tangent.x* tangent.x - rA.x * rA.x*tangent.y * tangent.y) * invInertiaA +
+        if (!tangent.isZero(1e-9f)) {
+            tangent = tangent.nor();
+            float effectiveTangentialMass = invMassA + invMassB + Math.abs((2*rA.x*rA.y*tangent.y*tangent.x - rA.y*rA.y*tangent.x*tangent.x - rA.x*rA.x*tangent.y*tangent.y) * invInertiaA +
                 (2*rB.x*rB.y*tangent.y*tangent.x - rB.y*rB.y*tangent.x* tangent.x - rB.x * rB.x*tangent.y * tangent.y) * invInertiaB);
             //impulse which would bring the relative tangential velocity to zero
             float jt = -relativeVel.dot(tangent) / effectiveTangentialMass;
@@ -425,6 +424,11 @@ public class PhysicsResolver {
             if(df != null) debugForces.add(df);
             df = applyImpulse(obj2, new Vector2(frictionImpulse), cp, new Color(0f, 0f, 1f, 1f / (iteration + 1)), isRun, isDebug);
             if(df != null) debugForces.add(df);
+
+            vA = getContactVelocity(obj1, rA, obj1.getLinearVelocity(), obj1.getAngularVelocity());
+            vB = getContactVelocity(obj2, rB, obj2.getLinearVelocity(), obj2.getAngularVelocity());
+            relativeVel = new Vector2(vB).sub(vA);
+            tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n)));
         }
     }
 
