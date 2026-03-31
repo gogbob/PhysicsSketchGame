@@ -23,6 +23,9 @@ public class DynamicObject extends PhysicsObject {
     public float getMass() {
         return mass;
     }
+    public float getDensity() {
+        return density;
+    }
     public float getInertia() {
         return inertia;
     }

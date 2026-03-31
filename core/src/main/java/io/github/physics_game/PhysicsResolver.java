@@ -30,7 +30,8 @@ public class PhysicsResolver {
             //6. Update positions
 
             //RESOLVING ALL FORCES
-            for (PhysicsObject obj : objects) {
+            for (int i = 0; i < objects.size(); i++) {
+                PhysicsObject obj = objects.get(i);
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
                     //apply gravity
@@ -38,6 +39,20 @@ public class PhysicsResolver {
                     Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
                     Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
                     dynObj.setLinearVelocity(newVelocity);
+                }
+                for(int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject other = objects.get(j);
+                    if((obj instanceof Charged && other instanceof Charged) && (obj instanceof DynamicObject || other instanceof DynamicObject)) {
+                        //force goes from A to B for same sign charge
+                        Vector2 force = ((Charged) obj).findChargeForce(other);
+
+                        if(obj instanceof DynamicObject) {
+                            ((DynamicObject) obj).setLinearVelocity(new Vector2(obj.getLinearVelocity()).add(new Vector2(force).scl(-1f).scl(1/((DynamicObject) obj).getMass())));
+                        }
+                        if(other instanceof DynamicObject) {
+                            ((DynamicObject) other).setLinearVelocity(new Vector2(other.getLinearVelocity()).add(new Vector2(force).scl(1/((DynamicObject) other).getMass())));
+                        }
+                    }
                 }
             }
 
@@ -126,12 +141,30 @@ public class PhysicsResolver {
         if(Main.accumulator < fixedStep) {
 
 
-            for (PhysicsObject obj : objects) {
+            for (int i = 0; i < objects.size(); i++) {
+                PhysicsObject obj = objects.get(i);
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
                     forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass())));
                 }
+
+                for(int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject other = objects.get(j);
+                    if((obj instanceof Charged && other instanceof Charged) && (obj instanceof DynamicObject || other instanceof DynamicObject)) {
+                        //force goes from A to B for same sign charge
+                        Vector2 force = ((Charged) obj).findChargeForce(other);
+
+                        if(obj instanceof DynamicObject) {
+                            forces.add(new DebugForce(obj.getCenter(), new Vector2(force).scl(-1f), Color.CYAN));
+
+                        }
+                        if(other instanceof DynamicObject) {
+                            forces.add(new DebugForce(other.getCenter(), new Vector2(force), Color.CYAN));
+                        }
+                    }
+                }
             }
+
             for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {
                 for (ContactManifold coll : collisions) {
                     resolveCollision(coll, true, forces, 0, false);
@@ -148,13 +181,32 @@ public class PhysicsResolver {
             //6. Update positions
 
             //RESOLVING ALL FORCES
-            for (PhysicsObject obj : objects) {
+            for (int i = 0; i < objects.size(); i++) {
+                PhysicsObject obj = objects.get(i);
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
-                    Vector2 currentVelocity = dynObj.getLinearVelocity();
+                    //apply gravity
+
+                    Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
                     Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
                     dynObj.setLinearVelocity(newVelocity);
                     forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass())));
+                }
+                for(int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject other = objects.get(j);
+                    if((obj instanceof Charged && other instanceof Charged) && (obj instanceof DynamicObject || other instanceof DynamicObject)) {
+                        //force goes from A to B for same sign charge
+                        Vector2 force = ((Charged) obj).findChargeForce(other);
+
+                        if(obj instanceof DynamicObject) {
+                            ((DynamicObject) obj).setLinearVelocity(new Vector2(obj.getLinearVelocity()).add(new Vector2(force).scl(-1f).scl(1/((DynamicObject) obj).getMass())));
+                            forces.add(new DebugForce(obj.getCenter(), new Vector2(force).scl(-1f), Color.CYAN));
+                        }
+                        if(other instanceof DynamicObject) {
+                            ((DynamicObject) other).setLinearVelocity(new Vector2(other.getLinearVelocity()).add(new Vector2(force).scl(1/((DynamicObject) other).getMass())));
+                            forces.add(new DebugForce(other.getCenter(), new Vector2(force), Color.CYAN));
+                        }
+                    }
                 }
             }
 

@@ -19,7 +19,7 @@ public abstract class Level {
         List<Vector2> floorPoly = Arrays.asList(new Vector2(0, 0), new Vector2(viewPortWidth, 0), new Vector2(viewPortWidth, 1), new Vector2(0, 1));
         StaticObject floor = new StaticObject(-1, 0.5f, 0.5f, floorPoly, 0, 0, 0);
 
-        List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, viewPortHeight), new Vector2(0, viewPortHeight));
+        List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, viewPortHeight*2), new Vector2(0, viewPortHeight*2));
         StaticObject leftWall = new StaticObject(-2, 0.5f, 0.5f, wallPoly, 0, 0, 0);
         StaticObject rightWall = new StaticObject(-3, 0.5f, 0.5f, wallPoly, viewPortWidth - 1, 0, 0);
 

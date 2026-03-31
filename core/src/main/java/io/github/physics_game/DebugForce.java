@@ -28,6 +28,12 @@ public class DebugForce {
         this.force.set(force);
     }
 
+    public DebugForce(Vector2 position, Vector2 force, Color color) {
+        this.position.set(position);
+        this.force.set(force);
+        this.color = color;
+    }
+
     public Vector2 getPosition() {
         return new Vector2(position);
     }
