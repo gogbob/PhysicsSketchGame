@@ -1,4 +1,4 @@
-package io.github.physics_game.collision;
+package io.github.physics_game;
 
 public class ScoreCalculator {
     private static final int BaseScore= 100;
