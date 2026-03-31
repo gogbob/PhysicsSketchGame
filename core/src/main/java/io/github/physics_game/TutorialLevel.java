@@ -59,16 +59,27 @@ public class TutorialLevel extends Level {
 
     @Override
     public void tick(float deltaTime) {
-        // Implement any necessary updates for the tutorial level
-        if(!cupInside.getTriggeredObjectIds().contains(ball.getId())) {
-            elapsedTimeOutside -= deltaTime;
-            if (elapsedTimeOutside <= 0) {
-                System.out.println("Ball has been outside the cup for long enough! You win");
-                isComplete = true;
+        if(!isComplete) {
+            // Implement any necessary updates for the tutorial level
+            if(!cupInside.getTriggeredObjectIds().contains(ball.getId())) {
+                elapsedTimeOutside -= deltaTime;
+                if (elapsedTimeOutside <= 0) {
+                    System.out.println("Ball has been outside the cup for long enough! You win");
+                    isComplete = true;
+                }
+            } else {
+                System.out.println("Ball is inside the cup!");
+                elapsedTimeOutside = timeToComplete; // Reset the timer if the ball is inside the cup
             }
-        } else {
-            System.out.println("Ball is inside the cup!");
-            elapsedTimeOutside = timeToComplete; // Reset the timer if the ball is inside the cup
+
+            for(PhysicsObject obj : this.getPhysicsObjects()) {
+                if(obj instanceof TriggerObject) {
+                    ((TriggerObject) obj).resetTriggeredObjectIds();
+                }
+                if(obj instanceof DynamicTriggerObject) {
+                    ((DynamicTriggerObject) obj).resetTriggeredObjectIds();
+                }
+            }
         }
     }
 

@@ -46,7 +46,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
     private DynamicObject dynamicObject;
     private StaticObject floorObject;
-    private Level exampleLevel;
+    private Level currentLevel;
     private DrawTool drawTool;
 
 
@@ -72,7 +72,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         //exampleObject.setRotation((float)Math.PI);\
 
         drawTool = new DrawTool(camera, tutorialLevel);
-        exampleLevel = tutorialLevel;
+        currentLevel = tutorialLevel;
         Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
@@ -135,12 +135,12 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         if(!showDebugOverlay) {
             //Normal view
             if(runPhysics){
-                PhysicsResolver.step(exampleLevel.getPhysicsObjects());
+                PhysicsResolver.step(currentLevel.getPhysicsObjects());
             }
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
-            for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
+            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
                 if(obj instanceof DynamicTriggerObject) {
                     drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.BLUE);
                 } else if(obj instanceof DynamicObject) {
@@ -163,15 +163,18 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 }
             }
 
+            currentLevel.tick(delta);
+
             shapeRenderer.end();
 
             camera.update();
         } else {
             //Debug view
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(exampleLevel.getPhysicsObjects());
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
+
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-            for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
+            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
                 if(obj instanceof DynamicTriggerObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.GOLD);
                 } else if(obj instanceof DynamicObject) {
@@ -180,6 +183,21 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.CYAN);
                 } else if (obj instanceof TriggerObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.RED);
+                }
+            }
+
+            currentLevel.tick(delta);
+
+            // draw the drawing line
+            if (drawTool.isDrawing()) {
+                ArrayList<Vector2> pts = drawTool.getPoints();
+                if (pts.size() > 1) {
+                    shapeRenderer.setColor(Color.GREEN);
+                    for (int j = 0; j < pts.size() - 1; j++) {
+                        Vector2 p1 = pts.get(j);
+                        Vector2 p2 = pts.get(j + 1);
+                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
+                    }
                 }
             }
 

@@ -426,13 +426,12 @@ public class PhysicsResolver {
     public static void triggerAdditionalLogic(ArrayList<ContactManifold> collisions) {
         for(ContactManifold manifold : collisions) {
             PhysicsObject objA = manifold.getA();
-            PhysicsObject objB = manifold.getA();
+            PhysicsObject objB = manifold.getB();
 
             if(!(objA instanceof TriggerObject && objB instanceof TriggerObject)) {
                 if(objA instanceof TriggerObject) {
                     ((TriggerObject) objA).addTriggered(objB.getId());
-                }
-                if(objB instanceof TriggerObject) {
+                } else if(objB instanceof TriggerObject) {
                     ((TriggerObject) objB).addTriggered(objA.getId());
                 }
 
