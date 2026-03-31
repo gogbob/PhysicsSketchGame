@@ -19,6 +19,10 @@ public class TriggerObject extends PhysicsObject {
         return triggeredObjectIds;
     }
 
+    public void resetTriggeredObjectIds() {
+        triggeredObjectIds.clear();
+    }
+
     @Override
     public void reinitialize() {
         setPosition(new Vector2(getStartX(), getStartY()));

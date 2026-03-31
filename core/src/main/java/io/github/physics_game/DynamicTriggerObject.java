@@ -10,6 +10,10 @@ public class DynamicTriggerObject extends DynamicObject {
         super(id, friction, restitution, density, vertices, startX, startY, rotation);
     }
 
+    public void resetTriggeredObjectIds() {
+        triggeredObjectIds.clear();
+    }
+
     public void addTriggered(int id) {
         triggeredObjectIds.add(id);
     }

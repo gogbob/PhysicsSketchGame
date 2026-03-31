@@ -6,6 +6,7 @@ import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.PhysicsObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,9 +37,11 @@ public final class CustomContactHandler {
         }
 
         // Collect best manifold across all triangle pairs, filtering internal edges
-        ContactManifold best = ContactManifold.NO_CONTACT;
+        Vector2 bestNormal = new Vector2();
         float bestDepth = -Float.MAX_VALUE;
-
+        float bestCorrection = -Float.MAX_VALUE;
+        List<ContactPoint> contacts = new ArrayList<>();
+        ContactPoint bestPoint = null;
         for (List<Vector2> pA : polysA) {
             Aabb aabbA = Aabb.fromPolygon(pA);
             for (List<Vector2> pB : polysB) {
@@ -48,20 +51,55 @@ public final class CustomContactHandler {
                 }
 
                 ContactManifold manifold = SatCollision.detect(pA, pB);
-                if (!manifold.isColliding()) {
-                    continue;
+
+                if (manifold.isColliding() && manifold.getPoints().isEmpty()) {
+                    System.out.println("WARNING: collision without contacts");
                 }
 
-                // Prefer deeper (more stable) contacts
-                float d = manifold.getMaxPenetration();
-                if (d > bestDepth) {
-                    bestDepth = d;
-                    best = manifold;
+                if(manifold.isColliding()) {
+                    if(manifold.getPenetration() > bestDepth) {
+                        bestNormal = manifold.getNormal();
+                        bestDepth = manifold.getPenetration();
+                    }
+                    for(ContactPoint point : manifold.getPoints()) {
+                        boolean isUnique = true;
+                        for(ContactPoint p : contacts)
+                        {
+                            if(point.point.epsilonEquals(p.point, 0.01f)) {
+                                isUnique = false;
+                                break;
+                            }
+                        }
+                        if(isUnique) {
+                            contacts.add(point);
+                            if(bestPoint == null || point.penetration > bestCorrection) {
+                                bestCorrection = point.penetration;
+                                bestPoint = point;
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        return best;
+        if(contacts.isEmpty()) {
+            return new ContactManifold(true, bestNormal, new ArrayList<>(), bestDepth, a, b);
+        } else if(contacts.size() == 1) {
+            return new ContactManifold(true, bestNormal, contacts, bestDepth, a, b);
+        } else {
+            //find farthest point from best
+            ContactPoint farthest = null;
+            float maxDistance = -Float.MAX_VALUE;
+            for(ContactPoint point : contacts) {
+                float distance = point.point.dst(bestPoint.point);
+                if (distance > maxDistance) {
+                    maxDistance = distance;
+                    farthest = point;
+                }
+            }
+
+            return new ContactManifold(true, bestNormal, Arrays.asList(bestPoint, farthest), bestDepth, a, b);
+        }
     }
 
     public static List<List<Vector2>> toWorld(PhysicsObject object) {

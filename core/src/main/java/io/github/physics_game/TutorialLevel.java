@@ -1,7 +1,6 @@
 package io.github.physics_game;
 
 import com.badlogic.gdx.math.Vector2;
-import io.github.physics_game.collision.ScoreCalculator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,13 +13,8 @@ public class TutorialLevel extends Level {
     private FollowingTriggerObject cupInside;
     private DynamicObject ball;
     private boolean isComplete;
-
-    private static final int SHAPE_PENALTY = 10; // Each shape took off 10 points
+    private static final int ShapePenalty = 10; // Each shape took off 10 points
     private static final float TIME_PENALTY = 1.0f;
-
-    private int maxShapes = 5;
-    private int shapesDrawn = 0;
-    private float totalTime = 0f;
 
     public TutorialLevel() {
         super(0, "Tutorial Level", new ArrayList<>(), 20f, 15f);
@@ -65,27 +59,11 @@ public class TutorialLevel extends Level {
 
     @Override
     public void tick(float deltaTime) {
-        totalTime += deltaTime;
-
         // Implement any necessary updates for the tutorial level
         if(!cupInside.getTriggeredObjectIds().contains(ball.getId())) {
             elapsedTimeOutside -= deltaTime;
             if (elapsedTimeOutside <= 0) {
-                System.out.println(" Level Complete!");
-                System.out.println(" Shapes used: " + shapesDrawn + "/" + maxShapes);
-                System.out.println(" Time: " + String.format("%.1f", totalTime) + "s");
-
-                // calculate score
-                int score = ScoreCalculator.calculateScore(
-                    shapesDrawn, totalTime,
-                    SHAPE_PENALTY, TIME_PENALTY
-                );
-
-                int stars = ScoreCalculator.calculateStars(score);
-
-                System.out.println(" Your Final Score is: " + score);
-                System.out.println(" Stars: " + stars);
-
+                System.out.println("Ball has been outside the cup for long enough! You win");
                 isComplete = true;
             }
         } else {
@@ -94,26 +72,4 @@ public class TutorialLevel extends Level {
         }
     }
 
-    public boolean addDrawnShape(DynamicObject shape) {
-        if (shapesDrawn >= maxShapes) {
-            System.out.println(" Maximum shapes reached! (" + maxShapes + ")");
-            return false;
-        }
-        addPhysicsObject(shape);
-        shapesDrawn++;
-        System.out.println(" Shape " + shapesDrawn + "/" + maxShapes + " added");
-        return true;
-    }
-
-    public int getShapesDrawn() {
-        return shapesDrawn;
-    }
-
-    public int getMaxShapes() {
-        return maxShapes;
-    }
-
-    public float getTotalTime() {
-        return totalTime;
-    }
 }
