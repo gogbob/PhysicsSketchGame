@@ -83,9 +83,9 @@ public final class CustomContactHandler {
         }
 
         if(contacts.isEmpty()) {
-            return new ContactManifold(true, bestNormal, new ArrayList<>(), bestDepth);
+            return new ContactManifold(true, bestNormal, new ArrayList<>(), bestDepth, a, b);
         } else if(contacts.size() == 1) {
-            return new ContactManifold(true, bestNormal, contacts, bestDepth);
+            return new ContactManifold(true, bestNormal, contacts, bestDepth, a, b);
         } else {
             //find farthest point from best
             ContactPoint farthest = null;
@@ -98,7 +98,7 @@ public final class CustomContactHandler {
                 }
             }
 
-            return new ContactManifold(true, bestNormal, Arrays.asList(bestPoint, farthest), bestDepth);
+            return new ContactManifold(true, bestNormal, Arrays.asList(bestPoint, farthest), bestDepth, a, b);
         }
     }
 

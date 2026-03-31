@@ -1,6 +1,7 @@
 package io.github.physics_game.collision;
 
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.PhysicsObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,12 +17,20 @@ public final class ContactManifold {
     private final Vector2 normal; // A -> B
     private final List<ContactPoint> points; // 0..2 points
     private final float penetration;
+    private PhysicsObject a;
+    private PhysicsObject b;
 
     public ContactManifold(boolean colliding, Vector2 normal, List<ContactPoint> points, float penetration) {
         this.colliding = colliding;
         this.normal = new Vector2(normal);
         this.points = new ArrayList<>(points);
         this.penetration = penetration;
+    }
+
+    public ContactManifold(boolean colliding, Vector2 normal, List<ContactPoint> points, float penetration,  PhysicsObject a,  PhysicsObject b) {
+        this(colliding, normal, points, penetration);
+        this.a = a;
+        this.b = b;
     }
 
     public boolean isColliding() {
@@ -42,6 +51,14 @@ public final class ContactManifold {
 
     public float getPenetration() {
         return penetration;
+    }
+
+    public PhysicsObject getA() {
+        return a;
+    }
+
+    public PhysicsObject getB() {
+        return b;
     }
 
     public float getAveragePenetration() {

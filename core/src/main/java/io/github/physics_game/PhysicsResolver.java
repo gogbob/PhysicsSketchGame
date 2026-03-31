@@ -15,7 +15,7 @@ import java.util.List;
 
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
-    final static int NUM_VEL_ITERATIONS = 6;
+    final static int NUM_VEL_ITERATIONS = 10;
     final static int NUM_POS_ITERATIONS = 10;
     final static Vector2 GRAVITY = new Vector2(0, -6f);
     public static void step(ArrayList<PhysicsObject> objects) {
@@ -41,41 +41,25 @@ public class PhysicsResolver {
                 }
             }
 
-            //RESOLVE COLLISIONS
-            for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {
-                boolean anyCollision = false;
-                for (int i = 0; i < objects.size(); i++) {
-                    for (int j = i + 1; j < objects.size(); j++) {
-                        PhysicsObject obj1 = objects.get(i);
-                        PhysicsObject obj2 = objects.get(j);
-                        if(iteration == 0) {
-                            if(((obj1 instanceof TriggerObject || obj1 instanceof DynamicTriggerObject) && obj2 instanceof DynamicObject)
-                                || ((obj2 instanceof TriggerObject || obj2 instanceof DynamicTriggerObject) && obj1 instanceof DynamicObject)) {
-                                //check if a body is triggering a field
-                                ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
-                                if(manifold.isColliding()) {
-                                    if (obj1 instanceof TriggerObject) {
-                                        ((TriggerObject) obj1).addTriggered(obj2.getId());
-                                    } else if(obj2 instanceof TriggerObject) {
-                                        ((TriggerObject) obj2).addTriggered(obj1.getId());
-                                    }
-                                    //dynamic trigger objects can also trigger other trigger objects so are independent
-                                    if(obj1 instanceof DynamicTriggerObject) {
-                                        ((DynamicTriggerObject) obj1).addTriggered(obj2.getId());
-                                    }
-                                    if(obj2 instanceof DynamicTriggerObject) {
-                                        ((DynamicTriggerObject) obj2).addTriggered(obj1.getId());
-                                    }
-                                }
-                            }
-                        }
-                        if(resolveCollision(obj1, obj2, false, null, iteration, true)) {
-                            anyCollision = true;
-                        }
+            ArrayList<ContactManifold> collisions = new ArrayList<>();
+
+            for (int i = 0; i < objects.size(); i++) {
+                for (int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject obj1 = objects.get(i);
+                    PhysicsObject obj2 = objects.get(j);
+                    ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+                    if(manifold.isColliding() && manifold.getPointCount() > 0) {
+                        collisions.add(manifold);
                     }
                 }
-                if(!anyCollision) {
-                    break;
+            }
+
+            triggerAdditionalLogic(collisions);
+
+            for(int i = 0; i < NUM_VEL_ITERATIONS; i++) {
+                for (ContactManifold coll : collisions) {
+
+                    resolveCollision(coll, false, null, i, true);
                 }
             }
             // move the objects
@@ -122,7 +106,26 @@ public class PhysicsResolver {
                 forces.add(velForce);
             }
         }
+
+
+
+        ArrayList<ContactManifold> collisions = new ArrayList<>();
+
+        for (int i = 0; i < objects.size(); i++) {
+            for (int j = i + 1; j < objects.size(); j++) {
+                PhysicsObject obj1 = objects.get(i);
+                PhysicsObject obj2 = objects.get(j);
+                ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+                if(manifold.isColliding() && manifold.getPointCount() > 0) {
+                    collisions.add(manifold);
+                }
+            }
+        }
+
+
         if(Main.accumulator < fixedStep) {
+
+
             for (PhysicsObject obj : objects) {
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
@@ -130,18 +133,8 @@ public class PhysicsResolver {
                 }
             }
             for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {
-                boolean anyCollision = false;
-                for (int i = 0; i < objects.size(); i++) {
-                    for (int j = i + 1; j < objects.size(); j++) {
-                        PhysicsObject obj1 = objects.get(i);
-                        PhysicsObject obj2 = objects.get(j);
-                        if(resolveCollision(obj1, obj2, true, forces, iteration, false)) {
-                            anyCollision = true;
-                        }
-                    }
-                }
-                if(!anyCollision) {
-                    break;
+                for (ContactManifold coll : collisions) {
+                    resolveCollision(coll, true, forces, 0, false);
                 }
             }
         }
@@ -165,42 +158,25 @@ public class PhysicsResolver {
                 }
             }
 
+            collisions = new ArrayList<>();
 
-            //RESOLVE COLLISIONS
-            for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {
-                boolean anyCollision = false;
-                for (int i = 0; i < objects.size(); i++) {
-                    for (int j = i + 1; j < objects.size(); j++) {
-                        PhysicsObject obj1 = objects.get(i);
-                        PhysicsObject obj2 = objects.get(j);
-                        if(iteration == 0) {
-                            if(((obj1 instanceof TriggerObject || obj1 instanceof DynamicTriggerObject) && obj2 instanceof DynamicObject)
-                                || ((obj2 instanceof TriggerObject || obj2 instanceof DynamicTriggerObject) && obj1 instanceof DynamicObject)) {
-                                //check if a body is triggering a field
-                                ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
-                                if(manifold.isColliding()) {
-                                    if (obj1 instanceof TriggerObject) {
-                                        ((TriggerObject) obj1).addTriggered(obj2.getId());
-                                    } else if(obj2 instanceof TriggerObject) {
-                                        ((TriggerObject) obj2).addTriggered(obj1.getId());
-                                    }
-                                    //dynamic trigger objects can also trigger other trigger objects so are independent
-                                    if(obj1 instanceof DynamicTriggerObject) {
-                                        ((DynamicTriggerObject) obj1).addTriggered(obj2.getId());
-                                    }
-                                    if(obj2 instanceof DynamicTriggerObject) {
-                                        ((DynamicTriggerObject) obj2).addTriggered(obj1.getId());
-                                    }
-                                }
-                            }
-                        }
-                        if(resolveCollision(obj1, obj2, true, forces, iteration, true)) {
-                            anyCollision = true;
-                        }
+            for (int i = 0; i < objects.size(); i++) {
+                for (int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject obj1 = objects.get(i);
+                    PhysicsObject obj2 = objects.get(j);
+                    ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+                    if(manifold.isColliding() && manifold.getPointCount() > 0) {
+                        collisions.add(manifold);
                     }
                 }
-                if(!anyCollision) {
-                    break;
+            }
+
+            triggerAdditionalLogic(collisions);
+
+            //RESOLVE COLLISIONS
+            for(int i = 0; i < NUM_VEL_ITERATIONS; i++) {
+                for (ContactManifold coll : collisions) {
+                    resolveCollision(coll, true, forces, i, true);
                 }
             }
             // move the objects
@@ -237,25 +213,23 @@ public class PhysicsResolver {
         return forces;
     }
 
-    public static boolean resolveCollision(PhysicsObject obj1, PhysicsObject obj2, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration, boolean isRun) {
+    public static boolean resolveCollision(ContactManifold manifold, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration, boolean isRun) {
+        PhysicsObject obj1 = manifold.getA();
+        PhysicsObject obj2 = manifold.getB();
         if ((!((obj1 instanceof StaticObject) && obj2 instanceof StaticObject)) && !(obj1 instanceof TriggerObject || obj2 instanceof TriggerObject)) {
+            Vector2 n = manifold.getNormal().nor();
+            // Solve impulse for each contact point
+            for (ContactPoint contact : manifold.getPoints()) {
 
-            ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
-            if (manifold.isColliding() && manifold.getPointCount() > 0) {
-                Vector2 n = manifold.getNormal().nor();
-                // Solve impulse for each contact point
-                for (ContactPoint contact : manifold.getPoints()) {
-
-                    Vector2 impulseN = resolveNormalMotion(obj1, obj2, contact, n, contact.penetration, debugForces, iteration, isRun, isDebug);
-                    if(impulseN == null) {
-                        continue; // No impulse applied, skip friction
-                    }
-                    resolveFrictionMotion(obj1, obj2, contact, n, debugForces, iteration, isRun, isDebug, impulseN.len());
-                    // Recompute relative velocity after
-
+                Vector2 impulseN = resolveNormalMotion(obj1, obj2, contact, n, contact.penetration, debugForces, iteration, isRun, isDebug);
+                if(impulseN == null) {
+                    continue; // No impulse applied, skip friction
                 }
-                return true;
+                resolveFrictionMotion(obj1, obj2, contact, n, debugForces, iteration, isRun, isDebug, impulseN.len());
+                // Recompute relative velocity after
+
             }
+            return true;
         }
         return false;
     }
@@ -338,9 +312,12 @@ public class PhysicsResolver {
 
         // Check if moving apart
         float velN = relativeVel.dot(n);
-        if (velN > 0f || contact.penetration < 0.01f) {
+
+
+        if (contact.penetration < 0.01f) {
             return null;
         }
+
 
         float invMassA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getMass();
         float invMassB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getMass();
@@ -348,17 +325,24 @@ public class PhysicsResolver {
         float invInertiaB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getInertia();
 
         // Compute normal impulse
-        float rACrossN = n.crs(rA);
-        float rBCrossN = n.crs(rB);
         float kN = invMassA + invMassB + Math.abs((2*n.y*n.x*rA.y*rA.x - n.x*n.x*rA.y*rA.y  - n.y*n.y*rA.x*rA.x)*invInertiaA + (2*n.y*n.x*rB.y*rB.x - n.x*n.x*rB.y*rB.y  - n.y*n.y*rB.x*rB.x)*invInertiaB);
         if (kN <= 0f) return null;
+
+        if(contact.firstIteration) {
+            contact.firstIteration = false;
+            if(velN < -1f) {
+                contact.bias = -restitution * velN;
+            }
+        }
+
+        //use the accumulated impulse
+        float jn = (-velN + contact.bias) / kN;
+
+        float temp = contact.accumulatedNormalImpulse;
+        contact.accumulatedNormalImpulse = Math.max(temp + jn, 0f);
         float slop = 0.01f;
         float beta = 0.1f;
-        float vBias = beta /  fixedStep * Math.max(0, penetration - slop);
-
-        float jn = (-(1f + restitution) * velN + vBias) / kN;
-
-
+        jn = contact.accumulatedNormalImpulse - temp;
 
         // Distribute impulse over contact count for stability
 
@@ -406,17 +390,24 @@ public class PhysicsResolver {
         // resolve friction
         Vector2 tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n)));
 
-        if (!tangent.isZero(1e-9f)) {
+
+        if (!tangent.epsilonEquals(Vector2.Zero, 1e-12f)) {
             tangent = tangent.nor();
             float effectiveTangentialMass = invMassA + invMassB + Math.abs((2*rA.x*rA.y*tangent.y*tangent.x - rA.y*rA.y*tangent.x*tangent.x - rA.x*rA.x*tangent.y*tangent.y) * invInertiaA +
                 (2*rB.x*rB.y*tangent.y*tangent.x - rB.y*rB.y*tangent.x* tangent.x - rB.x * rB.x*tangent.y * tangent.y) * invInertiaB);
             //impulse which would bring the relative tangential velocity to zero
             float jt = -relativeVel.dot(tangent) / effectiveTangentialMass;
+
+            float temp = contact.accumulatedFrictionImpulse;
+            contact.accumulatedFrictionImpulse = contact.accumulatedFrictionImpulse + jt;
+
             //Clamping due to Coulomb's law of friction: |jt| <= μ * j
             float mu = (obj1.getFriction() + obj2.getFriction()) / 2f;
-            if (Math.abs(jt) > mu * jn) {
-                jt = mu * jn * Math.signum(jt);
+            if (Math.abs(contact.accumulatedFrictionImpulse) > mu * contact.accumulatedNormalImpulse) {
+                contact.accumulatedFrictionImpulse = mu * contact.accumulatedNormalImpulse * Math.signum(jt);
             }
+
+            jt = contact.accumulatedFrictionImpulse - temp;
             //Gdx.app.log("Physics Resolver", "Applying friction impulse with magnitude " + jt);
             Vector2 frictionImpulse = new Vector2(tangent).scl(jt);
 
@@ -429,6 +420,29 @@ public class PhysicsResolver {
             vB = getContactVelocity(obj2, rB, obj2.getLinearVelocity(), obj2.getAngularVelocity());
             relativeVel = new Vector2(vB).sub(vA);
             tangent = new Vector2(relativeVel).sub(new Vector2(n).scl(relativeVel.dot(n)));
+        }
+    }
+
+    public static void triggerAdditionalLogic(ArrayList<ContactManifold> collisions) {
+        for(ContactManifold manifold : collisions) {
+            PhysicsObject objA = manifold.getA();
+            PhysicsObject objB = manifold.getA();
+
+            if(!(objA instanceof TriggerObject && objB instanceof TriggerObject)) {
+                if(objA instanceof TriggerObject) {
+                    ((TriggerObject) objA).addTriggered(objB.getId());
+                }
+                if(objB instanceof TriggerObject) {
+                    ((TriggerObject) objB).addTriggered(objA.getId());
+                }
+
+                if(objA instanceof DynamicTriggerObject) {
+                    ((DynamicTriggerObject)objA).addTriggered(objB.getId());
+                }
+                if(objB instanceof DynamicTriggerObject) {
+                    ((DynamicTriggerObject)objB).addTriggered(objA.getId());
+                }
+            }
         }
     }
 
