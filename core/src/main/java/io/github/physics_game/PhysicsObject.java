@@ -104,7 +104,10 @@ public abstract class PhysicsObject {
     public float getStartY() {
         return startY;
     }
-    public abstract void reinitialize();
+    public void reinitialize() {
+        setPosition(new Vector2(startX, startY));
+        setRotation(startRotation);
+    }
     public abstract Vector2 getLinearVelocity();
     public abstract float getAngularVelocity();
 }

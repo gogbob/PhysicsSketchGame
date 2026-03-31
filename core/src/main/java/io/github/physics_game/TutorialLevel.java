@@ -10,7 +10,7 @@ import java.util.Vector;
 public class TutorialLevel extends Level {
     private final float timeToComplete = 5f; // Time in seconds to complete the level
     private float elapsedTimeOutside = timeToComplete;
-    private FollowingTriggerObject cupInside;
+    private FollowingUncollidableField cupInside;
     private DynamicObject ball;
     private boolean isComplete;
     private static final int ShapePenalty = 10; // Each shape took off 10 points
@@ -48,7 +48,7 @@ public class TutorialLevel extends Level {
         DynamicObject cup = new DynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 2f, 0f);
         addPhysicsObject(cup);
 
-        this.cupInside = new FollowingTriggerObject(2, 0.5f, 0.5f, cupInsideVertices, 5f, 2f, 0f, cup);
+        this.cupInside = new FollowingUncollidableField(2, cupInsideVertices, 5f, 2f, 0f, cup);
         addPhysicsObject(cupInside);
     }
 
@@ -60,7 +60,7 @@ public class TutorialLevel extends Level {
     @Override
     public void tick(float deltaTime) {
         // Implement any necessary updates for the tutorial level
-        if(!cupInside.getTriggeredObjectIds().contains(ball.getId())) {
+        if(!cupInside.getTriggerIds().contains(ball.getId())) {
             elapsedTimeOutside -= deltaTime;
             if (elapsedTimeOutside <= 0) {
                 System.out.println("Ball has been outside the cup for long enough! You win");
@@ -69,6 +69,12 @@ public class TutorialLevel extends Level {
         } else {
             System.out.println("Ball is inside the cup!");
             elapsedTimeOutside = timeToComplete; // Reset the timer if the ball is inside the cup
+        }
+
+        for(PhysicsObject obj : getPhysicsObjects()) {
+            if(obj instanceof Triggerable) {
+                ((Triggerable) obj).resetTriggerIds();
+            }
         }
     }
 
