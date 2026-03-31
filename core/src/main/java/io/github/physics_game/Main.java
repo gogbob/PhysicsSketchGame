@@ -137,6 +137,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             if(runPhysics){
                 PhysicsResolver.step(currentLevel.getPhysicsObjects());
             }
+
+            if(currentLevel.isComplete()) {
+                Gdx.app.log("Main", "Level complete! Loading next level...");
+                runPhysics = false;
+            }
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
@@ -172,6 +177,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             //Debug view
             ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
 
+            if(currentLevel.isComplete()) {
+                Gdx.app.log("Main", "Level complete! Loading next level...");
+                runPhysics = false;
+            }
+
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
@@ -181,7 +191,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.YELLOW);
                 } else if (obj instanceof StaticObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.CYAN);
-                } else if (obj instanceof TriggerObject) {
+                } else if (obj instanceof UncollidableObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.RED);
                 }
             }

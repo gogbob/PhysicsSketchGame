@@ -68,8 +68,8 @@ public class PhysicsResolver {
                     DynamicObject dynObj = (DynamicObject) obj;
                     dynObj.updatePosition(fixedStep);
                 }
-                if(obj instanceof FollowingTriggerObject) {
-                    ((FollowingTriggerObject) obj).updatePosition();
+                if(obj instanceof Following) {
+                    ((Following) obj).updatePosition();
                 }
             }
 
@@ -185,8 +185,8 @@ public class PhysicsResolver {
                     DynamicObject dynObj = (DynamicObject) obj;
                     dynObj.updatePosition(fixedStep);
                 }
-                if(obj instanceof FollowingTriggerObject) {
-                    ((FollowingTriggerObject) obj).updatePosition();
+                if(obj instanceof Following) {
+                    ((Following) obj).updatePosition();
                 }
             }
 
@@ -216,7 +216,7 @@ public class PhysicsResolver {
     public static boolean resolveCollision(ContactManifold manifold, boolean isDebug, ArrayList<DebugForce> debugForces, int iteration, boolean isRun) {
         PhysicsObject obj1 = manifold.getA();
         PhysicsObject obj2 = manifold.getB();
-        if ((!((obj1 instanceof StaticObject) && obj2 instanceof StaticObject)) && !(obj1 instanceof TriggerObject || obj2 instanceof TriggerObject)) {
+        if ((!((obj1 instanceof StaticObject) && obj2 instanceof StaticObject)) && !(obj1 instanceof UncollidableObject || obj2 instanceof UncollidableObject)) {
             Vector2 n = manifold.getNormal().nor();
             // Solve impulse for each contact point
             for (ContactPoint contact : manifold.getPoints()) {
@@ -235,7 +235,7 @@ public class PhysicsResolver {
     }
 
     public static boolean resolvePenetrationCorrection(PhysicsObject obj1, PhysicsObject obj2) {
-        if((obj1 instanceof StaticObject && obj2 instanceof StaticObject) || (obj1 instanceof TriggerObject || obj2 instanceof TriggerObject)) {
+        if((obj1 instanceof StaticObject && obj2 instanceof StaticObject) || (obj1 instanceof UncollidableObject || obj2 instanceof UncollidableObject)) {
             return false;
         }
 
@@ -428,18 +428,11 @@ public class PhysicsResolver {
             PhysicsObject objA = manifold.getA();
             PhysicsObject objB = manifold.getB();
 
-            if(!(objA instanceof TriggerObject && objB instanceof TriggerObject)) {
-                if(objA instanceof TriggerObject) {
-                    ((TriggerObject) objA).addTriggered(objB.getId());
-                } else if(objB instanceof TriggerObject) {
-                    ((TriggerObject) objB).addTriggered(objA.getId());
-                }
-
-                if(objA instanceof DynamicTriggerObject) {
-                    ((DynamicTriggerObject)objA).addTriggered(objB.getId());
-                }
-                if(objB instanceof DynamicTriggerObject) {
-                    ((DynamicTriggerObject)objB).addTriggered(objA.getId());
+            if(!(objA instanceof UncollidableObject && objB instanceof UncollidableObject)) {
+                if(objA instanceof Triggerable) {
+                    ((Triggerable) objA).addTriggerId(objB.getId());
+                } else if(objB instanceof Triggerable) {
+                    ((Triggerable) objB).addTriggerId(objA.getId());
                 }
             }
         }
