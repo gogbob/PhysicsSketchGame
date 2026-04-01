@@ -16,8 +16,7 @@ import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import io.github.physics_game.collision.CustomContactHandler;
-import io.github.physics_game.collision.EarClippingDecomposer;
-import io.github.physics_game.collision.SatCollision;
+import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;

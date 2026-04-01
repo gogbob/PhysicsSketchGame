@@ -1,7 +1,8 @@
 package io.github.physics_game;
 
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.physics.box2d.World;
+import io.github.physics_game.object_types.PhysicsObject;
+import io.github.physics_game.object_types.StaticObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;

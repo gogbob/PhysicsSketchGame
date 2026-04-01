@@ -1,7 +1,7 @@
 package io.github.physics_game.collision;
 
 import com.badlogic.gdx.math.Vector2;
-import io.github.physics_game.PhysicsObject;
+import io.github.physics_game.object_types.PhysicsObject;
 
 import java.util.ArrayList;
 import java.util.List;

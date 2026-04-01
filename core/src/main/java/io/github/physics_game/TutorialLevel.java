@@ -1,11 +1,11 @@
 package io.github.physics_game;
 
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Vector;
 
 public class TutorialLevel extends Level {
     private final float timeToComplete = 5f; // Time in seconds to complete the level

@@ -1,14 +1,11 @@
 package io.github.physics_game;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.physics.box2d.Contact;
 import io.github.physics_game.collision.ContactManifold;
 import io.github.physics_game.collision.ContactPoint;
 import io.github.physics_game.collision.CustomContactHandler;
+import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.List;
