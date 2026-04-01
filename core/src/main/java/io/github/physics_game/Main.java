@@ -7,6 +7,8 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
@@ -32,6 +34,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
+    BitmapFont winFont;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
@@ -58,6 +61,8 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
+        winFont = new BitmapFont();
+        winFont.setColor(Color.WHITE);
         DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
@@ -104,7 +109,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     @Override
     public void render() {
-
         float delta = Gdx.graphics.getDeltaTime();
 
         drawTool.update();
@@ -131,6 +135,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         // clear the screen
         ScreenUtils.clear(Color.BLACK);
+
 
         if(!showDebugOverlay) {
             //Normal view
@@ -171,8 +176,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             currentLevel.tick(delta);
 
             shapeRenderer.end();
-
-            camera.update();
         } else {
             //Debug view
             ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
@@ -216,9 +219,21 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             shapeRenderer.end();
-
-            camera.update();
         }
+
+        //generate UI Here
+        batch.begin();
+
+        if(currentLevel.isComplete()) {
+            GlyphLayout layout = new GlyphLayout(winFont, "Level Complete!", Color.GREEN, 0, 1, false);
+            float x = camera.position.x + viewport.getScreenWidth()/2f - layout.width /2f;
+            float y = camera.position.y + viewport.getScreenHeight() * 3f/4f + layout.height /2f;
+            winFont.draw(batch, layout, x, y);
+
+        }
+
+        batch.end();
+        camera.update();
     }
 
     @Override
