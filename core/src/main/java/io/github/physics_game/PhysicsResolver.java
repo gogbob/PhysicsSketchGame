@@ -1,9 +1,6 @@
 package io.github.physics_game;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.collision.ContactManifold;
 import io.github.physics_game.collision.ContactPoint;
@@ -17,8 +14,8 @@ public class PhysicsResolver {
     final static int NUM_VEL_ITERATIONS = 6;
     final static int NUM_POS_ITERATIONS = 3;
     final static Vector2 GRAVITY = new Vector2(0, -6f);
-    public static void step(ArrayList<PhysicsObject> objects) {
-        while(Main.accumulator >= fixedStep) {
+    public static void step(float accumulator, ArrayList<PhysicsObject> objects) {
+        while(GameScreen.accumulator >= fixedStep) {
             // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.
 
             //1. Integrate forces → update velocity
@@ -106,11 +103,11 @@ public class PhysicsResolver {
                 }
             }
 
-            Main.accumulator -= fixedStep;
+            GameScreen.accumulator -= fixedStep;
         }
     }
 
-    public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects) {
+    public static ArrayList<DebugForce> stepWithDebug(float accumulator, ArrayList<PhysicsObject> objects) {
 
         ArrayList<DebugForce> forces = new ArrayList<>();
 
@@ -121,7 +118,7 @@ public class PhysicsResolver {
                 forces.add(velForce);
             }
         }
-        if(Main.accumulator < fixedStep) {
+        if(GameScreen.accumulator < fixedStep) {
             for (PhysicsObject obj : objects) {
                 if (obj instanceof DynamicObject) {
                     DynamicObject dynObj = (DynamicObject) obj;
@@ -145,7 +142,7 @@ public class PhysicsResolver {
             }
         }
 
-        while(Main.accumulator >= fixedStep) {
+        while(GameScreen.accumulator >= fixedStep) {
             //1. Integrate forces → update velocity
             //2. Detect collisions
             //3. Build contact constraints
@@ -231,7 +228,7 @@ public class PhysicsResolver {
                 }
             }
 
-            Main.accumulator -= fixedStep;
+            GameScreen.accumulator -= fixedStep;
         }
         return forces;
     }
