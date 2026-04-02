@@ -42,10 +42,10 @@ public class TutorialLevel extends Level {
         );
 
         List<Vector2> circleVertices = PhysicsResolver.getCircleVertices(12, 0.5f);
-        this.ball = new ChargedDynamicObject(0, 0.5f, 0.5f, 1f, circleVertices, 6f, 4f, 0f, 0.8f);
+        this.ball = new ChargedDynamicObject(0, 0.5f, 0.5f, 1f, circleVertices, 6f, 4f, 0f, 5f);
         addPhysicsObject(ball);
 
-        DynamicObject cup = new ChargedDynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 2f, 0f, 0.8f);
+        DynamicObject cup = new ChargedDynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 2f, 0f, 5f);
         addPhysicsObject(cup);
 
         this.cupInside = new FollowingUncollidableField(2, cupInsideVertices, 5f, 2f, 0f, cup);
@@ -58,7 +58,7 @@ public class TutorialLevel extends Level {
     }
 
     @Override
-    public void tick(float deltaTime) {
+    public LevelTickData tick(float deltaTime) {
         // Implement any necessary updates for the tutorial level
         if(!cupInside.getTriggerIds().contains(ball.getId())) {
             elapsedTimeOutside -= deltaTime;
@@ -75,6 +75,13 @@ public class TutorialLevel extends Level {
             if(obj instanceof Triggerable) {
                 ((Triggerable) obj).resetTriggerIds();
             }
+        }
+
+        if(elapsedTimeOutside < timeToComplete) {
+            return new LevelTickData(elapsedTimeOutside);
+        }
+        else {
+            return new LevelTickData();
         }
     }
 

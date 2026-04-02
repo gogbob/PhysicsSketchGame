@@ -44,10 +44,12 @@ public class PhysicsResolver {
                         Vector2 force = ((Charged) obj).findChargeForce(other);
 
                         if(obj instanceof DynamicObject) {
-                            ((DynamicObject) obj).setLinearVelocity(new Vector2(obj.getLinearVelocity()).add(new Vector2(force).scl(-1f).scl(1/((DynamicObject) obj).getMass())));
+                            ((DynamicObject) obj).setLinearVelocity(new Vector2(obj.getLinearVelocity())
+                                .add(new Vector2(force).scl(-1f).scl(1/((DynamicObject) obj).getMass()).scl(fixedStep)));
                         }
                         if(other instanceof DynamicObject) {
-                            ((DynamicObject) other).setLinearVelocity(new Vector2(other.getLinearVelocity()).add(new Vector2(force).scl(1/((DynamicObject) other).getMass())));
+                            ((DynamicObject) other).setLinearVelocity(new Vector2(other.getLinearVelocity())
+                                .add(new Vector2(force).scl(1/((DynamicObject) other).getMass()).scl(fixedStep)));
                         }
                     }
                 }
@@ -196,11 +198,13 @@ public class PhysicsResolver {
                         Vector2 force = ((Charged) obj).findChargeForce(other);
 
                         if(obj instanceof DynamicObject) {
-                            ((DynamicObject) obj).setLinearVelocity(new Vector2(obj.getLinearVelocity()).add(new Vector2(force).scl(-1f).scl(1/((DynamicObject) obj).getMass())));
+                            ((DynamicObject) obj).setLinearVelocity(new Vector2(obj.getLinearVelocity())
+                                .add(new Vector2(force).scl(-1f).scl(1/((DynamicObject) obj).getMass()).scl(fixedStep)));
                             forces.add(new DebugForce(obj.getCenter(), new Vector2(force).scl(-1f), Color.CYAN));
                         }
                         if(other instanceof DynamicObject) {
-                            ((DynamicObject) other).setLinearVelocity(new Vector2(other.getLinearVelocity()).add(new Vector2(force).scl(1/((DynamicObject) other).getMass())));
+                            ((DynamicObject) other).setLinearVelocity(new Vector2(other.getLinearVelocity())
+                                .add(new Vector2(force).scl(1/((DynamicObject) other).getMass()).scl(fixedStep)));
                             forces.add(new DebugForce(other.getCenter(), new Vector2(force), Color.CYAN));
                         }
                     }

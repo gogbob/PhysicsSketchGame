@@ -43,5 +43,16 @@ public abstract class Level {
     }
 
     public abstract boolean isComplete();
-    public abstract void tick(float deltaTime);
+    public abstract LevelTickData tick(float deltaTime);
+
+    public class LevelTickData {
+        private Float timeLeft = null;
+        public LevelTickData() {}
+        public LevelTickData(Float timeLeft) {
+            this.timeLeft = timeLeft;
+        }
+        public Float getTimeLeft() {
+            return timeLeft;
+        }
+    }
 }
