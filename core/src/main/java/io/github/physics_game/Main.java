@@ -7,6 +7,8 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
@@ -32,6 +34,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
+    BitmapFont winFont;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
@@ -46,7 +49,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
     private DynamicObject dynamicObject;
     private StaticObject floorObject;
-    private Level exampleLevel;
+    private Level currentLevel;
     private DrawTool drawTool;
 
 
@@ -58,6 +61,8 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
+        winFont = new BitmapFont();
+        winFont.setColor(Color.WHITE);
         DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
@@ -68,11 +73,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(-0.7f, -0.7f)
             ),
             5, 5, 0);
-        exampleLevel = new Level(0, "Example Level", new ArrayList<>(), viewport.getWorldWidth(), viewport.getWorldHeight());
-        //exampleObject.setRotation((float)Math.PI);
-        exampleLevel.addPhysicsObject(exampleObject);
+        TutorialLevel tutorialLevel = new TutorialLevel();
+        //exampleObject.setRotation((float)Math.PI);\
 
-        drawTool = new DrawTool(camera, exampleLevel);
+        drawTool = new DrawTool(camera, tutorialLevel);
+        currentLevel = tutorialLevel;
         Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
@@ -104,7 +109,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     @Override
     public void render() {
-
         float delta = Gdx.graphics.getDeltaTime();
 
         drawTool.update();
@@ -132,16 +136,28 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         // clear the screen
         ScreenUtils.clear(Color.BLACK);
 
+
         if(!showDebugOverlay) {
             //Normal view
             if(runPhysics){
-                PhysicsResolver.step(exampleLevel.getPhysicsObjects());
+                PhysicsResolver.step(currentLevel.getPhysicsObjects());
+            }
+
+            if(currentLevel.isComplete()) {
+                Gdx.app.log("Main", "Level complete! Loading next level...");
+                runPhysics = false;
             }
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
-            for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
-                drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), (obj instanceof StaticObject)? Color.GRAY : Color.WHITE);
+            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
+                if(obj instanceof DynamicTriggerObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.BLUE);
+                } else if(obj instanceof DynamicObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                } else if (obj instanceof StaticObject) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.GRAY);
+                }
             }
 
             // draw the drawing line
@@ -157,21 +173,44 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 }
             }
 
-            shapeRenderer.end();
+            currentLevel.tick(delta);
 
-            camera.update();
+            shapeRenderer.end();
         } else {
             //Debug view
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(exampleLevel.getPhysicsObjects());
+            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
+
+            if(currentLevel.isComplete()) {
+                Gdx.app.log("Main", "Level complete! Loading next level...");
+                runPhysics = false;
+            }
+
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-            for(PhysicsObject obj : exampleLevel.getPhysicsObjects()) {
-                if(obj instanceof DynamicObject) {
+            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
+                if(obj instanceof DynamicTriggerObject) {
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.GOLD);
+                } else if(obj instanceof DynamicObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.YELLOW);
                 } else if (obj instanceof StaticObject) {
-                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.CYAN);
-                } else {
-                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.CYAN);
+                } else if (obj instanceof UncollidableObject) {
+                    drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.RED);
+                }
+            }
+
+            currentLevel.tick(delta);
+
+            // draw the drawing line
+            if (drawTool.isDrawing()) {
+                ArrayList<Vector2> pts = drawTool.getPoints();
+                if (pts.size() > 1) {
+                    shapeRenderer.setColor(Color.GREEN);
+                    for (int j = 0; j < pts.size() - 1; j++) {
+                        Vector2 p1 = pts.get(j);
+                        Vector2 p2 = pts.get(j + 1);
+                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
+                    }
                 }
             }
 
@@ -180,9 +219,21 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             shapeRenderer.end();
-
-            camera.update();
         }
+
+        //generate UI Here
+        batch.begin();
+
+        if(currentLevel.isComplete()) {
+            GlyphLayout layout = new GlyphLayout(winFont, "Level Complete!", Color.GREEN, 0, 1, false);
+            float x = camera.position.x + viewport.getScreenWidth()/2f - layout.width /2f;
+            float y = camera.position.y + viewport.getScreenHeight() * 3f/4f + layout.height /2f;
+            winFont.draw(batch, layout, x, y);
+
+        }
+
+        batch.end();
+        camera.update();
     }
 
     @Override

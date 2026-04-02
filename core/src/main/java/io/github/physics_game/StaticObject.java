@@ -11,12 +11,6 @@ public class StaticObject extends PhysicsObject {
         super(id, friction, restitution, vertices, startX, startY, rotation);
     }
 
-
-    public void reinitialize() {
-        setPosition(new Vector2(getStartX(), getStartY()));
-        setRotation(0f);
-    }
-
     @Override
     public Vector2 getLinearVelocity() {
         return new Vector2(0, 0);
