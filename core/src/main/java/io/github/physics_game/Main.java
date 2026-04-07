@@ -34,13 +34,14 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
+    public final float drawPeriod = 1/10f;
 
     // throttle logging to once-per-second
     float logTimer = 0f;
 
     // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
-
+    private float drawTimer = 0f;
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
@@ -75,7 +76,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         TutorialLevel tutorialLevel = new TutorialLevel();
         //exampleObject.setRotation((float)Math.PI);\
 
-        drawTool = new DrawTool(camera, 0.4f);
+        drawTool = new DrawTool(camera, viewport, 0.4f);
         currentLevel = tutorialLevel;
         Gdx.app.log("Main", "DrawTool created!");
 
@@ -110,15 +111,21 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
+        drawTimer += delta;
+
         PhysicsObject drawnObject = drawTool.update();
-        if(drawnObject != null) {
-            currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-            currentLevel.addPhysicsObject(drawnObject);
-
-            if(drawnObject instanceof DynamicObject) {
+        if (drawnObject != null) {
+            // Finalized shapes must be committed immediately; only throttle static preview refreshes.
+            if (drawnObject instanceof DynamicObject) {
+                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                currentLevel.addPhysicsObject(drawnObject);
                 Gdx.app.log("Main", "Added new DynamicObject with ID " + drawnObject.getId());
+                drawTimer = 0f;
+            } else if (drawTimer >= drawPeriod) {
+                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                currentLevel.addPhysicsObject(drawnObject);
+                drawTimer -= drawPeriod;
             }
-
         }
 
 
@@ -168,7 +175,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 }
             }
 
-            currentLevel.tick(delta);
+            currentLevel.tick((runPhysics)? delta : 0f);
 
             shapeRenderer.end();
         } else {
@@ -194,7 +201,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 }
             }
 
-            currentLevel.tick(delta);
+            currentLevel.tick((runPhysics)? delta : 0f);
 
             for(DebugForce f : forces) {
                 drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());

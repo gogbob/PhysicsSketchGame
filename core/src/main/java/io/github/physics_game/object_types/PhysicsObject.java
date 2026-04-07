@@ -20,8 +20,7 @@ public abstract class PhysicsObject {
     private float startX;
     private float startY;
     private float startRotation;
-    private Vector2 com = new Vector2();
-    private Vector2 relativePosition = new Vector2();
+    private Vector2 localCenterOffset = new Vector2();
 
     public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
         this(id, friction, restitution, vertices, startX, startY, rotation
@@ -33,9 +32,14 @@ public abstract class PhysicsObject {
         this.id = id;
         this.friction = friction;
         this.restitution = restitution;
-        this.vertices = new ArrayList<>(vertices);
-        this.localBody = new CustomContactHandler.PolygonBody(vertices);
-        this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
+
+        Vector2 localCom = (com == null) ? new Vector2() : new Vector2(com);
+        this.localCenterOffset = new Vector2(localCom);
+        List<Vector2> centeredVertices = recenterVertices(vertices, localCom);
+
+        this.vertices = new ArrayList<>(centeredVertices);
+        this.localBody = new CustomContactHandler.PolygonBody(centeredVertices);
+        this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(centeredVertices);
         int prevSize = concaveLocalTriangles.size();
 
 
@@ -49,23 +53,44 @@ public abstract class PhysicsObject {
             currentSize =  concaveLocalBest.size();
         }
 
-        this.startX = startX;
-        this.startY = startY;
-        this.com = new Vector2(com);
-        this.relativePosition = new Vector2(this.com).sub(getPosition());
-        setRotation(rotation);
-        this.startRotation = rotation;
-        setPosition(new Vector2(startX, startY));
+        // Keep the simulation transform at COM so impulses/rotation use the same origin.
+        Vector2 rotatedLocalCom = new Vector2(localCenterOffset).rotateRad(rotation);
+        this.startX = startX + rotatedLocalCom.x;
+        this.startY = startY + rotatedLocalCom.y;
 
+        this.startRotation = rotation;
+        setRotation(rotation);
+        setPosition(new Vector2(this.startX, this.startY));
+    }
+
+    private List<Vector2> recenterVertices(List<Vector2> source, Vector2 com) {
+        List<Vector2> centered = new ArrayList<>();
+        if (source == null) {
+            return centered;
+        }
+        for (Vector2 v : source) {
+            if (v != null) {
+                centered.add(new Vector2(v).sub(com));
+            }
+        }
+        return centered;
     }
 
 
     public Vector2 getCenter()  {
-        //Gdx.app.log("DynamicObject", "Center of mass: " + com);
-        float x = relativePosition.x * (float)Math.cos(getRotation() - startRotation) - relativePosition.y * (float)Math.sin(getRotation() - startRotation) + getPosition().x;
-        float y = relativePosition.x * (float)Math.sin(getRotation() - startRotation) + relativePosition.y * (float)Math.cos(getRotation() - startRotation)  + getPosition().y;
-        return new Vector2(x, y);
+        return getPosition();
     }
+
+    public Vector2 getAnchorPosition() {
+        Vector2 rotatedOffset = new Vector2(localCenterOffset).rotateRad(getRotation());
+        return new Vector2(getPosition()).sub(rotatedOffset);
+    }
+
+    public void setAnchorPosition(Vector2 anchorPosition) {
+        Vector2 rotatedOffset = new Vector2(localCenterOffset).rotateRad(getRotation());
+        setPosition(new Vector2(anchorPosition).add(rotatedOffset));
+    }
+
     public void setPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);
     }

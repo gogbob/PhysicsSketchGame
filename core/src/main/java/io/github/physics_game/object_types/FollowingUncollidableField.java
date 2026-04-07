@@ -6,14 +6,20 @@ import java.util.List;
 
 public class FollowingUncollidableField extends TriggerField implements Following {
     private PhysicsObject followedObj;
-    private Vector2 relativePosition;
+    private Vector2 relativeAnchorLocal;
     private float relativeRotation;
 
     public FollowingUncollidableField(int id, List<Vector2> vertices, float startX, float startY, float rotation, PhysicsObject followedObj) {
         super(id, vertices, startX, startY, rotation);
-        this.relativePosition = new Vector2(followedObj.getPosition()).sub(getPosition());
-        this.relativeRotation = followedObj.getRotation() - getRotation();
         this.followedObj = followedObj;
+
+        Vector2 followerAnchor = getAnchorPosition();
+        Vector2 followedAnchor = followedObj.getAnchorPosition();
+
+        this.relativeAnchorLocal = new Vector2(followerAnchor)
+            .sub(followedAnchor)
+            .rotateRad(-followedObj.getRotation());
+        this.relativeRotation = getRotation() - followedObj.getRotation();
     }
 
     @Override
@@ -29,13 +35,13 @@ public class FollowingUncollidableField extends TriggerField implements Followin
     @Override
     public void updatePosition() {
         if (followedObj != null) {
-            float cos = (float) Math.cos(followedObj.getRotation() - relativeRotation);
-            float sin = (float) Math.sin(followedObj.getRotation() - relativeRotation);
+            Vector2 followedAnchor = followedObj.getAnchorPosition();
+            Vector2 nextAnchor = new Vector2(relativeAnchorLocal)
+                .rotateRad(followedObj.getRotation())
+                .add(followedAnchor);
 
-            float x = relativePosition.x * cos - relativePosition.y * sin + followedObj.getPosition().x;
-            float y = relativePosition.x * sin + relativePosition.y * cos + followedObj.getPosition().y;
-            setPosition(new Vector2(x, y));
-            setRotation(followedObj.getRotation());
+            setRotation(followedObj.getRotation() + relativeRotation);
+            setAnchorPosition(nextAnchor);
         }
     }
 }

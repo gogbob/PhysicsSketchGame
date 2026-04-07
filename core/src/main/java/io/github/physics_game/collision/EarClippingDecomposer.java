@@ -8,15 +8,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Decomposes a simple (possibly concave) polygon into triangles using ear clipping.
- *
- * <p>Ear clipping is O(n^2) and robust for gameplay-sized polygons. We keep the implementation
- * explicit and heavily documented because this class is intended as a reference for the geometry
- * pipeline used by custom collision detection.</p>
- */
 public final class EarClippingDecomposer {
     private static final float EPSILON = 1e-8f;
+    private static final float CONVEX_EPSILON = 1e-6f;
 
     private EarClippingDecomposer() {
     }
@@ -151,7 +145,7 @@ public final class EarClippingDecomposer {
     }
 
     private static boolean isConvex(Vector2 prev, Vector2 curr, Vector2 next) {
-        return new Vector2(curr).sub(prev).crs(new Vector2(next).sub(curr)) > 0.01f;
+        return new Vector2(curr).sub(prev).crs(new Vector2(next).sub(curr)) > CONVEX_EPSILON;
     }
 
     private static float cross(Vector2 a, Vector2 b, Vector2 c) {
@@ -207,108 +201,100 @@ public final class EarClippingDecomposer {
             Vector2 a = cleaned.get(root);
             Vector2 b = cleaned.get(indices.get(i));
             Vector2 c = cleaned.get(indices.get(i + 1));
+            if (Math.abs(orientedArea(a, b, c)) <= CONVEX_EPSILON) {
+                continue;
+            }
             triangles.add(copyTriangle(a, b, c));
         }
     }
 
     public static List<List<Vector2>> mergePolygons(List<List<Vector2>> polys) {
         List<List<Vector2>> polygons = new ArrayList<>(polys.size());
-        for (int i = 0; i < polys.size(); i++) {
-            List<Vector2> poly = polys.get(i);
+        for (List<Vector2> poly : polys) {
             polygons.add(new ArrayList<>(poly));
         }
 
-        for (int i = 0; i < polygons.size(); i++) {
-            List<Vector2> currentPoly = polygons.get(i);
-            for (int j = i + 1; j < polygons.size(); j++) {
-                List<Vector2> nextPoly = polygons.get(j);
-                boolean found = false;
-                for (int k = 0; k < currentPoly.size() && !found; k++) {
-                    Vector2 a = currentPoly.get(k);
-                    Vector2 b = currentPoly.get((k + 1) % currentPoly.size());
-                    for (int l = 0; l < nextPoly.size() && !found; l++) {
-                        Vector2 c = nextPoly.get(l);
-                        Vector2 d = nextPoly.get((l + 1) % nextPoly.size());
-                        if (a.epsilonEquals(d, EPSILON) && b.epsilonEquals(c, EPSILON)) {
-                            // Found a shared edge
-                            found = true;
+        boolean mergedAny = true;
+        while (mergedAny) {
+            mergedAny = false;
 
-                            //all you have to check for convexness is whether a is at convex
-                            //and b is at convex
-                            int prevIndex = ((k - 1) + currentPoly.size()) % currentPoly.size();
-                            int nextIndex = (l + 2) % nextPoly.size();
-                            //keep in mind of counterClockwise order:
-                            //since a arrives before b
-                            //the point before a arrives before in the merged polygon
-                            boolean isACon = isConvex(currentPoly.get(prevIndex), a, nextPoly.get(nextIndex));
-                            prevIndex = (k + 2) % currentPoly.size();
-                            nextIndex = ((l - 1) + nextPoly.size()) % nextPoly.size();
-                            boolean isBCon = isConvex(nextPoly.get(nextIndex), b, currentPoly.get(prevIndex));
-
-
-                            // if they are convex merge
-                            if(isACon && isBCon) {
-                                boolean isConvex = true;
-                                Vector2 prevEdge = null;
-                                Vector2 prevPoint = null;
-                                //do additional check
-                                for (int m = k + 1; m <= k + currentPoly.size(); m++) {
-                                    if(prevPoint == null) prevPoint = currentPoly.get(m % currentPoly.size());
-                                    else if(prevEdge == null) {
-                                        prevEdge = new Vector2(currentPoly.get(m % currentPoly.size())).sub(prevPoint);
-                                        prevPoint = new Vector2(currentPoly.get(m % currentPoly.size()));
-                                    }
-                                    else {
-                                        if(prevEdge.crs(new Vector2(currentPoly.get(m % currentPoly.size())).sub(prevPoint)) < 0) {
-                                            Gdx.app.log("EarClippingDecomposer", "found inconsistent case");
-                                            isConvex = false;
-                                        }
-                                        prevPoint = currentPoly.get(m % currentPoly.size());
-                                        prevEdge = new Vector2(currentPoly.get(m % currentPoly.size())).sub(prevPoint);
-                                    }
-                                }
-
-                                //then go from the point that is equivalent to k around the next poly until the point that is equivalent to k + 1
-                                for (int m = l + 1; m <= l + nextPoly.size(); m++) {
-                                    if(prevPoint == null) prevPoint = nextPoly.get(m % nextPoly.size());
-                                    else if(prevEdge == null) prevEdge = new Vector2(nextPoly.get(m % nextPoly.size())).sub(prevPoint);
-                                    else {
-                                        if(prevEdge.crs(new Vector2(nextPoly.get(m % nextPoly.size())).sub(prevPoint)) < 0) {
-                                            Gdx.app.log("EarClippingDecomposer", "found inconsistent case");
-                                            isConvex = false;
-                                        }
-                                        prevPoint = nextPoly.get(m % nextPoly.size());
-                                        prevEdge = new Vector2(nextPoly.get(m % nextPoly.size())).sub(prevPoint);
-                                    }
-                                }
-
-                                if(prevEdge.crs(new Vector2(nextPoly.get((k + 1) % nextPoly.size())).sub(prevPoint)) < 0) {
-                                    Gdx.app.log("EarClippingDecomposer", "found inconsistent case");
-                                    isConvex = false;
-                                }
-
-                                if(isConvex) {
-                                    List<Vector2> merged = new ArrayList<>();
-                                    //first go through the vertices from k + 1 until k
-                                    for (int m = k + 1; m <= k + currentPoly.size() - 1; m++) {
-                                        merged.add(currentPoly.get(m % currentPoly.size()));
-                                    }
-
-                                    //then go from the point that is equivalent to k around the next poly until the point that is equivalent to k + 1
-                                    for (int m = l + 1; m <= l + nextPoly.size() - 1; m++) {
-                                        merged.add(nextPoly.get(m % nextPoly.size()));
-                                    }
-                                    polygons.set(i, merged);
-                                    polygons.remove(j);
-                                    j--;
-                                }
-                            }
-                        }
+            for (int i = 0; i < polygons.size() && !mergedAny; i++) {
+                List<Vector2> currentPoly = polygons.get(i);
+                for (int j = i + 1; j < polygons.size() && !mergedAny; j++) {
+                    List<Vector2> nextPoly = polygons.get(j);
+                    List<Vector2> merged = tryMergeAlongSharedEdge(currentPoly, nextPoly);
+                    if (merged != null) {
+                        polygons.set(i, merged);
+                        polygons.remove(j);
+                        mergedAny = true;
                     }
                 }
             }
         }
+
         return polygons;
     }
-}
 
+    private static List<Vector2> tryMergeAlongSharedEdge(List<Vector2> a, List<Vector2> b) {
+        for (int i = 0; i < a.size(); i++) {
+            Vector2 a0 = a.get(i);
+            Vector2 a1 = a.get((i + 1) % a.size());
+
+            for (int j = 0; j < b.size(); j++) {
+                Vector2 b0 = b.get(j);
+                Vector2 b1 = b.get((j + 1) % b.size());
+
+                if (!a0.epsilonEquals(b1, EPSILON) || !a1.epsilonEquals(b0, EPSILON)) {
+                    continue;
+                }
+
+                List<Vector2> merged = buildMergedLoop(a, b, i, j);
+                merged = sanitizePolygon(merged);
+                if (merged.size() < 3) {
+                    continue;
+                }
+                if (signedArea(merged) < 0f) {
+                    Collections.reverse(merged);
+                }
+                if (isStrictlyConvex(merged)) {
+                    return merged;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static List<Vector2> buildMergedLoop(List<Vector2> a, List<Vector2> b, int edgeA, int edgeB) {
+        List<Vector2> merged = new ArrayList<>();
+
+        // Walk A from edgeA+1 back to edgeA (exclusive of shared edge endpoints on one side).
+        for (int m = edgeA + 1; m <= edgeA + a.size() - 1; m++) {
+            merged.add(new Vector2(a.get(m % a.size())));
+        }
+
+        // Walk B from edgeB+1 back to edgeB.
+        for (int m = edgeB + 1; m <= edgeB + b.size() - 1; m++) {
+            merged.add(new Vector2(b.get(m % b.size())));
+        }
+
+        return merged;
+    }
+
+    private static boolean isStrictlyConvex(List<Vector2> poly) {
+        if (poly.size() < 3) {
+            return false;
+        }
+
+        for (int i = 0; i < poly.size(); i++) {
+            Vector2 prev = poly.get((i - 1 + poly.size()) % poly.size());
+            Vector2 curr = poly.get(i);
+            Vector2 next = poly.get((i + 1) % poly.size());
+            if (orientedArea(prev, curr, next) <= CONVEX_EPSILON) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}

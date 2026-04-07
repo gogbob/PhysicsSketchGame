@@ -42,10 +42,10 @@ public class TutorialLevel extends Level {
         );
 
         List<Vector2> circleVertices = PhysicsResolver.getCircleVertices(12, 0.5f);
-        this.ball = new ChargedDynamicObject(0, 0.5f, 0.5f, 1f, circleVertices, 6f, 4f, 0f, 5f);
+        this.ball = new DynamicObject(0, 0.5f, 0.5f, 1f, circleVertices, 6f, 4f, 0f);
         addPhysicsObject(ball);
 
-        DynamicObject cup = new ChargedDynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 2f, 0f, 5f);
+        DynamicObject cup = new DynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 2f, 0f);
         addPhysicsObject(cup);
 
         this.cupInside = new FollowingUncollidableField(2, cupInsideVertices, 5f, 2f, 0f, cup);

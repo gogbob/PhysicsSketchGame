@@ -513,37 +513,82 @@ public class PhysicsResolver {
     }
 
     public static Vector2 getCenterOfMassPolygon(List<List<Vector2>> triangles, List<Float> densities) {
-        Vector2 sum = new Vector2();
-        //make a weight average of the centers of mass of triangles
-        for (List<Vector2> tri : triangles) {
-            if (tri.size() == 3) {
-                sum.add(new Vector2(getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)))
-                    .scl(getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri)))));
-            }
+        if (triangles == null || densities == null || triangles.isEmpty()) {
+            return new Vector2();
         }
-        return sum.scl(1f / triangles.size());
+
+        Vector2 weightedSum = new Vector2();
+        float totalMass = 0f;
+        int count = Math.min(triangles.size(), densities.size());
+
+        for (int i = 0; i < count; i++) {
+            List<Vector2> tri = triangles.get(i);
+            if (tri == null || tri.size() != 3) {
+                continue;
+            }
+
+            float mass = getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(i));
+            if (mass <= 1e-8f) {
+                continue;
+            }
+
+            Vector2 triCom = getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2));
+            weightedSum.mulAdd(triCom, mass);
+            totalMass += mass;
+        }
+
+        if (totalMass <= 1e-8f) {
+            return new Vector2();
+        }
+
+        return weightedSum.scl(1f / totalMass);
     }
 
     public static Vector2 getCenterOfMassPolygon(List<List<Vector2>> triangles) {
-        Vector2 sum = new Vector2();
-        //make a weight average of the centers of mass of triangles
-        for (List<Vector2> tri : triangles) {
-            if (tri.size() == 3) {
-                sum.add(new Vector2(getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)))
-                    .scl(getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), 1f)));
-            }
+        if (triangles == null || triangles.isEmpty()) {
+            return new Vector2();
         }
-        return sum.scl(1f / triangles.size());
+
+        Vector2 weightedSum = new Vector2();
+        float totalMass = 0f;
+
+        for (int i = 0; i < triangles.size(); i++) {
+            List<Vector2> tri = triangles.get(i);
+            if (tri == null || tri.size() != 3) {
+                continue;
+            }
+
+            float mass = getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), 1f);
+            if (mass <= 1e-8f) {
+                continue;
+            }
+
+            Vector2 triCom = getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2));
+            weightedSum.mulAdd(triCom, mass);
+            totalMass += mass;
+        }
+
+        if (totalMass <= 1e-8f) {
+            return new Vector2();
+        }
+
+        return weightedSum.scl(1f / totalMass);
     }
 
     public static float getMassOfPolygon(List<List<Vector2>> triangles, List<Float> densities) {
-        float area = 0f;
-        for (List<Vector2> tri : triangles) {
-            if (tri.size() == 3) {
-                area +=getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri)));
+        if (triangles == null || densities == null || triangles.isEmpty()) {
+            return 0f;
+        }
+
+        float mass = 0f;
+        int count = Math.min(triangles.size(), densities.size());
+        for (int i = 0; i < count; i++) {
+            List<Vector2> tri = triangles.get(i);
+            if (tri != null && tri.size() == 3) {
+                mass += getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(i));
             }
         }
-        return area;
+        return mass;
     }
 
     public static float getMassOfPolygon(List<List<Vector2>> triangles, float density) {
@@ -557,13 +602,17 @@ public class PhysicsResolver {
     }
 
     public static float getMomentOfInertiaPolygon(List<List<Vector2>> triangles, List<Float> densities) {
+        if (triangles == null || densities == null || triangles.isEmpty()) {
+            return 0f;
+        }
+
         float inertia = 0f;
-        for (List<Vector2> tri : triangles) {
-            if (tri.size() == 3) {
-                //use parallel axis theorem to calculate the total moment of inertia:
-                //I_total = I_triangle + m_triangle * d^2
-                inertia += getMomentOfInertiaTriangle(tri.get(0), tri.get(1), tri.get(2),
-                    getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(triangles.indexOf(tri))));
+        int count = Math.min(triangles.size(), densities.size());
+        for (int i = 0; i < count; i++) {
+            List<Vector2> tri = triangles.get(i);
+            if (tri != null && tri.size() == 3) {
+                float mass = getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), densities.get(i));
+                inertia += getMomentOfInertiaTriangle(tri.get(0), tri.get(1), tri.get(2), mass);
             }
         }
         return inertia;

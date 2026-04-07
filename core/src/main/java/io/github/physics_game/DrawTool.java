@@ -5,6 +5,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Camera;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import io.github.physics_game.object_types.PhysicsObject;
 import io.github.physics_game.object_types.DynamicObject;
 import io.github.physics_game.object_types.StaticObject;
@@ -24,11 +25,13 @@ import static java.lang.Math.*;
 public class DrawTool {
     private static final float resolutionScale = 0.05f;
     private static final float rangeMax = 0.05f;
+    private static final float ISO_LEVEL = 0.9f;
 
     private ReentrantLock lock = new ReentrantLock();
 
     private boolean drawing; // check if it's drawing or not
     private final Camera camera;
+    private final Viewport viewport;
     private int nextId; // give id to objects
     private List<Vector2> circleShape;
     private final float toolWidth; // the width of the tool (the radius of the circle)
@@ -70,8 +73,9 @@ public class DrawTool {
         {-1,-1,-1,-1}         // 15 1111
     };
 
-    public DrawTool(Camera camera, float toolWidth) {
+    public DrawTool(Camera camera, Viewport viewport, float toolWidth) {
         this.camera = camera;
+        this.viewport = viewport;
         this.drawing = false;
         this.nextId = 100;  // object drew by player = start from 100
         this.toolWidth = toolWidth;
@@ -244,18 +248,13 @@ public class DrawTool {
         return Arrays.asList(minX, maxX, minY, maxY);
     }
 
-    private List<Vector2> performMarchingSquares() {
-        return generateLocalContours();
-    }
-
     public List<Vector2> generateLocalContours() {
         createPixelatedEdges();
-        if(exteriorLoop == null || exteriorLoop.size() < 3) {
+        if (exteriorLoop == null || exteriorLoop.size() < 3) {
             return null;
         }
-        return exteriorLoop;
+        return new ArrayList<>(exteriorLoop);
     }
-
 
     private void createPixelatedEdges() {
         List<MarchingSegment> segments = new ArrayList<>();
@@ -275,8 +274,7 @@ public class DrawTool {
 
                 int[] edges = edgeTable[c];
                 if(c == 5 || c == 10) {
-                    addSegment(edgePos(edges[0], p, v0, v1, v2, v3), edgePos(edges[1], p, v0, v1, v2, v3), segments, adjacency);
-                    addSegment(edgePos(edges[2], p, v0, v1, v2, v3), edgePos(edges[3], p, v0, v1, v2, v3), segments, adjacency);
+                    addAmbiguousCellSegments(c, p, v0, v1, v2, v3, segments, adjacency);
                 } else {
                     addSegment(edgePos(edges[0], p, v0, v1, v2, v3), edgePos(edges[1], p, v0, v1, v2, v3), segments, adjacency);
                 }
@@ -300,8 +298,9 @@ public class DrawTool {
             if(loop.size() >= 3) {
                 ArrayList<Vector2> tessellatedLoop = new ArrayList<>(loop);
                 tessellateContour(tessellatedLoop);
-                if(tessellatedLoop.size() >= 3) {
-                    foundLoops.add(tessellatedLoop);
+                List<Vector2> sanitized = sanitizeLoop(tessellatedLoop);
+                if(sanitized != null) {
+                    foundLoops.add(sanitized);
                 }
             }
         }
@@ -321,13 +320,192 @@ public class DrawTool {
         }
 
         exteriorLoop = new ArrayList<>(foundLoops.get(outerIdx));
+        exteriorLoop = ensureLoopWinding(exteriorLoop, true);
         for(int i = 0; i < foundLoops.size(); i++) {
             if(i != outerIdx) {
-                interiorLoops.add(new ArrayList<>(foundLoops.get(i)));
+                interiorLoops.add(ensureLoopWinding(new ArrayList<>(foundLoops.get(i)), false));
             }
         }
 
-        exteriorLoop = connectInteriorLoopsToExterior(exteriorLoop, interiorLoops);
+        if(!interiorLoops.isEmpty()) {
+            exteriorLoop = connectInteriorLoopsToExterior(exteriorLoop, interiorLoops);
+        }
+
+        exteriorLoop = normalizeMergedLoop(exteriorLoop);
+    }
+
+    private void addSegment(Vector2 a, Vector2 b, List<MarchingSegment> segments, Map<String, List<Integer>> adjacency) {
+        if (a == null || b == null || a.epsilonEquals(b, 1e-6f)) {
+            return;
+        }
+
+        int idx = segments.size();
+        MarchingSegment segment = new MarchingSegment(a, b);
+        segments.add(segment);
+
+        adjacency.computeIfAbsent(segment.keyA, k -> new ArrayList<>()).add(idx);
+        adjacency.computeIfAbsent(segment.keyB, k -> new ArrayList<>()).add(idx);
+    }
+
+    private void addAmbiguousCellSegments(int caseId,
+                                          Vector2 p,
+                                          float v0,
+                                          float v1,
+                                          float v2,
+                                          float v3,
+                                          List<MarchingSegment> segments,
+                                          Map<String, List<Integer>> adjacency) {
+        // Bilinear saddle decider: choose one of the two valid topologies for 5/10.
+        float center = 0.25f * (v0 + v1 + v2 + v3);
+        boolean centerInside = center >= ISO_LEVEL;
+
+        int[][] pairs;
+        if (caseId == 5) {
+            // case 5 corners: v0,v2 inside. Switch pairing based on center sign.
+            pairs = centerInside
+                ? new int[][]{{0, 1}, {2, 3}}
+                : new int[][]{{0, 3}, {1, 2}};
+        } else {
+            // case 10 corners: v1,v3 inside. Opposite pairing choice from case 5.
+            pairs = centerInside
+                ? new int[][]{{0, 3}, {1, 2}}
+                : new int[][]{{0, 1}, {2, 3}};
+        }
+
+        for (int[] pair : pairs) {
+            addSegment(
+                edgePos(pair[0], p, v0, v1, v2, v3),
+                edgePos(pair[1], p, v0, v1, v2, v3),
+                segments,
+                adjacency
+            );
+        }
+    }
+
+    private List<Vector2> traceLoopFromSegment(int startSegment,
+                                               List<MarchingSegment> segments,
+                                               Map<String, List<Integer>> adjacency,
+                                               Set<Integer> travelledEdges) {
+        List<Vector2> loop = new ArrayList<>();
+        MarchingSegment start = segments.get(startSegment);
+
+        String startKey = start.keyA;
+        String prevKey = start.keyA;
+        String currentKey = start.keyB;
+
+        loop.add(new Vector2(start.a));
+        loop.add(new Vector2(start.b));
+        travelledEdges.add(startSegment);
+
+        boolean closed = false;
+        int guard = 0;
+        int maxSteps = Math.max(segments.size() * 2, 64);
+        while (guard++ < maxSteps) {
+            if (currentKey.equals(startKey)) {
+                closed = true;
+                break;
+            }
+
+            int nextSegment = findNextSegment(currentKey, prevKey, segments, adjacency, travelledEdges);
+            if (nextSegment < 0) {
+                break;
+            }
+
+            MarchingSegment seg = segments.get(nextSegment);
+            String nextKey = seg.otherKey(currentKey);
+            loop.add(new Vector2(seg.pointForKey(nextKey)));
+
+            travelledEdges.add(nextSegment);
+            prevKey = currentKey;
+            currentKey = nextKey;
+        }
+
+        if (!closed) {
+            // Open chains are unstable during in-progress drawing and cause bad transient triangulation.
+            return Collections.emptyList();
+        }
+
+        if (loop.size() > 1 && loop.get(0).epsilonEquals(loop.get(loop.size() - 1), 1e-5f)) {
+            loop.remove(loop.size() - 1);
+        }
+
+        return loop;
+    }
+
+    private int findNextSegment(String currentKey,
+                                String prevKey,
+                                List<MarchingSegment> segments,
+                                Map<String, List<Integer>> adjacency,
+                                Set<Integer> travelledEdges) {
+        List<Integer> candidates = adjacency.getOrDefault(currentKey, Collections.emptyList());
+        Vector2 currentPoint = keyToPoint(currentKey);
+        Vector2 prevPoint = keyToPoint(prevKey);
+
+        int best = -1;
+        float bestScore = -Float.MAX_VALUE;
+        int fallback = -1;
+
+        for (int segmentIdx : candidates) {
+            if (travelledEdges.contains(segmentIdx)) {
+                continue;
+            }
+
+            MarchingSegment seg = segments.get(segmentIdx);
+            String otherKey = seg.otherKey(currentKey);
+            if (otherKey.equals(prevKey)) {
+                fallback = segmentIdx;
+                continue;
+            }
+
+            Vector2 nextPoint = seg.pointForKey(otherKey);
+            Vector2 dirOut = new Vector2(nextPoint).sub(currentPoint);
+            if (dirOut.len2() <= 1e-12f) {
+                continue;
+            }
+
+            float score;
+            if (prevPoint == null || currentPoint == null || new Vector2(currentPoint).sub(prevPoint).len2() <= 1e-12f) {
+                // First turn: prefer longer continuation over tiny stubs.
+                score = dirOut.len2();
+            } else {
+                Vector2 dirIn = new Vector2(currentPoint).sub(prevPoint).nor();
+                score = dirIn.dot(new Vector2(dirOut).nor()); // maximal dot => minimal turn
+            }
+
+            if (score > bestScore || (Math.abs(score - bestScore) <= 1e-6f && segmentIdx < best)) {
+                bestScore = score;
+                best = segmentIdx;
+            }
+        }
+
+        return best >= 0 ? best : fallback;
+    }
+
+    private Vector2 keyToPoint(String key) {
+        if (key == null) {
+            return null;
+        }
+        int sep = key.indexOf(',');
+        if (sep <= 0 || sep >= key.length() - 1) {
+            return null;
+        }
+        try {
+            int x = Integer.parseInt(key.substring(0, sep));
+            int y = Integer.parseInt(key.substring(sep + 1));
+            return new Vector2(x / 100000f, y / 100000f);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private float signedArea(List<Vector2> loop) {
+        float area = 0f;
+        for (int i = 0; i < loop.size(); i++) {
+            Vector2 a = loop.get(i);
+            Vector2 b = loop.get((i + 1) % loop.size());
+            area += a.x * b.y - b.x * a.y;
+        }
+        return 0.5f * area;
     }
 
     private void tessellateContour(ArrayList<Vector2> contour) {
@@ -396,99 +574,151 @@ public class DrawTool {
             Gdx.app.log("ERROR", "contour is null");
             return null;
         }
+
+        List<Vector2> cleaned = normalizeMergedLoop(contour);
+        if (cleaned == null) {
+            return null;
+        }
+
         if(dynamicObject) {
-            DynamicObject obj = new DynamicObject(nextId, 0.5f, 0.4f, 1f, contour,
+            DynamicObject obj = new DynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
                 referencePoint.x, referencePoint.y, 0, mass, inertia, com);
             nextId++;
             return obj;
         }
 
-        return new StaticObject(1000, 0.5f, 0.4f, contour, referencePoint.x, referencePoint.y, 0);
+        return new StaticObject(1000, 0.5f, 0.4f, cleaned, referencePoint.x, referencePoint.y, 0);
     }
 
-    private void addSegment(Vector2 a, Vector2 b, List<MarchingSegment> segments, Map<String, List<Integer>> adjacency) {
-        if(pointKey(a).equals(pointKey(b))) {
-            return;
-        }
-        int idx = segments.size();
-        MarchingSegment segment = new MarchingSegment(a, b);
-        segments.add(segment);
-        adjacency.computeIfAbsent(segment.keyA, k -> new ArrayList<>()).add(idx);
-        adjacency.computeIfAbsent(segment.keyB, k -> new ArrayList<>()).add(idx);
-    }
-
-    private List<Vector2> traceLoopFromSegment(int startSegment,
-                                               List<MarchingSegment> segments,
-                                               Map<String, List<Integer>> adjacency,
-                                               Set<Integer> travelledEdges) {
-        List<Vector2> loop = new ArrayList<>();
-        MarchingSegment start = segments.get(startSegment);
-
-        String startKey = start.keyA;
-        String prevKey = start.keyA;
-        String currentKey = start.keyB;
-
-        loop.add(new Vector2(start.a));
-        loop.add(new Vector2(start.b));
-        travelledEdges.add(startSegment);
-
-        int guard = 0;
-        int maxStep = Math.max(segments.size() * 2, 64);
-        while(!currentKey.equals(startKey) && guard++ < maxStep) {
-            int nextSegment = findNextSegment(currentKey, prevKey, segments, adjacency, travelledEdges);
-            if(nextSegment < 0) {
-                break;
-            }
-
-            MarchingSegment seg = segments.get(nextSegment);
-            String nextKey = seg.otherKey(currentKey);
-            loop.add(new Vector2(seg.pointForKey(nextKey)));
-
-            travelledEdges.add(nextSegment);
-            prevKey = currentKey;
-            currentKey = nextKey;
+    private List<Vector2> sanitizeLoop(List<Vector2> loop) {
+        if (loop == null || loop.size() < 3) {
+            return null;
         }
 
-        if(loop.size() > 1) {
-            Vector2 first = loop.get(0);
-            Vector2 last = loop.get(loop.size() - 1);
-            if(first.epsilonEquals(last, 1e-5f)) {
-                loop.remove(loop.size() - 1);
-            }
-        }
-
-        return loop;
-    }
-
-    private int findNextSegment(String currentKey,
-                                String prevKey,
-                                List<MarchingSegment> segments,
-                                Map<String, List<Integer>> adjacency,
-                                Set<Integer> travelledEdges) {
-        List<Integer> candidates = adjacency.getOrDefault(currentKey, Collections.emptyList());
-        int fallback = -1;
-        for(int segmentIdx : candidates) {
-            if(travelledEdges.contains(segmentIdx)) {
+        List<Vector2> out = new ArrayList<>();
+        for (Vector2 p : loop) {
+            if (p == null) {
                 continue;
             }
-            MarchingSegment seg = segments.get(segmentIdx);
-            String otherKey = seg.otherKey(currentKey);
-            if(!otherKey.equals(prevKey)) {
-                return segmentIdx;
+            if (out.isEmpty() || !out.get(out.size() - 1).epsilonEquals(p, 1e-5f)) {
+                out.add(new Vector2(p));
             }
-            fallback = segmentIdx;
         }
-        return fallback;
+
+        if (out.size() > 1 && out.get(0).epsilonEquals(out.get(out.size() - 1), 1e-5f)) {
+            out.remove(out.size() - 1);
+        }
+
+        // Remove near-collinear vertices to avoid near-zero-area ears.
+        int i = 0;
+        while (out.size() >= 3 && i < out.size()) {
+            Vector2 prev = out.get((i - 1 + out.size()) % out.size());
+            Vector2 curr = out.get(i);
+            Vector2 next = out.get((i + 1) % out.size());
+            if (Math.abs(orientedArea(prev, curr, next)) <= 1e-6f) {
+                out.remove(i);
+                continue;
+            }
+            i++;
+        }
+
+        if (out.size() < 3) {
+            return null;
+        }
+
+        if (Math.abs(signedArea(out)) < 1e-4f) {
+            return null;
+        }
+
+        if (hasSelfIntersection(out)) {
+            return null;
+        }
+
+        return out;
     }
 
-    private float signedArea(List<Vector2> loop) {
-        float area = 0f;
-        for(int i = 0; i < loop.size(); i++) {
-            Vector2 a = loop.get(i);
-            Vector2 b = loop.get((i + 1) % loop.size());
-            area += a.x * b.y - b.x * a.y;
+    // Post-merge cleanup: keep bridge-compatible loops while removing obvious duplicates/degenerates.
+    private List<Vector2> normalizeMergedLoop(List<Vector2> loop) {
+        if (loop == null || loop.size() < 3) {
+            return null;
         }
-        return 0.5f * area;
+
+        List<Vector2> out = new ArrayList<>();
+        for (Vector2 p : loop) {
+            if (p == null) {
+                continue;
+            }
+            if (out.isEmpty() || !out.get(out.size() - 1).epsilonEquals(p, 1e-5f)) {
+                out.add(new Vector2(p));
+            }
+        }
+
+        if (out.size() > 1 && out.get(0).epsilonEquals(out.get(out.size() - 1), 1e-5f)) {
+            out.remove(out.size() - 1);
+        }
+
+        int i = 0;
+        while (out.size() >= 3 && i < out.size()) {
+            Vector2 prev = out.get((i - 1 + out.size()) % out.size());
+            Vector2 curr = out.get(i);
+            Vector2 next = out.get((i + 1) % out.size());
+            if (Math.abs(orientedArea(prev, curr, next)) <= 1e-6f) {
+                out.remove(i);
+                continue;
+            }
+            i++;
+        }
+
+        if (out.size() < 3 || Math.abs(signedArea(out)) < 1e-4f) {
+            return null;
+        }
+
+        return out;
+    }
+
+    private boolean hasSelfIntersection(List<Vector2> loop) {
+        int n = loop.size();
+        for (int i = 0; i < n; i++) {
+            Vector2 a1 = loop.get(i);
+            Vector2 a2 = loop.get((i + 1) % n);
+            for (int j = i + 1; j < n; j++) {
+                // Adjacent edges share endpoints and should be ignored.
+                if (Math.abs(i - j) <= 1 || (i == 0 && j == n - 1)) {
+                    continue;
+                }
+                Vector2 b1 = loop.get(j);
+                Vector2 b2 = loop.get((j + 1) % n);
+                if (segmentsIntersect(a1, a2, b1, b2)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean segmentsIntersect(Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
+        float o1 = orientedArea(a, b, c);
+        float o2 = orientedArea(a, b, d);
+        float o3 = orientedArea(c, d, a);
+        float o4 = orientedArea(c, d, b);
+
+        if (Math.abs(o1) <= 1e-6f && onSegment(a, b, c)) return true;
+        if (Math.abs(o2) <= 1e-6f && onSegment(a, b, d)) return true;
+        if (Math.abs(o3) <= 1e-6f && onSegment(c, d, a)) return true;
+        if (Math.abs(o4) <= 1e-6f && onSegment(c, d, b)) return true;
+
+        return (o1 > 0f) != (o2 > 0f) && (o3 > 0f) != (o4 > 0f);
+    }
+
+    private boolean onSegment(Vector2 a, Vector2 b, Vector2 p) {
+        return p.x >= Math.min(a.x, b.x) - 1e-6f
+            && p.x <= Math.max(a.x, b.x) + 1e-6f
+            && p.y >= Math.min(a.y, b.y) - 1e-6f
+            && p.y <= Math.max(a.y, b.y) + 1e-6f;
+    }
+
+    private float orientedArea(Vector2 a, Vector2 b, Vector2 c) {
+        return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     }
 
     private List<Vector2> connectInteriorLoopsToExterior(List<Vector2> outerLoop, List<List<Vector2>> innerLoops) {
@@ -496,16 +726,28 @@ public class DrawTool {
             return outerLoop;
         }
 
-        List<Vector2> merged = new ArrayList<>(outerLoop);
+        List<Vector2> merged = ensureLoopWinding(new ArrayList<>(outerLoop), true);
         for(List<Vector2> innerLoop : innerLoops) {
             if(innerLoop == null || innerLoop.size() < 3) {
                 continue;
             }
-            int[] bridge = findClosestBridge(merged, innerLoop);
-            merged = spliceLoopAtBridge(merged, innerLoop, bridge[0], bridge[1]);
+            List<Vector2> orientedInner = ensureLoopWinding(new ArrayList<>(innerLoop), false);
+            int[] bridge = findClosestBridge(merged, orientedInner);
+            merged = spliceLoopAtBridge(merged, orientedInner, bridge[0], bridge[1]);
         }
 
         return merged;
+    }
+
+    private List<Vector2> ensureLoopWinding(List<Vector2> loop, boolean ccw) {
+        if (loop == null || loop.size() < 3) {
+            return loop;
+        }
+        float area = signedArea(loop);
+        if ((ccw && area < 0f) || (!ccw && area > 0f)) {
+            Collections.reverse(loop);
+        }
+        return loop;
     }
 
     private int[] findClosestBridge(List<Vector2> outerLoop, List<Vector2> innerLoop) {
@@ -516,48 +758,165 @@ public class DrawTool {
         for(int i = 0; i < outerLoop.size(); i++) {
             Vector2 outer = outerLoop.get(i);
             for(int j = 0; j < innerLoop.size(); j++) {
-                float dist2 = outer.dst2(innerLoop.get(j));
-                if(dist2 < bestDist2) {
-                    bestDist2 = dist2;
-                    outerIndex = i;
-                    innerIndex = j;
+                Vector2 inner = innerLoop.get(j);
+                float dist2 = outer.dst2(inner);
+                if (dist2 >= bestDist2) {
+                    continue;
                 }
+                if (!isValidBridge(outerLoop, innerLoop, i, j)) {
+                    continue;
+                }
+                bestDist2 = dist2;
+                outerIndex = i;
+                innerIndex = j;
             }
         }
 
         return new int[]{outerIndex, innerIndex};
     }
 
-    private List<Vector2> spliceLoopAtBridge(List<Vector2> outerLoop, List<Vector2> innerLoop, int outerIndex, int innerIndex) {
-        List<Vector2> orderedInner = new ArrayList<>(innerLoop);
-        if(Math.signum(signedArea(outerLoop)) == Math.signum(signedArea(orderedInner))) {
-            Collections.reverse(orderedInner);
-            innerIndex = orderedInner.size() - 1 - innerIndex;
+    private boolean isValidBridge(List<Vector2> outerLoop, List<Vector2> innerLoop, int outerIndex, int innerIndex) {
+        Vector2 a = outerLoop.get(outerIndex);
+        Vector2 b = innerLoop.get(innerIndex);
+
+        if (bridgeCrossesLoop(a, b, outerLoop, outerIndex)) {
+            return false;
+        }
+        if (bridgeCrossesLoop(a, b, innerLoop, innerIndex)) {
+            return false;
         }
 
+        Vector2 midpoint = new Vector2(a).add(b).scl(0.5f);
+        return isPointInsideLoop(midpoint, outerLoop);
+    }
+
+    private boolean bridgeCrossesLoop(Vector2 a, Vector2 b, List<Vector2> loop, int endpointIndex) {
+        for (int i = 0; i < loop.size(); i++) {
+            Vector2 p = loop.get(i);
+            Vector2 q = loop.get((i + 1) % loop.size());
+
+            // Skip edges touching the chosen endpoint on that loop.
+            if (i == endpointIndex || ((i + 1) % loop.size()) == endpointIndex) {
+                continue;
+            }
+
+            if (segmentsIntersect(a, b, p, q)) {
+                if (a.epsilonEquals(p, 1e-5f) || a.epsilonEquals(q, 1e-5f)
+                    || b.epsilonEquals(p, 1e-5f) || b.epsilonEquals(q, 1e-5f)) {
+                    continue;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isPointInsideLoop(Vector2 point, List<Vector2> loop) {
+        boolean inside = false;
+        for (int i = 0, j = loop.size() - 1; i < loop.size(); j = i++) {
+            Vector2 vi = loop.get(i);
+            Vector2 vj = loop.get(j);
+            boolean intersects = ((vi.y > point.y) != (vj.y > point.y))
+                && (point.x < (vj.x - vi.x) * (point.y - vi.y) / ((vj.y - vi.y) + 1e-12f) + vi.x);
+            if (intersects) {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    private List<Vector2> spliceLoopAtBridge(List<Vector2> outerLoop, List<Vector2> innerLoop, int outerIndex, int innerIndex) {
+        List<Vector2> forward = buildSplicedLoop(outerLoop, innerLoop, outerIndex, innerIndex, true);
+        List<Vector2> backward = buildSplicedLoop(outerLoop, innerLoop, outerIndex, innerIndex, false);
+
+        float targetArea = Math.max(0f, Math.abs(signedArea(outerLoop)) - Math.abs(signedArea(innerLoop)));
+        float forwardError = Math.abs(Math.abs(signedArea(forward)) - targetArea);
+        float backwardError = Math.abs(Math.abs(signedArea(backward)) - targetArea);
+
+        boolean forwardValid = !hasSelfIntersection(forward);
+        boolean backwardValid = !hasSelfIntersection(backward);
+
+        if (forwardValid && !backwardValid) {
+            return forward;
+        }
+        if (backwardValid && !forwardValid) {
+            return backward;
+        }
+
+        return forwardError <= backwardError ? forward : backward;
+    }
+
+    private List<Vector2> buildSplicedLoop(List<Vector2> outerLoop,
+                                           List<Vector2> innerLoop,
+                                           int outerIndex,
+                                           int innerIndex,
+                                           boolean forward) {
         List<Vector2> merged = new ArrayList<>();
 
-        for(int i = 0; i <= outerIndex; i++) {
+        for (int i = 0; i <= outerIndex; i++) {
             merged.add(new Vector2(outerLoop.get(i)));
         }
 
         Vector2 bridgeOuter = outerLoop.get(outerIndex);
-        Vector2 bridgeInner = orderedInner.get(innerIndex);
-        merged.add(new Vector2(bridgeInner));
+        Vector2 bridgeInner = innerLoop.get(innerIndex);
+        BridgeCorridor corridor = buildBridgeCorridor(bridgeOuter, bridgeInner);
 
-        for(int i = 1; i < orderedInner.size(); i++) {
-            int idx = (innerIndex + i) % orderedInner.size();
-            merged.add(new Vector2(orderedInner.get(idx)));
+        // Enter the hole boundary through one side of a tiny corridor.
+        merged.add(corridor.outerEnter);
+        merged.add(corridor.innerEnter);
+
+        for (int i = 1; i < innerLoop.size(); i++) {
+            int idx;
+            if (forward) {
+                idx = (innerIndex + i) % innerLoop.size();
+            } else {
+                idx = (innerIndex - i + innerLoop.size()) % innerLoop.size();
+            }
+            merged.add(new Vector2(innerLoop.get(idx)));
         }
 
-        merged.add(new Vector2(bridgeInner));
-        merged.add(new Vector2(bridgeOuter));
+        // Exit through the other side of the corridor to avoid overlapping bridge edges.
+        merged.add(corridor.innerExit);
+        merged.add(corridor.outerExit);
 
-        for(int i = outerIndex + 1; i < outerLoop.size(); i++) {
+        for (int i = outerIndex + 1; i < outerLoop.size(); i++) {
             merged.add(new Vector2(outerLoop.get(i)));
         }
 
         return merged;
+    }
+
+    private BridgeCorridor buildBridgeCorridor(Vector2 outer, Vector2 inner) {
+        Vector2 dir = new Vector2(inner).sub(outer);
+        float len = dir.len();
+        if (len <= 1e-6f) {
+            return new BridgeCorridor(new Vector2(outer), new Vector2(inner), new Vector2(inner), new Vector2(outer));
+        }
+
+        // Keep a finite slit for simple-polygon validity, but make it visually negligible.
+        float halfWidth = Math.max(0.0005f, Math.min(resolutionScale * 0.08f, len * 0.005f));
+        Vector2 normal = new Vector2(-dir.y, dir.x).nor().scl(halfWidth);
+
+        return new BridgeCorridor(
+            new Vector2(outer).add(normal),
+            new Vector2(inner).add(normal),
+            new Vector2(inner).sub(normal),
+            new Vector2(outer).sub(normal)
+        );
+    }
+
+    private static class BridgeCorridor {
+        private final Vector2 outerEnter;
+        private final Vector2 innerEnter;
+        private final Vector2 innerExit;
+        private final Vector2 outerExit;
+
+        private BridgeCorridor(Vector2 outerEnter, Vector2 innerEnter, Vector2 innerExit, Vector2 outerExit) {
+            this.outerEnter = outerEnter;
+            this.innerEnter = innerEnter;
+            this.innerExit = innerExit;
+            this.outerExit = outerExit;
+        }
     }
 
     private String pointKey(Vector2 point) {
@@ -568,18 +927,14 @@ public class DrawTool {
 
     private Vector2 edgePos(int edge, Vector2 p, float v0, float v1, float v2, float v3) {
         switch(edge) {
-
             case 0:
                 return interpolation(p, new Vector2(p.x + resolutionScale, p.y), v0, v1);
             case 1:
-                return interpolation(new Vector2(p.x + resolutionScale, p.y), new Vector2(p.x + resolutionScale, p.y + resolutionScale),
-                    v1, v2);
+                return interpolation(new Vector2(p.x + resolutionScale, p.y), new Vector2(p.x + resolutionScale, p.y + resolutionScale), v1, v2);
             case 2:
-                return interpolation(new Vector2(p.x + resolutionScale, p.y + resolutionScale), new Vector2(p.x, p.y + resolutionScale),
-                    v2, v3);
+                return interpolation(new Vector2(p.x + resolutionScale, p.y + resolutionScale), new Vector2(p.x, p.y + resolutionScale), v2, v3);
             case 3:
-                return interpolation(new Vector2(p.x, p.y + resolutionScale), new Vector2(p.x, p.y),
-                    v3, v0);
+                return interpolation(new Vector2(p.x, p.y + resolutionScale), new Vector2(p.x, p.y), v3, v0);
             default:
                 return interpolation(p, new Vector2(p.x + resolutionScale, p.y), v0, v1);
         }
@@ -599,7 +954,6 @@ public class DrawTool {
         if(v1 > 0.9f) caseIndex |= 2;
         if(v2 > 0.9f) caseIndex |= 4;
         if(v3 > 0.9f) caseIndex |= 8;
-
         return caseIndex;
     }
 
@@ -645,30 +999,6 @@ public class DrawTool {
             return x + "," + y;
         }
     }
-
-    private List<Vector2> drawFromLookUp(int caseIndex, int x, int y) {
-        int[] edgeKey = edgeTable[caseIndex];
-        List<Vector2> edgePoints = new ArrayList<>();
-        for(int i = 0; i < edgeKey.length; i+=2) {
-            if(edgeKey[i] == -1) break;
-            switch(edgeKey[i]) {
-                case 0:
-                    edgePoints.add(new Vector2(x + 0.5f, y));
-                    break;
-                case 1:
-                    edgePoints.add(new Vector2(x + 1, y + 0.5f));
-                    break;
-                case 2:
-                    edgePoints.add(new Vector2(x + 0.5f, y + 1));
-                    break;
-                case 3:
-                    edgePoints.add(new Vector2(x, y + 0.5f));
-                    break;
-            }
-        }
-        return edgePoints;
-    }
-
     // finish drawing + create object method
     private DynamicObject finishDrawing() {
         drawing = false;
@@ -683,7 +1013,7 @@ public class DrawTool {
 
         // change into the position in game world
         Vector3 screenPos = new Vector3(screenX, screenY, 0);
-        Vector3 worldPos = camera.unproject(screenPos);
+        Vector3 worldPos = viewport.unproject(screenPos);
 
         return new Vector2(worldPos.x, worldPos.y);
     }
@@ -693,4 +1023,3 @@ public class DrawTool {
         return drawing;
     }
 }
-
