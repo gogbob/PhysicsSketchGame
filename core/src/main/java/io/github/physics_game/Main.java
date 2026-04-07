@@ -112,12 +112,13 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         PhysicsObject drawnObject = drawTool.update();
         if(drawnObject != null) {
-            if(drawnObject instanceof StaticObject && drawnObject.getId() <1000) {
-                //see what is going on
-                float a = 1f;
-            }
             currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
             currentLevel.addPhysicsObject(drawnObject);
+
+            if(drawnObject instanceof DynamicObject) {
+                Gdx.app.log("Main", "Added new DynamicObject with ID " + drawnObject.getId());
+            }
+
         }
 
 

@@ -17,18 +17,22 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
+
 import static java.lang.Math.*;
 
 public class DrawTool {
-    private static final float resolutionScale = 0.01f;
-    private static final float rangeMax = 0.01f;
+    private static final float resolutionScale = 0.05f;
+    private static final float rangeMax = 0.05f;
+
+    private ReentrantLock lock = new ReentrantLock();
 
     private boolean drawing; // check if it's drawing or not
     private final Camera camera;
     private int nextId; // give id to objects
     private List<Vector2> circleShape;
     private final float toolWidth; // the width of the tool (the radius of the circle)
-    private final float density = 1f;
+    private final float density = 0.1f;
     private float mass = 0f;
     private float inertia = 0f;
     private Vector2 com = new Vector2();
@@ -75,20 +79,27 @@ public class DrawTool {
 
     // call the method each frame
     public PhysicsObject update() {
-        // press mouse = start to draw
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            return startDrawing();
+        if(lock.tryLock()) {
+            try {
+                // press mouse = start to draw
+                if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+                    return startDrawing();
+                }
+
+                // continue press mouse = continue to draw
+                if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
+                    return addPoint(false);
+                }
+
+                // release mouse = done + create object
+                if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
+                    return finishDrawing();
+                }
+            } finally {
+                lock.unlock();
+            }
         }
 
-        // continue press mouse = continue to draw
-        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
-            return addPoint(false);
-        }
-
-        // release mouse = done + create object
-        if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
-            return finishDrawing();
-        }
         return null;
     }
 
@@ -142,7 +153,7 @@ public class DrawTool {
         Vector2 pos = getMousePosition();
         Vector2 delta = new Vector2(pos).sub(prevPosition);
         addPixelValues(pos, delta);
-        updateDrawingMetrics(prevPosition, pos);
+        updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
         prevPosition = pos;
         List<Vector2> contour = generateLocalContours();
         return buildCurrentObject(contour, buildDynamic);
@@ -348,7 +359,7 @@ public class DrawTool {
     private void updateDrawingMetrics(Vector2 start, Vector2 end) {
         Vector2 delta = new Vector2(end).sub(start);
         float length = delta.len();
-        if(length < 1e-6f) {
+        if(length < 1e-8f) {
             return;
         }
 
@@ -359,17 +370,20 @@ public class DrawTool {
         float capMass = capArea * density;
         float addedMass = rectMass + capMass;
 
-        Vector2 dir = new Vector2(delta).scl(1f / length);
+        Vector2 dir = new Vector2(delta).nor();
         Vector2 rectCenter = new Vector2(start).add(end).scl(0.5f);
         Vector2 capCenter = new Vector2(end).sub(new Vector2(dir).scl((float)(4f * radius / (3f * PI))));
 
         float totalMass = mass + addedMass;
-        if(totalMass > 1e-6f) {
+        Vector2 prevCom = new Vector2(com);
+        if(totalMass > 1e-8f) {
             Vector2 weighted = new Vector2(com).scl(mass)
                 .add(new Vector2(rectCenter).scl(rectMass))
                 .add(new Vector2(capCenter).scl(capMass));
             com = weighted.scl(1f / totalMass);
         }
+
+        inertia -= totalMass * (new Vector2(com).sub(prevCom).len() * new Vector2(com).sub(prevCom).len());
 
         float rectInertia = rectMass * (length * length + (2f * radius) * (2f * radius)) / 12f;
         float capInertia = capMass * radius * radius / 2f;

@@ -30,7 +30,7 @@ public abstract class Level {
     }
 
     public ArrayList<PhysicsObject> getPhysicsObjects() {
-        return new ArrayList<>(physicsObjects);
+        return physicsObjects;
     }
     public void addPhysicsObject(PhysicsObject obj) {
         physicsObjects.add(obj);

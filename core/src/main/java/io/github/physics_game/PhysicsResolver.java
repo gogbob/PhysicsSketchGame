@@ -138,8 +138,6 @@ public class PhysicsResolver {
 
 
         if(Main.accumulator < fixedStep) {
-
-
             for (int i = 0; i < objects.size(); i++) {
                 PhysicsObject obj = objects.get(i);
                 if (obj instanceof DynamicObject) {
