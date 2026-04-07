@@ -23,13 +23,19 @@ public abstract class PhysicsObject {
     private Vector2 com = new Vector2();
     private Vector2 relativePosition = new Vector2();
 
-    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, List<List<Vector2>> triangles, float startX, float startY, float rotation) {
+    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
+        this(id, friction, restitution, vertices, startX, startY, rotation
+            , PhysicsResolver.getCenterOfMassPolygon(EarClippingDecomposer.decomposeToTriangles(vertices)));
+    }
+
+    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com) {
+        super();
         this.id = id;
         this.friction = friction;
         this.restitution = restitution;
         this.vertices = new ArrayList<>(vertices);
         this.localBody = new CustomContactHandler.PolygonBody(vertices);
-        this.concaveLocalTriangles = triangles;
+        this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
         int prevSize = concaveLocalTriangles.size();
 
 
@@ -45,18 +51,13 @@ public abstract class PhysicsObject {
 
         this.startX = startX;
         this.startY = startY;
-        this.com = PhysicsResolver.getCenterOfMassPolygon(concaveLocalTriangles);
+        this.com = new Vector2(com);
         this.relativePosition = new Vector2(this.com).sub(getPosition());
         setRotation(rotation);
         this.startRotation = rotation;
         setPosition(new Vector2(startX, startY));
 
     }
-
-    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
-        this(id, friction, restitution, vertices, EarClippingDecomposer.decomposeToTriangles(vertices), startX, startY, rotation);
-    }
-
 
 
     public Vector2 getCenter()  {

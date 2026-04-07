@@ -75,7 +75,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         TutorialLevel tutorialLevel = new TutorialLevel();
         //exampleObject.setRotation((float)Math.PI);\
 
-        drawTool = new DrawTool(camera, tutorialLevel);
+        drawTool = new DrawTool(camera, 0.4f);
         currentLevel = tutorialLevel;
         Gdx.app.log("Main", "DrawTool created!");
 
@@ -110,7 +110,15 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        drawTool.update();
+        PhysicsObject drawnObject = drawTool.update();
+        if(drawnObject != null) {
+            if(drawnObject instanceof StaticObject && drawnObject.getId() <1000) {
+                //see what is going on
+                float a = 1f;
+            }
+            currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+            currentLevel.addPhysicsObject(drawnObject);
+        }
 
 
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
@@ -159,19 +167,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 }
             }
 
-            // draw the drawing line
-            if (drawTool.isDrawing()) {
-                ArrayList<Vector2> pts = drawTool.getPoints();
-                if (pts.size() > 1) {
-                    shapeRenderer.setColor(Color.GREEN);
-                    for (int j = 0; j < pts.size() - 1; j++) {
-                        Vector2 p1 = pts.get(j);
-                        Vector2 p2 = pts.get(j + 1);
-                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
-                    }
-                }
-            }
-
             currentLevel.tick(delta);
 
             shapeRenderer.end();
@@ -199,19 +194,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             currentLevel.tick(delta);
-
-            // draw the drawing line
-            if (drawTool.isDrawing()) {
-                ArrayList<Vector2> pts = drawTool.getPoints();
-                if (pts.size() > 1) {
-                    shapeRenderer.setColor(Color.GREEN);
-                    for (int j = 0; j < pts.size() - 1; j++) {
-                        Vector2 p1 = pts.get(j);
-                        Vector2 p2 = pts.get(j + 1);
-                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
-                    }
-                }
-            }
 
             for(DebugForce f : forces) {
                 drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
