@@ -1,8 +1,6 @@
-package io.github.physics_game;
+package io.github.physics_game.object_types;
 
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.physics.box2d.*;
-import io.github.physics_game.collision.EarClippingDecomposer;
 
 import java.util.List;
 

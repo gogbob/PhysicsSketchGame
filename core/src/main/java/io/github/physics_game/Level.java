@@ -1,7 +1,8 @@
 package io.github.physics_game;
 
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.physics.box2d.World;
+import io.github.physics_game.object_types.PhysicsObject;
+import io.github.physics_game.object_types.StaticObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,5 +43,16 @@ public abstract class Level {
     }
 
     public abstract boolean isComplete();
-    public abstract void tick(float deltaTime);
+    public abstract LevelTickData tick(float deltaTime);
+
+    public class LevelTickData {
+        private Float timeLeft = null;
+        public LevelTickData() {}
+        public LevelTickData(Float timeLeft) {
+            this.timeLeft = timeLeft;
+        }
+        public Float getTimeLeft() {
+            return timeLeft;
+        }
+    }
 }

@@ -1,4 +1,4 @@
-package io.github.physics_game;
+package io.github.physics_game.object_types;
 
 import com.badlogic.gdx.math.Vector2;
 
