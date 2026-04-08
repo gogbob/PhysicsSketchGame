@@ -17,7 +17,7 @@ public class TutorialLevel extends Level {
     private static final float TIME_PENALTY = 1.0f;
 
     public TutorialLevel() {
-        super(0, "Tutorial Level", new ArrayList<>(), 20f, 15f);
+        super(0, "Tutorial Level", new ArrayList<>(), 40f, 30f);
 
         List<Vector2> cupVertices = new ArrayList<>(
             Arrays.asList(

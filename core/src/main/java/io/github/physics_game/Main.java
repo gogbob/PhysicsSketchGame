@@ -28,7 +28,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     FitViewport viewport;
     private Texture image;
     private Texture ballImage;
-    World world;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
@@ -57,7 +56,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void create() {
         // Use a small world size (meters) so objects are visible with the debug renderer.
         camera = new OrthographicCamera();
-        viewport = new FitViewport(20f, 15f, camera); // world units: 20 x 15
+        viewport = new FitViewport(40f, 30f, camera); // world units: 20 x 15
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
@@ -227,7 +226,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     @Override
     public void dispose() {
-        world.dispose();
         debugRenderer.dispose();
         if (batch != null) batch.dispose();
         if (image != null) image.dispose();
