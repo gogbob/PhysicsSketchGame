@@ -5,6 +5,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Camera;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import io.github.physics_game.levels.Level;
 import io.github.physics_game.object_types.DynamicObject;
 
 import java.util.ArrayList;

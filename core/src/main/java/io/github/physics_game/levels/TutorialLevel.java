@@ -1,6 +1,7 @@
-package io.github.physics_game;
+package io.github.physics_game.levels;
 
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;

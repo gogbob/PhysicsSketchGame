@@ -1,4 +1,4 @@
-package io.github.physics_game;
+package io.github.physics_game.levels;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
