@@ -150,12 +150,8 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
             for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-                if(obj instanceof DynamicTriggerObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.BLUE);
-                } else if(obj instanceof DynamicObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
-                } else if (obj instanceof StaticObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.GRAY);
+                if(!(obj instanceof UncollidableObject)) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), obj.getColor());
                 }
             }
 

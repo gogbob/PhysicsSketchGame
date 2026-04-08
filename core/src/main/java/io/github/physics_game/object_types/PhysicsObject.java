@@ -1,6 +1,7 @@
 package io.github.physics_game.object_types;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.collision.CustomContactHandler;
@@ -22,6 +23,7 @@ public abstract class PhysicsObject {
     private float startRotation;
     private Vector2 com = new Vector2();
     private Vector2 relativePosition = new Vector2();
+    private Color color = new Color();
 
 
     public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
@@ -31,6 +33,7 @@ public abstract class PhysicsObject {
         this.vertices = new ArrayList<>(vertices);
         this.localBody = new CustomContactHandler.PolygonBody(vertices);
         this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
+        this.color.set(Color.WHITE);
         int prevSize = concaveLocalTriangles.size();
 
         if(id == 100) {
@@ -61,6 +64,12 @@ public abstract class PhysicsObject {
         float x = relativePosition.x * (float)Math.cos(getRotation() - startRotation) - relativePosition.y * (float)Math.sin(getRotation() - startRotation) + getPosition().x;
         float y = relativePosition.x * (float)Math.sin(getRotation() - startRotation) + relativePosition.y * (float)Math.cos(getRotation() - startRotation)  + getPosition().y;
         return new Vector2(x, y);
+    }
+    public Color getColor() {
+        return color;
+    }
+    public void setColor(Color color) {
+        this.color.set(color);
     }
     public void setPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);

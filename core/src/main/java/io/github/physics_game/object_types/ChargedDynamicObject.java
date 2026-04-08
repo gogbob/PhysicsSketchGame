@@ -1,5 +1,6 @@
 package io.github.physics_game.object_types;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.PhysicsResolver;
 
@@ -11,6 +12,7 @@ public class ChargedDynamicObject extends DynamicObject implements Charged {
     public ChargedDynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, float chargeDensity) {
         super(id, friction, restitution, density, vertices, startX, startY, rotation);
         this.chargeDensity = chargeDensity;
+        setColor((chargeDensity >= 0) ? new Color(Math.min(chargeDensity/20f, 0.5f) + 0.5f, 0.5f, 0.5f, 1) : new Color(0.5f, 0.5f, Math.min(-chargeDensity/20f, 0.5f), 1));
     }
 
     @Override
