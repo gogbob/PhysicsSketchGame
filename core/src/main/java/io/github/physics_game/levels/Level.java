@@ -1,5 +1,6 @@
-package io.github.physics_game;
+package io.github.physics_game.levels;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.object_types.PhysicsObject;
 import io.github.physics_game.object_types.StaticObject;
@@ -23,6 +24,10 @@ public abstract class Level {
         List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, viewPortHeight*2), new Vector2(0, viewPortHeight*2));
         StaticObject leftWall = new StaticObject(-2, 0.5f, 0.5f, wallPoly, 0, 0, 0);
         StaticObject rightWall = new StaticObject(-3, 0.5f, 0.5f, wallPoly, viewPortWidth - 1, 0, 0);
+
+        floor.setColor(Color.GRAY);
+        leftWall.setColor(Color.GRAY);
+        rightWall.setColor(Color.GRAY);
 
         physicsObjects.add(floor);
         physicsObjects.add(leftWall);

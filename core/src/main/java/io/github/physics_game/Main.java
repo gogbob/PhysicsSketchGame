@@ -16,6 +16,8 @@ import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import io.github.physics_game.collision.CustomContactHandler;
+import io.github.physics_game.levels.Level;
+import io.github.physics_game.levels.TutorialLevel;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
@@ -28,19 +30,24 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     FitViewport viewport;
     private Texture image;
     private Texture ballImage;
+    World world;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
-    public final float drawPeriod = 1/10f;
+    private float levelTimer = 0f;
+    private int finalScore = -1;
+    private int finalStars = 0;
+    private boolean scoreCalculated = false;
+
 
     // throttle logging to once-per-second
     float logTimer = 0f;
 
     // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
-    private float drawTimer = 0f;
+
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
     private static final float NORMAL_DEBUG_LENGTH = 0.6f;
@@ -56,7 +63,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void create() {
         // Use a small world size (meters) so objects are visible with the debug renderer.
         camera = new OrthographicCamera();
-        viewport = new FitViewport(40f, 30f, camera); // world units: 20 x 15
+        viewport = new FitViewport(20f, 15f, camera); // world units: 20 x 15
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
@@ -75,7 +82,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
         TutorialLevel tutorialLevel = new TutorialLevel();
         //exampleObject.setRotation((float)Math.PI);\
 
-        drawTool = new DrawTool(camera, viewport, 0.4f);
+        drawTool = new DrawTool(camera, tutorialLevel);
         currentLevel = tutorialLevel;
         Gdx.app.log("Main", "DrawTool created!");
 
@@ -110,23 +117,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        drawTimer += delta;
+        drawTool.update();
 
-        PhysicsObject drawnObject = drawTool.update();
-        if (drawnObject != null) {
-            // Finalized shapes must be committed immediately; only throttle static preview refreshes.
-            if (drawnObject instanceof DynamicObject) {
-                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                currentLevel.addPhysicsObject(drawnObject);
-                Gdx.app.log("Main", "Added new DynamicObject with ID " + drawnObject.getId());
-                drawTimer = 0f;
-            } else if (drawTimer >= drawPeriod) {
-                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                currentLevel.addPhysicsObject(drawnObject);
-                drawTimer -= drawPeriod;
-            }
+        if (!currentLevel.isComplete()) {
+            levelTimer += delta;
         }
-
 
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
@@ -158,23 +153,42 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             if(currentLevel.isComplete()) {
-                Gdx.app.log("Main", "Level complete! Loading next level...");
-                runPhysics = false;
+                if (!scoreCalculated) {
+                    finalScore = ScoreCalculator.calculateScore(
+                        drawTool.getShapesUsed(),
+                        levelTimer
+                    );
+                    finalStars = ScoreCalculator.calculateStars(finalScore);
+                    scoreCalculated = true;
+
+                    Gdx.app.log("Main", "Level complete!");
+                    Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
+                }
             }
+
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
             for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-                if(obj instanceof DynamicTriggerObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.BLUE);
-                } else if(obj instanceof DynamicObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.WHITE);
-                } else if (obj instanceof StaticObject) {
-                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), Color.GRAY);
+                if(!(obj instanceof UncollidableObject)) {
+                    drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), obj.getColor());
                 }
             }
 
-            currentLevel.tick((runPhysics)? delta : 0f);
+            // draw the drawing line
+            if (drawTool.isDrawing()) {
+                ArrayList<Vector2> pts = drawTool.getPoints();
+                if (pts.size() > 1) {
+                    shapeRenderer.setColor(Color.GREEN);
+                    for (int j = 0; j < pts.size() - 1; j++) {
+                        Vector2 p1 = pts.get(j);
+                        Vector2 p2 = pts.get(j + 1);
+                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
+                    }
+                }
+            }
+
+            currentLevel.tick(delta);
 
             shapeRenderer.end();
         } else {
@@ -200,7 +214,20 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 }
             }
 
-            currentLevel.tick((runPhysics)? delta : 0f);
+            currentLevel.tick(delta);
+
+            // draw the drawing line
+            if (drawTool.isDrawing()) {
+                ArrayList<Vector2> pts = drawTool.getPoints();
+                if (pts.size() > 1) {
+                    shapeRenderer.setColor(Color.GREEN);
+                    for (int j = 0; j < pts.size() - 1; j++) {
+                        Vector2 p1 = pts.get(j);
+                        Vector2 p2 = pts.get(j + 1);
+                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
+                    }
+                }
+            }
 
             for(DebugForce f : forces) {
                 drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
@@ -209,23 +236,37 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             shapeRenderer.end();
         }
 
+        //camera.update();
+        //batch.setProjectionMatrix(camera.combined);
         //generate UI Here
         batch.begin();
 
         if(currentLevel.isComplete()) {
-            GlyphLayout layout = new GlyphLayout(winFont, "Level Complete!", Color.GREEN, 0, 1, false);
-            float x = camera.position.x + viewport.getScreenWidth()/2f - layout.width /2f;
-            float y = camera.position.y + viewport.getScreenHeight() * 3f/4f + layout.height /2f;
-            winFont.draw(batch, layout, x, y);
+            GlyphLayout layout1 = new GlyphLayout(winFont, "Level Complete!");
+            winFont.setColor(Color.GREEN);
+
+            float x1 = (Gdx.graphics.getWidth() - layout1.width) / 2f;
+            float y1 = Gdx.graphics.getHeight() * 0.75f;
+
+            winFont.draw(batch, layout1, x1, y1);
+
+            GlyphLayout layout2 = new GlyphLayout(winFont, "Score: " + finalScore);
+            winFont.setColor(Color.WHITE);
+            winFont.draw(batch, layout2, (Gdx.graphics.getWidth() - layout2.width)/2f, y1 - 30);
+
+            GlyphLayout layout3 = new GlyphLayout(winFont, "Stars: " + finalStars);
+            winFont.setColor(Color.YELLOW);
+            winFont.draw(batch, layout3, (Gdx.graphics.getWidth() - layout3.width)/2f, y1 - 60);
 
         }
 
         batch.end();
-        camera.update();
+
     }
 
     @Override
     public void dispose() {
+        world.dispose();
         debugRenderer.dispose();
         if (batch != null) batch.dispose();
         if (image != null) image.dispose();

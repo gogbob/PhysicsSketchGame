@@ -1,6 +1,7 @@
-package io.github.physics_game;
+package io.github.physics_game.levels;
 
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
@@ -8,8 +9,9 @@ import java.util.Arrays;
 import java.util.List;
 
 public class TutorialLevel extends Level {
-    private final float timeToComplete = 5f; // Time in seconds to complete the level
-    private float elapsedTimeOutside = timeToComplete;
+    private final float timeToComplete = 1.5f; // Time in seconds to complete the level
+    private float elapsedTimeInside = 0f;
+    //private float elapsedTimeOutside = timeToComplete;
     private FollowingUncollidableField cupInside;
     private DynamicObject ball;
     private boolean isComplete;
@@ -59,28 +61,27 @@ public class TutorialLevel extends Level {
 
     @Override
     public LevelTickData tick(float deltaTime) {
-        // Implement any necessary updates for the tutorial level
-        if(!cupInside.getTriggerIds().contains(ball.getId())) {
-            elapsedTimeOutside -= deltaTime;
-            if (elapsedTimeOutside <= 0) {
-                System.out.println("Ball has been outside the cup for long enough! You win");
+        if (cupInside.getTriggerIds().contains(ball.getId())) {
+            elapsedTimeInside += deltaTime;
+            System.out.println("Ball is inside the cup!");
+
+            if (elapsedTimeInside >= timeToComplete) {
+                System.out.println("Ball stayed inside the cup long enough! You win");
                 isComplete = true;
             }
         } else {
-            System.out.println("Ball is inside the cup!");
-            elapsedTimeOutside = timeToComplete; // Reset the timer if the ball is inside the cup
+            elapsedTimeInside = 0f;
         }
 
-        for(PhysicsObject obj : getPhysicsObjects()) {
-            if(obj instanceof Triggerable) {
+        for (PhysicsObject obj : getPhysicsObjects()) {
+            if (obj instanceof Triggerable) {
                 ((Triggerable) obj).resetTriggerIds();
             }
         }
 
-        if(elapsedTimeOutside < timeToComplete) {
-            return new LevelTickData(elapsedTimeOutside);
-        }
-        else {
+        if (elapsedTimeInside > 0f && elapsedTimeInside < timeToComplete) {
+            return new LevelTickData(timeToComplete - elapsedTimeInside);
+        } else {
             return new LevelTickData();
         }
     }
