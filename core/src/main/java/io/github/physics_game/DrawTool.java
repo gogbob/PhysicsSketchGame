@@ -15,6 +15,7 @@ public class DrawTool {
     private Camera camera;
     private Level level;
     private int nextId; // give id to objects
+    private int shapesUsed = 0;
 
     public DrawTool(Camera camera, Level level) {
         this.camera = camera;
@@ -111,9 +112,18 @@ public class DrawTool {
         );
 
         nextId++;  // next object ID + 1
+        shapesUsed++;
         level.addPhysicsObject(obj);
 
         System.out.println("You have created the object! The point size is " + localPoints.size());
+    }
+
+    public int getShapesUsed() {
+        return shapesUsed;
+    }
+
+    public void resetShapesUsed() {
+        shapesUsed = 0;
     }
 
     // get mouse position in world methode

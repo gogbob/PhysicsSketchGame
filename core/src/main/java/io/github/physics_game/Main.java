@@ -34,6 +34,11 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
+    private float levelTimer = 0f;
+    private int finalScore = -1;
+    private int finalStars = 0;
+    private boolean scoreCalculated = false;
+
 
     // throttle logging to once-per-second
     float logTimer = 0f;
@@ -112,6 +117,9 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         drawTool.update();
 
+        if (!currentLevel.isComplete()) {
+            levelTimer += delta;
+        }
 
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
@@ -143,9 +151,19 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             if(currentLevel.isComplete()) {
-                Gdx.app.log("Main", "Level complete! Loading next level...");
-                runPhysics = false;
+                if (!scoreCalculated) {
+                    finalScore = ScoreCalculator.calculateScore(
+                        drawTool.getShapesUsed(),
+                        levelTimer
+                    );
+                    finalStars = ScoreCalculator.calculateStars(finalScore);
+                    scoreCalculated = true;
+
+                    Gdx.app.log("Main", "Level complete!");
+                    Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
+                }
             }
+
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
@@ -216,19 +234,32 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             shapeRenderer.end();
         }
 
+        //camera.update();
+        //batch.setProjectionMatrix(camera.combined);
         //generate UI Here
         batch.begin();
 
         if(currentLevel.isComplete()) {
-            GlyphLayout layout = new GlyphLayout(winFont, "Level Complete!", Color.GREEN, 0, 1, false);
-            float x = camera.position.x + viewport.getScreenWidth()/2f - layout.width /2f;
-            float y = camera.position.y + viewport.getScreenHeight() * 3f/4f + layout.height /2f;
-            winFont.draw(batch, layout, x, y);
+            GlyphLayout layout1 = new GlyphLayout(winFont, "Level Complete!");
+            winFont.setColor(Color.GREEN);
+
+            float x1 = (Gdx.graphics.getWidth() - layout1.width) / 2f;
+            float y1 = Gdx.graphics.getHeight() * 0.75f;
+
+            winFont.draw(batch, layout1, x1, y1);
+
+            GlyphLayout layout2 = new GlyphLayout(winFont, "Score: " + finalScore);
+            winFont.setColor(Color.WHITE);
+            winFont.draw(batch, layout2, (Gdx.graphics.getWidth() - layout2.width)/2f, y1 - 30);
+
+            GlyphLayout layout3 = new GlyphLayout(winFont, "Stars: " + finalStars);
+            winFont.setColor(Color.YELLOW);
+            winFont.draw(batch, layout3, (Gdx.graphics.getWidth() - layout3.width)/2f, y1 - 60);
 
         }
 
         batch.end();
-        camera.update();
+
     }
 
     @Override
