@@ -69,7 +69,7 @@ public class TutorialLevel extends Level {
                 isComplete = true;
             }
         } else {
-            elapsedTimeInside = 0f; // 一离开就重新计时
+            elapsedTimeInside = 0f;
         }
 
         for (PhysicsObject obj : getPhysicsObjects()) {
