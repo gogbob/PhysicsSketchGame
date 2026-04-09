@@ -16,7 +16,7 @@ public class PhysicsResolver {
     final static int NUM_POS_ITERATIONS = 10;
     final static Vector2 GRAVITY = new Vector2(0, -6f);
     public static void step(ArrayList<PhysicsObject> objects) {
-        while(Main.accumulator >= fixedStep) {
+        while(GameScreen.accumulator >= fixedStep) {
             // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.
 
             //1. Integrate forces → update velocity
@@ -105,7 +105,7 @@ public class PhysicsResolver {
                 }
             }
 
-            Main.accumulator -= fixedStep;
+            GameScreen.accumulator -= fixedStep;
         }
     }
 
@@ -137,7 +137,7 @@ public class PhysicsResolver {
         }
 
 
-        if(Main.accumulator < fixedStep) {
+        if(GameScreen.accumulator < fixedStep) {
             for (int i = 0; i < objects.size(); i++) {
                 PhysicsObject obj = objects.get(i);
                 if (obj instanceof DynamicObject) {
@@ -169,7 +169,7 @@ public class PhysicsResolver {
             }
         }
 
-        while(Main.accumulator >= fixedStep) {
+        while(GameScreen.accumulator >= fixedStep) {
             //1. Integrate forces → update velocity
             //2. Detect collisions
             //3. Build contact constraints
@@ -259,7 +259,7 @@ public class PhysicsResolver {
                 }
             }
 
-            Main.accumulator -= fixedStep;
+            GameScreen.accumulator -= fixedStep;
         }
         return forces;
     }
