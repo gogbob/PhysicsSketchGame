@@ -18,8 +18,8 @@ public class TutorialLevel extends Level {
     private static final int ShapePenalty = 10; // Each shape took off 10 points
     private static final float TIME_PENALTY = 1.0f;
 
-    public TutorialLevel() {
-        super(0, "Tutorial Level", new ArrayList<>(), 40f, 30f);
+    public TutorialLevel(float viewPortWidth, float viewPortHeight) {
+        super(0, "Tutorial Level", new ArrayList<>(), viewPortWidth, viewPortHeight);
 
         List<Vector2> cupVertices = new ArrayList<>(
             Arrays.asList(

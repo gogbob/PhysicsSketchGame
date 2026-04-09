@@ -41,6 +41,8 @@ public class DrawTool {
     private Vector2 com = new Vector2();
     private Vector2 prevPosition;
     private List<List<Float>> gridField;
+    private List<Vector2> pointSegments;
+    private List<Float> massSegments;
     private Vector2 referencePoint;
     private List<Vector2> exteriorLoop = new ArrayList<>();
     private List<List<Vector2>> interiorLoops = new ArrayList<>();
@@ -109,12 +111,15 @@ public class DrawTool {
 
     // start drawing method (make a circle)
     private StaticObject startDrawing() {
-
         drawing = true;
         exteriorLoop.clear();
         interiorLoops.clear();
-        mass = 0f;
-        inertia = 0f;
+        mass = (toolWidth * toolWidth * (float)PI)*density;
+        inertia = 1/2f * mass * toolWidth * toolWidth;
+        massSegments = new ArrayList<>();
+        massSegments.add(mass);
+        pointSegments = new ArrayList<>();
+        pointSegments.add(new Vector2());
         com.setZero();
         minX = -50;
         maxX = 50;
@@ -132,6 +137,7 @@ public class DrawTool {
                 Vector2 pixelPos = new Vector2(i * resolutionScale, j * resolutionScale);
                 float dist = new Vector2(pixelPos).len();
                 if(dist <= toolWidth + rangeMax) {
+
                     float addValue = dist <= toolWidth ? 1f : max(0f, (toolWidth + rangeMax - dist) / rangeMax);
                     int gridX = i - minX;
                     int gridY = j - minY;
@@ -552,6 +558,10 @@ public class DrawTool {
         Vector2 rectCenter = new Vector2(start).add(end).scl(0.5f);
         Vector2 capCenter = new Vector2(end).sub(new Vector2(dir).scl((float)(4f * radius / (3f * PI))));
 
+        pointSegments.add((new Vector2(rectCenter).scl(rectMass))
+            .add(new Vector2(capCenter).scl(capMass)).scl(1f / addedMass));
+        massSegments.add(addedMass);
+
         float totalMass = mass + addedMass;
         Vector2 prevCom = new Vector2(com);
         if(totalMass > 1e-8f) {
@@ -582,12 +592,13 @@ public class DrawTool {
 
         if(dynamicObject) {
             DynamicObject obj = new DynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
-                referencePoint.x, referencePoint.y, 0, mass, inertia, com);
+                referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
             nextId++;
             return obj;
         }
 
-        return new StaticObject(1000, 0.5f, 0.4f, cleaned, referencePoint.x, referencePoint.y, 0);
+        return new StaticObject(1000, 0.5f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
+            0, com, pointSegments, massSegments);
     }
 
     private List<Vector2> sanitizeLoop(List<Vector2> loop) {

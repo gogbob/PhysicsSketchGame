@@ -7,38 +7,61 @@ import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.collision.EarClippingDecomposer;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public abstract class PhysicsObject {
     private final int id;
     private float friction;
     private float restitution;
-    private List<Vector2> vertices;
-    private CustomContactHandler.PolygonBody localBody;
-    private List<List<Vector2>> concaveLocalTriangles;
+    private float density;
+    private final List<Vector2> vertices;
+    private final CustomContactHandler.PolygonBody localBody;
+    private final List<List<Vector2>> concaveLocalTriangles;
     private List<List<Vector2>> concaveLocalBest;
     private float startX;
     private float startY;
     private float startRotation;
-    private Vector2 com = new Vector2();
-    private Vector2 relativePosition = new Vector2();
-    private Color color = new Color();
+    private List<Float> massSegments;
+    private List<Vector2> pointSegments;
+    private Vector2 localCenterOffset = new Vector2();
+    private final Color color = new Color();
 
+    public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation) {
 
-    public PhysicsObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation) {
+        this(id, friction, restitution, density, vertices, startX, startY, rotation
+            , PhysicsResolver.getCenterOfMassPolygon(EarClippingDecomposer.decomposeToTriangles(vertices)));
+        for(List<Vector2> tri : this.getConcaveLocalTriangles()) {
+            float massPoint = PhysicsResolver.getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density);
+            Vector2 center = new Vector2(PhysicsResolver.getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)));
+            addMassSegment(massPoint, center);
+        }
+    }
+
+    public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments) {
+        this(id, friction, restitution, density, vertices, startX, startY, rotation
+            , com);
+        this.massSegments = massSegments;
+        this.pointSegments = pointSegments;
+    }
+
+    public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com) {
+        super();
         this.id = id;
         this.friction = friction;
         this.restitution = restitution;
-        this.vertices = new ArrayList<>(vertices);
-        this.localBody = new CustomContactHandler.PolygonBody(vertices);
-        this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(vertices);
-        this.color.set(Color.WHITE);
+        this.density = density;
+        this.massSegments = new ArrayList<>();
+        this.pointSegments = new ArrayList<>();
+
+        Vector2 localCom = (com == null) ? new Vector2() : new Vector2(com);
+        this.localCenterOffset = new Vector2(localCom);
+        List<Vector2> centeredVertices = recenterVertices(vertices, localCom);
+
+        this.vertices = new ArrayList<>(centeredVertices);
+        this.localBody = new CustomContactHandler.PolygonBody(centeredVertices);
+        this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(centeredVertices);
         int prevSize = concaveLocalTriangles.size();
 
-        if(id == 100) {
-            Gdx.app.log("DynamicObject", "Initial triangles: " + concaveLocalTriangles.size());
-        }
 
         concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalTriangles);
         int currentSize = concaveLocalBest.size();
@@ -50,27 +73,78 @@ public abstract class PhysicsObject {
             currentSize =  concaveLocalBest.size();
         }
 
-        this.startX = startX;
-        this.startY = startY;
-        this.com = PhysicsResolver.getCenterOfMassPolygon(concaveLocalTriangles);
-        this.relativePosition = new Vector2(this.com).sub(getPosition());
-        setRotation(rotation);
-        this.startRotation = rotation;
-        setPosition(new Vector2(startX, startY));
+        // Keep the simulation transform at COM so impulses/rotation use the same origin.
+        Vector2 rotatedLocalCom = new Vector2(localCenterOffset).rotateRad(rotation);
+        this.startX = startX + rotatedLocalCom.x;
+        this.startY = startY + rotatedLocalCom.y;
 
+        this.startRotation = rotation;
+        setRotation(rotation);
+        setPosition(new Vector2(this.startX, this.startY));
+        color.set(Color.WHITE);
     }
+
+    private List<Vector2> recenterVertices(List<Vector2> source, Vector2 com) {
+        List<Vector2> centered = new ArrayList<>();
+        if (source == null) {
+            return centered;
+        }
+        for (Vector2 v : source) {
+            if (v != null) {
+                centered.add(new Vector2(v).sub(com));
+            }
+        }
+        return centered;
+    }
+
+
     public Vector2 getCenter()  {
-        //Gdx.app.log("DynamicObject", "Center of mass: " + com);
-        float x = relativePosition.x * (float)Math.cos(getRotation() - startRotation) - relativePosition.y * (float)Math.sin(getRotation() - startRotation) + getPosition().x;
-        float y = relativePosition.x * (float)Math.sin(getRotation() - startRotation) + relativePosition.y * (float)Math.cos(getRotation() - startRotation)  + getPosition().y;
-        return new Vector2(x, y);
+        return getPosition();
     }
+
     public Color getColor() {
         return color;
     }
+
     public void setColor(Color color) {
-        this.color.set(color);
+        color.set(color);
     }
+
+    public void addMassSegment(float mass, Vector2 point) {
+        this.massSegments.add(mass);
+        this.pointSegments.add(point);
+    }
+
+    public void setMassSegments(List<Float> mass, List<Vector2> points) {
+        massSegments = new ArrayList<>(mass);
+        pointSegments = new ArrayList<>(points);
+    }
+
+    public List<Float> getMassSegments() {
+        return new ArrayList<>(massSegments);
+    }
+    public List<Vector2> getPointSegments() {
+        return new ArrayList<>(pointSegments);
+    }
+
+    public float getMassSegment(int i) {
+        return this.massSegments.get(i);
+    }
+
+    public Vector2 getPointSegment(int i) {
+        return this.pointSegments.get(i);
+    }
+
+    public Vector2 getAnchorPosition() {
+        Vector2 rotatedOffset = new Vector2(localCenterOffset).rotateRad(getRotation());
+        return new Vector2(getPosition()).sub(rotatedOffset);
+    }
+
+    public void setAnchorPosition(Vector2 anchorPosition) {
+        Vector2 rotatedOffset = new Vector2(localCenterOffset).rotateRad(getRotation());
+        setPosition(new Vector2(anchorPosition).add(rotatedOffset));
+    }
+
     public void setPosition(Vector2 localPosition) {
         localBody.setPosition(localPosition.x, localPosition.y);
     }

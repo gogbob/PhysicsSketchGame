@@ -17,15 +17,16 @@ public class DynamicObject extends PhysicsObject {
 
     public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices,
                          float startX, float startY, float rotation) {
-        super(id, friction, restitution, vertices, startX, startY, rotation);
+        super(id, friction, restitution, density, vertices, startX, startY, rotation);
         this.density = density;
         this.mass = PhysicsResolver.getMassOfPolygon(getConcaveLocalTriangles(), density);
         this.inertia = PhysicsResolver.getMomentOfInertiaPolygon(getConcaveLocalTriangles(), density);
+
     }
 
     public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices,
-                         float startX, float startY, float rotation, float mass, float inertia, Vector2 com) {
-        super(id, friction, restitution, vertices, startX, startY, rotation, com);
+                         float startX, float startY, float rotation, float mass, float inertia, Vector2 com,  List<Vector2> pointSegments, List<Float> massSegments) {
+        super(id, friction, restitution, density, vertices, startX, startY, rotation, com, pointSegments, massSegments);
         this.density = density;
         this.mass = mass;
         this.inertia = inertia;

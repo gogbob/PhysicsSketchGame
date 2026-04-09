@@ -30,16 +30,18 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     FitViewport viewport;
     private Texture image;
     private Texture ballImage;
-    World world;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
+    public drawTypes type;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
     private float levelTimer = 0f;
     private int finalScore = -1;
     private int finalStars = 0;
     private boolean scoreCalculated = false;
+    public static final float viewPortWidth = 40f;
+    public static final float viewPortHeight = 30f;
 
 
     // throttle logging to once-per-second
@@ -63,7 +65,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void create() {
         // Use a small world size (meters) so objects are visible with the debug renderer.
         camera = new OrthographicCamera();
-        viewport = new FitViewport(20f, 15f, camera); // world units: 20 x 15
+        viewport = new FitViewport(viewPortWidth, viewPortHeight, camera); // world units: 20 x 15
         viewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
@@ -79,10 +81,10 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                 new Vector2(-0.7f, -0.7f)
             ),
             5, 5, 0);
-        TutorialLevel tutorialLevel = new TutorialLevel();
+        TutorialLevel tutorialLevel = new TutorialLevel(viewPortWidth, viewPortHeight);
         //exampleObject.setRotation((float)Math.PI);\
 
-        drawTool = new DrawTool(camera, tutorialLevel);
+        drawTool = new DrawTool(camera, viewport, 0.5f);
         currentLevel = tutorialLevel;
         Gdx.app.log("Main", "DrawTool created!");
 
@@ -117,8 +119,17 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        drawTool.update();
-
+        PhysicsObject drawnObject = drawTool.update();
+        if(drawnObject != null) {
+            if (drawnObject instanceof DynamicObject) {
+                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                currentLevel.addPhysicsObject(drawnObject);
+                currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
+            } else {
+                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                currentLevel.addPhysicsObject(drawnObject);
+            }
+        }
         if (!currentLevel.isComplete()) {
             levelTimer += delta;
         }
@@ -155,7 +166,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             if(currentLevel.isComplete()) {
                 if (!scoreCalculated) {
                     finalScore = ScoreCalculator.calculateScore(
-                        drawTool.getShapesUsed(),
+                        currentLevel.getNumDrawnObjects(),
                         levelTimer
                     );
                     finalStars = ScoreCalculator.calculateStars(finalScore);
@@ -174,20 +185,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
                     drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), obj.getColor());
                 }
             }
-
-            // draw the drawing line
-            if (drawTool.isDrawing()) {
-                ArrayList<Vector2> pts = drawTool.getPoints();
-                if (pts.size() > 1) {
-                    shapeRenderer.setColor(Color.GREEN);
-                    for (int j = 0; j < pts.size() - 1; j++) {
-                        Vector2 p1 = pts.get(j);
-                        Vector2 p2 = pts.get(j + 1);
-                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
-                    }
-                }
-            }
-
             currentLevel.tick(delta);
 
             shapeRenderer.end();
@@ -215,19 +212,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             currentLevel.tick(delta);
-
-            // draw the drawing line
-            if (drawTool.isDrawing()) {
-                ArrayList<Vector2> pts = drawTool.getPoints();
-                if (pts.size() > 1) {
-                    shapeRenderer.setColor(Color.GREEN);
-                    for (int j = 0; j < pts.size() - 1; j++) {
-                        Vector2 p1 = pts.get(j);
-                        Vector2 p2 = pts.get(j + 1);
-                        shapeRenderer.rectLine(p1.x, p1.y, p2.x, p2.y, 0.05f);
-                    }
-                }
-            }
 
             for(DebugForce f : forces) {
                 drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
@@ -266,7 +250,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
     @Override
     public void dispose() {
-        world.dispose();
         debugRenderer.dispose();
         if (batch != null) batch.dispose();
         if (image != null) image.dispose();

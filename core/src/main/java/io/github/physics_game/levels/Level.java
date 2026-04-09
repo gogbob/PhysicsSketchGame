@@ -13,6 +13,7 @@ public abstract class Level {
     private int levelId;
     private String levelName;
     private ArrayList<PhysicsObject> physicsObjects = new ArrayList<>();
+    private int numDrawnObjects;
 
     public Level(int levelId, String levelName, ArrayList<PhysicsObject> internalObjects, float viewPortWidth, float viewPortHeight) {
         this.levelId = levelId;
@@ -45,6 +46,12 @@ public abstract class Level {
     }
     public String getLevelName() {
         return levelName;
+    }
+    public void setNumDrawnObjects(int numDrawnObjects) {
+        this.numDrawnObjects = numDrawnObjects;
+    }
+    public int getNumDrawnObjects() {
+        return numDrawnObjects;
     }
 
     public abstract boolean isComplete();
