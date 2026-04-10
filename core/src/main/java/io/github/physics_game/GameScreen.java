@@ -1,9 +1,6 @@
 package io.github.physics_game;
 
-import com.badlogic.gdx.ApplicationAdapter;
-import com.badlogic.gdx.ApplicationListener;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
+import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
@@ -25,7 +22,9 @@ import java.util.Arrays;
 import java.util.List;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
-public class Main extends ApplicationAdapter implements ApplicationListener {
+public class GameScreen extends ScreenAdapter {
+    private final MainGame game;
+
     private SpriteBatch batch;
     FitViewport viewport;
     private Texture image;
@@ -33,7 +32,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
-    public DrawType type;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
     private float levelTimer = 0f;
@@ -43,6 +41,9 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public static final float viewPortWidth = 40f;
     public static final float viewPortHeight = 30f;
 
+    public GameScreen(MainGame game) {
+        this.game = game;
+    }
 
     // throttle logging to once-per-second
     float logTimer = 0f;
@@ -62,7 +63,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
 
     @Override
-    public void create() {
+    public void show() {
         // Use a small world size (meters) so objects are visible with the debug renderer.
         camera = new OrthographicCamera();
         viewport = new FitViewport(viewPortWidth, viewPortHeight, camera); // world units: 20 x 15
@@ -86,41 +87,15 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         drawTool = new DrawTool(camera, viewport, 0.5f);
         currentLevel = tutorialLevel;
-        type = DrawType.CHARGED;
         Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
         Gdx.app.log("Main", "create() - viewport world size = " + viewport.getWorldWidth() + "x" + viewport.getWorldHeight());
-
-        //CustomContactHandler.detect(squareBody1, squareBody2);
-
-
-
-        // Place the body near the center of the viewport so it's visible
-//        float startX = viewport.getWorldWidth() / 2f;
-//        float startY = viewport.getWorldHeight() / 2f;
-
-        // Create a slanted static floor along the bottom of the viewport so the circle can collide with it.
-        // We use an EdgeShape from a left point near the left edge up to a slightly higher right point to make it slanted.
-
-        // Shared concave local polygon definition used by both custom math and Box2D fixtures.
-//        List<Vector2> concaveLocalVertices = Arrays.asList(
-//            new Vector2(-0.7f, 0.7f),
-//            new Vector2(0.7f, 0.7f),
-//            new Vector2(0.7f, 0.2f),
-//            new Vector2(0.2f, 0.2f),
-//            new Vector2(0.2f, -0.7f),
-//            new Vector2(-0.7f, -0.7f)
-//        );
-//
-//        dynamicObject = new DynamicObject(0, 0.3f, 0.1f, concaveLocalVertices, startX, startY, 0f, world);
     }
 
     @Override
-    public void render() {
-        float delta = Gdx.graphics.getDeltaTime();
-
-        PhysicsObject drawnObject = drawTool.update(type);
+    public void render(float delta) {
+        PhysicsObject drawnObject = drawTool.update();
         if(drawnObject != null) {
             if (drawnObject instanceof DynamicObject) {
                 currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
@@ -165,10 +140,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             if(currentLevel.isComplete()) {
-                Gdx.app.log("Main", "Level complete! Loading next level...");
-            }
-
-            if(currentLevel.isComplete()) {
                 if (!scoreCalculated) {
                     finalScore = ScoreCalculator.calculateScore(
                         currentLevel.getNumDrawnObjects(),
@@ -199,6 +170,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
             if(currentLevel.isComplete()) {
                 Gdx.app.log("Main", "Level complete! Loading next level...");
+                runPhysics = false;
             }
 
             shapeRenderer.setProjectionMatrix(camera.combined);
