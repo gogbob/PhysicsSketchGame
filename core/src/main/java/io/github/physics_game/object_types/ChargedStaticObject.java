@@ -15,15 +15,15 @@ public class ChargedStaticObject extends StaticObject implements Charged {
     public ChargedStaticObject(int id, float friction, float restitution, List<Vector2> vertices, float startX, float startY, float rotation, float chargeDensity) {
         super(id, friction, restitution, vertices, startX, startY, rotation);
         this.chargeDensity = chargeDensity;
-        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(chargeDensity * getDensity()/3f, 0.7f), 1) :
-            new Color(1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f, 1));
+        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1) :
+            new Color(1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f, 1));
     }
 
     public ChargedStaticObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments,  float chargeDensity) {
         super(id, friction, restitution, density, vertices, startX, startY, rotation,com, pointSegments, massSegments);
         this.chargeDensity = chargeDensity;
-        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(chargeDensity * getDensity()/3f, 0.7f), 1) :
-            new Color(1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f, 1));
+        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1) :
+            new Color(1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f, 1));
     }
 
     @Override

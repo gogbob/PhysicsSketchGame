@@ -15,16 +15,16 @@ public class ChargedDynamicObject extends DynamicObject implements Charged {
     public ChargedDynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, float chargeDensity) {
         super(id, friction, restitution, density, vertices, startX, startY, rotation);
         this.chargeDensity = chargeDensity;
-        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity()/5f, 0.7f), 1f - Math.min(chargeDensity * getDensity()/5f, 0.7f), 1) :
-            new Color(1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f, 1));
+        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1) :
+            new Color(1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f, 1));
     }
 
     public ChargedDynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation,
                                float mass, float inertia, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments,  float chargeDensity) {
         super(id, friction, restitution, density, vertices, startX, startY, rotation, mass, inertia,com, pointSegments, massSegments);
         this.chargeDensity = chargeDensity;
-        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity()/5f, 0.7f), 1f - Math.min(chargeDensity * getDensity()/5f, 0.7f), 1) :
-            new Color(1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f, 1));
+        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1) :
+            new Color(1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f, 1));
     }
 
     @Override
@@ -35,8 +35,8 @@ public class ChargedDynamicObject extends DynamicObject implements Charged {
     @Override
     public void setChargeDensity(float chargeDensity) {
         this.chargeDensity = chargeDensity;
-        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(chargeDensity * getDensity()/3f, 0.7f), 1) :
-            new Color(1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f - Math.min(-chargeDensity * getDensity()/3f, 0.7f), 1f, 1));
+        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1) :
+            new Color(1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f, 1));
     }
 
     @Override

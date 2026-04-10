@@ -2,7 +2,8 @@ package io.github.physics_game;
 
 public enum DrawType {
     NORMAL,
-    CHARGED,
+    POSITIVE,
+    NEGATIVE,
     ICY,
     ANTIGRAVITY,
 }

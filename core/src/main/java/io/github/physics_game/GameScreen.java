@@ -25,6 +25,7 @@ import java.util.List;
 public class GameScreen extends ScreenAdapter {
     private final MainGame game;
 
+    private DrawType drawType = DrawType.POSITIVE;
     private SpriteBatch batch;
     FitViewport viewport;
     private Texture image;
@@ -95,7 +96,7 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
-        PhysicsObject drawnObject = drawTool.update();
+        PhysicsObject drawnObject = drawTool.update(drawType);
         if(drawnObject != null) {
             if (drawnObject instanceof DynamicObject) {
                 currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
@@ -127,6 +128,10 @@ public class GameScreen extends ScreenAdapter {
         if(Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             Gdx.app.log("Main", "ticking 1 time step");
             accumulator = 2f / 60f;
+        }
+
+        if(Gdx.input.isKeyJustPressed(Input.Keys.G)) {
+            drawType = (drawType == DrawType.POSITIVE)? DrawType.NEGATIVE : DrawType.POSITIVE;
         }
 
         // clear the screen
@@ -170,7 +175,6 @@ public class GameScreen extends ScreenAdapter {
 
             if(currentLevel.isComplete()) {
                 Gdx.app.log("Main", "Level complete! Loading next level...");
-                runPhysics = false;
             }
 
             shapeRenderer.setProjectionMatrix(camera.combined);

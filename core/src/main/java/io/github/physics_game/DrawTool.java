@@ -598,9 +598,9 @@ public class DrawTool {
                 obj = new AntigravityObject(nextId, 0.5f, 0.4f, density, cleaned,
                     referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
                 Gdx.app.log("Draw Tool", "Creating Antigravity object");
-            } else if(drawType == DrawType.CHARGED) {
+            } else if(drawType == DrawType.POSITIVE ||  drawType == DrawType.NEGATIVE) {
                 obj = new ChargedDynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
-                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments, chargeDensity);
+                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments, (drawType == DrawType.POSITIVE)? chargeDensity : -chargeDensity);
                 Gdx.app.log("Draw Tool", "Creating Charged object");
             } else if(drawType == DrawType.ICY) {
                 obj = new DynamicObject(nextId, 0.00f, 0.4f, density, cleaned,
@@ -621,9 +621,9 @@ public class DrawTool {
             staticObject = new StaticObject(1000, 0.5f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
                 0, com, pointSegments, massSegments);
             staticObject.setColor(Color.CORAL);
-        } else if(drawType == DrawType.CHARGED) {
+        } else if(drawType == DrawType.POSITIVE ||  drawType == DrawType.NEGATIVE) {
             staticObject = new ChargedStaticObject(1000, 0.5f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
-                0, com, pointSegments, massSegments, chargeDensity);
+                0, com, pointSegments, massSegments, (drawType == DrawType.POSITIVE)? chargeDensity : -chargeDensity);
         } else if(drawType == DrawType.ICY) {
             staticObject = new StaticObject(1000, 0.0f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
                 0, com, pointSegments, massSegments);
