@@ -186,6 +186,13 @@ public final class CustomContactHandler {
         }
     }
 
+    public static Vector2 toWorld(Vector2 position, float rotation, Vector2 local) {
+        float x = local.x * ((float) Math.cos(rotation)) - local.y * ((float) Math.sin(rotation)) + position.x;
+        float y = local.x * ((float) Math.sin(rotation)) + local.y * ((float) Math.cos(rotation)) + position.y;
+
+        return new Vector2(x, y);
+    }
+
     private static final class Aabb {
         final float minX;
         final float minY;

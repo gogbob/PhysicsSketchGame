@@ -107,7 +107,11 @@ public abstract class PhysicsObject {
     }
 
     public void setColor(Color color) {
-        color.set(color);
+        this.color.set(color);
+    }
+
+    public float getDensity() {
+        return density;
     }
 
     public void addMassSegment(float mass, Vector2 point) {
@@ -131,8 +135,8 @@ public abstract class PhysicsObject {
         return this.massSegments.get(i);
     }
 
-    public Vector2 getPointSegment(int i) {
-        return this.pointSegments.get(i);
+    public Vector2 getWorldPointSegment(int i) {
+        return CustomContactHandler.toWorld(getPosition(), getRotation(), new Vector2(this.pointSegments.get(i)).sub(localCenterOffset));
     }
 
     public Vector2 getAnchorPosition() {

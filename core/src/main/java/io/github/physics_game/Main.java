@@ -33,7 +33,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     public static float accumulator = 0f;
-    public drawTypes type;
+    public DrawType type;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
     private float levelTimer = 0f;
@@ -86,6 +86,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
         drawTool = new DrawTool(camera, viewport, 0.5f);
         currentLevel = tutorialLevel;
+        type = DrawType.CHARGED;
         Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
@@ -119,7 +120,7 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
 
-        PhysicsObject drawnObject = drawTool.update();
+        PhysicsObject drawnObject = drawTool.update(type);
         if(drawnObject != null) {
             if (drawnObject instanceof DynamicObject) {
                 currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
@@ -164,6 +165,10 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
             }
 
             if(currentLevel.isComplete()) {
+                Gdx.app.log("Main", "Level complete! Loading next level...");
+            }
+
+            if(currentLevel.isComplete()) {
                 if (!scoreCalculated) {
                     finalScore = ScoreCalculator.calculateScore(
                         currentLevel.getNumDrawnObjects(),
@@ -194,7 +199,6 @@ public class Main extends ApplicationAdapter implements ApplicationListener {
 
             if(currentLevel.isComplete()) {
                 Gdx.app.log("Main", "Level complete! Loading next level...");
-                runPhysics = false;
             }
 
             shapeRenderer.setProjectionMatrix(camera.combined);

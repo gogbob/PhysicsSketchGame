@@ -3,12 +3,11 @@ package io.github.physics_game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import io.github.physics_game.object_types.PhysicsObject;
-import io.github.physics_game.object_types.DynamicObject;
-import io.github.physics_game.object_types.StaticObject;
+import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,11 +25,13 @@ public class DrawTool {
     private static final float resolutionScale = 0.05f;
     private static final float rangeMax = 0.05f;
     private static final float ISO_LEVEL = 0.9f;
+    public static final float minDist = 0.5f;
 
     private ReentrantLock lock = new ReentrantLock();
-
+    public float chargeDensity = 2.0f;
     private boolean drawing; // check if it's drawing or not
     private final Camera camera;
+    private DrawType drawType = DrawType.NORMAL;
     private final Viewport viewport;
     private int nextId; // give id to objects
     private List<Vector2> circleShape;
@@ -84,22 +85,22 @@ public class DrawTool {
     }
 
     // call the method each frame
-    public PhysicsObject update() {
+    public synchronized PhysicsObject update(DrawType drawType) {
         if(lock.tryLock()) {
             try {
                 // press mouse = start to draw
                 if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-                    return startDrawing();
+                    return startDrawing(drawType);
                 }
 
                 // continue press mouse = continue to draw
-                if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
+                if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing && getMousePosition().sub(prevPosition).len() > minDist) {
                     return addPoint(false);
                 }
 
                 // release mouse = done + create object
                 if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
-                    return finishDrawing();
+                    return finishDrawing(drawType);
                 }
             } finally {
                 lock.unlock();
@@ -110,8 +111,9 @@ public class DrawTool {
     }
 
     // start drawing method (make a circle)
-    private StaticObject startDrawing() {
+    private StaticObject startDrawing(DrawType drawType) {
         drawing = true;
+        if(drawType != null) this.drawType = drawType;
         exteriorLoop.clear();
         interiorLoops.clear();
         mass = (toolWidth * toolWidth * (float)PI)*density;
@@ -591,14 +593,46 @@ public class DrawTool {
         }
 
         if(dynamicObject) {
-            DynamicObject obj = new DynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
-                referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
+            DynamicObject obj;
+            if(drawType == DrawType.ANTIGRAVITY) {
+                obj = new AntigravityObject(nextId, 0.5f, 0.4f, density, cleaned,
+                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
+                Gdx.app.log("Draw Tool", "Creating Antigravity object");
+            } else if(drawType == DrawType.CHARGED) {
+                obj = new ChargedDynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
+                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments, chargeDensity);
+                Gdx.app.log("Draw Tool", "Creating Charged object");
+            } else if(drawType == DrawType.ICY) {
+                obj = new DynamicObject(nextId, 0.00f, 0.4f, density, cleaned,
+                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
+                Gdx.app.log("Draw Tool", "Creating Icy object");
+                obj.setColor(new Color(0.8f, 0.8f, 1.0f, 1));
+            } else {
+                obj = new DynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
+                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
+                Gdx.app.log("Draw Tool", "Creating Normal object");
+            }
             nextId++;
             return obj;
         }
 
-        return new StaticObject(1000, 0.5f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
-            0, com, pointSegments, massSegments);
+        StaticObject staticObject;
+        if(drawType == DrawType.ANTIGRAVITY) {
+            staticObject = new StaticObject(1000, 0.5f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
+                0, com, pointSegments, massSegments);
+            staticObject.setColor(Color.CORAL);
+        } else if(drawType == DrawType.CHARGED) {
+            staticObject = new ChargedStaticObject(1000, 0.5f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
+                0, com, pointSegments, massSegments, chargeDensity);
+        } else if(drawType == DrawType.ICY) {
+            staticObject = new StaticObject(1000, 0.0f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
+                0, com, pointSegments, massSegments);
+            staticObject.setColor(new Color(0.8f, 0.8f, 1.0f, 1));
+        } else {
+            staticObject = new StaticObject(1000, 0.5f, 0.4f, density, cleaned, referencePoint.x, referencePoint.y,
+                0, com, pointSegments, massSegments);
+        }
+        return staticObject;
     }
 
     private List<Vector2> sanitizeLoop(List<Vector2> loop) {
@@ -1011,9 +1045,10 @@ public class DrawTool {
         }
     }
     // finish drawing + create object method
-    private DynamicObject finishDrawing() {
+    private DynamicObject finishDrawing(DrawType drawType) {
         drawing = false;
-
+        DynamicObject temp = (DynamicObject)addPoint(true);
+        if(drawType != null) this.drawType = drawType;
         return (DynamicObject)addPoint(true);
     }
     // get mouse position in world methode

@@ -1,6 +1,8 @@
 package io.github.physics_game.object_types;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.DebugForce;
 import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.collision.EarClippingDecomposer;
 
@@ -37,9 +39,6 @@ public class DynamicObject extends PhysicsObject {
     public float getMass() {
         return mass;
     }
-    public float getDensity() {
-        return density;
-    }
     public float getInertia() {
         return inertia;
     }
@@ -73,5 +72,25 @@ public class DynamicObject extends PhysicsObject {
             setRotation(0f);
             currentVelocity.setZero();
             currentAngularVelocity = 0f;
+    }
+
+    public DebugForce applyForce(Vector2 force, Vector2 point, Color color, boolean isRun, boolean isDebug) {
+        if(isRun) {
+            Vector2 r = new Vector2(point).sub(this.getCenter());
+            Vector2 deltaLinearVel = new Vector2(force).scl(1f / this.getMass());
+            float deltaAngularVel = r.crs(force) / this.getInertia();
+
+            Vector2 newLinearVel = new Vector2(this.getLinearVelocity()).add(deltaLinearVel);
+            float newAngularVel = this.getAngularVelocity() + deltaAngularVel;
+
+            this.setLinearVelocity(newLinearVel);
+            this.setAngularVelocity(newAngularVel);
+        }
+        if(isDebug) {
+            DebugForce impulseForce = new DebugForce(point, force);
+            impulseForce.setColor(color);
+            return impulseForce;
+        }
+        return null;
     }
 }
