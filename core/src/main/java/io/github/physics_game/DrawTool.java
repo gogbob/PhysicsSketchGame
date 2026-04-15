@@ -148,7 +148,7 @@ public class DrawTool {
             }
         }
 
-        List<Vector2> contour = generateLocalContours();
+        List<Vector2> contour = generateLocalContours(false);
 
         referencePoint = pos;
 
@@ -167,8 +167,13 @@ public class DrawTool {
         addPixelValues(pos, delta);
         updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
         prevPosition = pos;
-        List<Vector2> contour = generateLocalContours();
+        List<Vector2> contour = generateLocalContours(false);
         return buildCurrentObject(contour, buildDynamic);
+    }
+
+    public void testAddPoint(boolean buildDynamic) {
+        List<Vector2> contour = generateLocalContours(true);
+        buildCurrentObject(contour, buildDynamic);
     }
 
     private void addPixelValues(Vector2 pos, Vector2 delta) {
@@ -256,15 +261,15 @@ public class DrawTool {
         return Arrays.asList(minX, maxX, minY, maxY);
     }
 
-    public List<Vector2> generateLocalContours() {
-        createPixelatedEdges();
+    public List<Vector2> generateLocalContours(boolean debug) {
+        createPixelatedEdges(debug);
         if (exteriorLoop == null || exteriorLoop.size() < 3) {
             return null;
         }
         return new ArrayList<>(exteriorLoop);
     }
 
-    private void createPixelatedEdges() {
+    private void createPixelatedEdges(boolean debug) {
         List<MarchingSegment> segments = new ArrayList<>();
         Map<String, List<Integer>> adjacency = new HashMap<>();
 
@@ -302,6 +307,9 @@ public class DrawTool {
             if(travelledEdges.contains(i)) {
                 continue;
             }
+            if(debug) {
+                System.out.println("Tracing loop from segment " + i + " with endpoints " + segments.get(i).a + " and " + segments.get(i).b);
+            }
             List<Vector2> loop = traceLoopFromSegment(i, segments, adjacency, travelledEdges);
             if(loop.size() >= 3) {
                 ArrayList<Vector2> tessellatedLoop = new ArrayList<>(loop);
@@ -329,14 +337,28 @@ public class DrawTool {
 
         exteriorLoop = new ArrayList<>(foundLoops.get(outerIdx));
         exteriorLoop = ensureLoopWinding(exteriorLoop, true);
+        if(debug) {
+            PhysicsResolver.printShape(exteriorLoop);
+        }
         for(int i = 0; i < foundLoops.size(); i++) {
             if(i != outerIdx) {
                 interiorLoops.add(ensureLoopWinding(new ArrayList<>(foundLoops.get(i)), false));
             }
         }
 
+        if(debug) {
+            List<List<Vector2>> allLoops = new ArrayList<>();
+            allLoops.add(exteriorLoop);
+            allLoops.addAll(interiorLoops);
+            PhysicsResolver.printListShape(allLoops);
+        }
+
         if(!interiorLoops.isEmpty()) {
             exteriorLoop = connectInteriorLoopsToExterior(exteriorLoop, interiorLoops);
+        }
+
+        if(debug) {
+            PhysicsResolver.printShape(exteriorLoop);
         }
 
         exteriorLoop = normalizeMergedLoop(exteriorLoop);
@@ -514,6 +536,23 @@ public class DrawTool {
             area += a.x * b.y - b.x * a.y;
         }
         return 0.5f * area;
+    }
+
+    private List<Vector2> ensureLoopWinding(List<Vector2> loop, boolean expectCounterClockwise) {
+        if (loop == null || loop.size() < 3) {
+            return loop;
+        }
+
+        float area = signedArea(loop);
+        if (Math.abs(area) <= 1e-8f) {
+            return loop;
+        }
+
+        boolean isCounterClockwise = area > 0f;
+        if (isCounterClockwise != expectCounterClockwise) {
+            Collections.reverse(loop);
+        }
+        return loop;
     }
 
     private void tessellateContour(ArrayList<Vector2> contour) {
@@ -771,31 +810,32 @@ public class DrawTool {
             return outerLoop;
         }
 
-        List<Vector2> merged = ensureLoopWinding(new ArrayList<>(outerLoop), true);
-        for(List<Vector2> innerLoop : innerLoops) {
+        List<Vector2> baseOuterLoop = ensureLoopWinding(new ArrayList<>(outerLoop), true);
+        List<Vector2> merged = new ArrayList<>(baseOuterLoop);
+        for(int innerLoopIndex = 0; innerLoopIndex < innerLoops.size(); innerLoopIndex++) {
+            List<Vector2> innerLoop = innerLoops.get(innerLoopIndex);
             if(innerLoop == null || innerLoop.size() < 3) {
                 continue;
             }
+
             List<Vector2> orientedInner = ensureLoopWinding(new ArrayList<>(innerLoop), false);
-            int[] bridge = findClosestBridge(merged, orientedInner);
-            merged = spliceLoopAtBridge(merged, orientedInner, bridge[0], bridge[1]);
+            int[] bridge = findClosestBridge(baseOuterLoop, orientedInner, innerLoops, innerLoopIndex);
+
+            int mergedOuterIndex = findVertexIndex(merged, baseOuterLoop.get(bridge[0]));
+            if (mergedOuterIndex < 0) {
+                continue;
+            }
+
+            merged = spliceLoopAtBridge(merged, orientedInner, mergedOuterIndex, bridge[1]);
         }
 
         return merged;
     }
 
-    private List<Vector2> ensureLoopWinding(List<Vector2> loop, boolean ccw) {
-        if (loop == null || loop.size() < 3) {
-            return loop;
-        }
-        float area = signedArea(loop);
-        if ((ccw && area < 0f) || (!ccw && area > 0f)) {
-            Collections.reverse(loop);
-        }
-        return loop;
-    }
-
-    private int[] findClosestBridge(List<Vector2> outerLoop, List<Vector2> innerLoop) {
+    private int[] findClosestBridge(List<Vector2> outerLoop,
+                                    List<Vector2> innerLoop,
+                                    List<List<Vector2>> allInnerLoops,
+                                    int targetInnerLoopIndex) {
         int outerIndex = 0;
         int innerIndex = 0;
         float bestDist2 = Float.MAX_VALUE;
@@ -808,7 +848,7 @@ public class DrawTool {
                 if (dist2 >= bestDist2) {
                     continue;
                 }
-                if (!isValidBridge(outerLoop, innerLoop, i, j)) {
+                if (!isValidBridge(outerLoop, innerLoop, i, j, allInnerLoops, targetInnerLoopIndex)) {
                     continue;
                 }
                 bestDist2 = dist2;
@@ -820,7 +860,21 @@ public class DrawTool {
         return new int[]{outerIndex, innerIndex};
     }
 
-    private boolean isValidBridge(List<Vector2> outerLoop, List<Vector2> innerLoop, int outerIndex, int innerIndex) {
+    private int findVertexIndex(List<Vector2> loop, Vector2 vertex) {
+        for (int i = 0; i < loop.size(); i++) {
+            if (loop.get(i).epsilonEquals(vertex, 1e-5f)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean isValidBridge(List<Vector2> outerLoop,
+                                  List<Vector2> innerLoop,
+                                  int outerIndex,
+                                  int innerIndex,
+                                  List<List<Vector2>> allInnerLoops,
+                                  int targetInnerLoopIndex) {
         Vector2 a = outerLoop.get(outerIndex);
         Vector2 b = innerLoop.get(innerIndex);
 
@@ -829,6 +883,19 @@ public class DrawTool {
         }
         if (bridgeCrossesLoop(a, b, innerLoop, innerIndex)) {
             return false;
+        }
+
+        for (int i = 0; i < allInnerLoops.size(); i++) {
+            if (i == targetInnerLoopIndex) {
+                continue;
+            }
+            List<Vector2> otherInner = allInnerLoops.get(i);
+            if (otherInner == null || otherInner.size() < 3) {
+                continue;
+            }
+            if (bridgeCrossesLoop(a, b, otherInner, -1)) {
+                return false;
+            }
         }
 
         Vector2 midpoint = new Vector2(a).add(b).scl(0.5f);

@@ -1,10 +1,8 @@
 package io.github.physics_game.collision;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.Vector2;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -65,10 +63,18 @@ public final class EarClippingDecomposer {
             }
 
             if (!earFound) {
-                // Degenerate or near-self-intersecting input can fail strict ear selection.
-                // We gracefully finish with a fan triangulation from the first surviving vertex.
-                fanTriangulateFallback(indices, cleaned, triangles);
-                return triangles;
+                // If strict ear selection fails, clip the least-bad local ear instead of arbitrary fan splitting.
+                int bestFallbackEar = selectBestFallbackEar(indices, cleaned);
+                if (bestFallbackEar < 0) {
+                    fanTriangulateFallback(indices, cleaned, triangles);
+                    return triangles;
+                }
+
+                int prevIndex = indices.get((bestFallbackEar - 1 + indices.size()) % indices.size());
+                int currIndex = indices.get(bestFallbackEar);
+                int nextIndex = indices.get((bestFallbackEar + 1) % indices.size());
+                triangles.add(copyTriangle(cleaned.get(prevIndex), cleaned.get(currIndex), cleaned.get(nextIndex)));
+                indices.remove(bestFallbackEar);
             }
 
             guard++;
@@ -131,6 +137,18 @@ public final class EarClippingDecomposer {
                                              Vector2 a,
                                              Vector2 b,
                                              Vector2 c) {
+        return countContainedVertices(indices, vertices, aIndex, bIndex, cIndex, a, b, c) > 0;
+    }
+
+    private static int countContainedVertices(List<Integer> indices,
+                                              List<Vector2> vertices,
+                                              int aIndex,
+                                              int bIndex,
+                                              int cIndex,
+                                              Vector2 a,
+                                              Vector2 b,
+                                              Vector2 c) {
+        int count = 0;
         for (int idx : indices) {
             if (idx == aIndex || idx == bIndex || idx == cIndex) {
                 continue;
@@ -138,10 +156,10 @@ public final class EarClippingDecomposer {
 
             Vector2 p = vertices.get(idx);
             if (isPointInsideOrOnTriangle(p, a, b, c)) {
-                return true;
+                count++;
             }
         }
-        return false;
+        return count;
     }
 
     private static boolean isConvex(Vector2 prev, Vector2 curr, Vector2 next) {
@@ -179,6 +197,117 @@ public final class EarClippingDecomposer {
 
     private static float orientedArea(Vector2 a, Vector2 b, Vector2 c) {
         return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    }
+
+    private static int selectBestFallbackEar(List<Integer> indices, List<Vector2> vertices) {
+        int bestEar = -1;
+        int bestContained = Integer.MAX_VALUE;
+        int bestOutsidePenalty = Integer.MAX_VALUE;
+        float bestAreaAbs = -1f;
+
+        for (int i = 0; i < indices.size(); i++) {
+            int prevIndex = indices.get((i - 1 + indices.size()) % indices.size());
+            int currIndex = indices.get(i);
+            int nextIndex = indices.get((i + 1) % indices.size());
+
+            Vector2 prev = vertices.get(prevIndex);
+            Vector2 curr = vertices.get(currIndex);
+            Vector2 next = vertices.get(nextIndex);
+
+            float triArea = Math.abs(orientedArea(prev, curr, next));
+            if (triArea <= CONVEX_EPSILON) {
+                continue;
+            }
+
+            int contained = countContainedVertices(indices, vertices, prevIndex, currIndex, nextIndex, prev, curr, next);
+            int outsidePenalty = computeOutsidePenalty(vertices, prev, curr, next);
+
+            if (contained < bestContained
+                || (contained == bestContained && outsidePenalty < bestOutsidePenalty)
+                || (contained == bestContained && outsidePenalty == bestOutsidePenalty && triArea > bestAreaAbs)) {
+                bestContained = contained;
+                bestOutsidePenalty = outsidePenalty;
+                bestAreaAbs = triArea;
+                bestEar = i;
+            }
+        }
+
+        return bestEar;
+    }
+
+    private static int computeOutsidePenalty(List<Vector2> polygon, Vector2 a, Vector2 b, Vector2 c) {
+        int penalty = 0;
+
+        // Penalize candidate ears whose diagonal likely exits the polygon boundary.
+        if (segmentIntersectsPolygonEdges(a, c, polygon)) {
+            penalty += 8;
+        }
+
+        Vector2 centroid = new Vector2(a).add(b).add(c).scl(1f / 3f);
+        if (!isPointInsidePolygon(centroid, polygon)) {
+            penalty += 4;
+        }
+
+        Vector2 abMid = new Vector2(a).add(b).scl(0.5f);
+        Vector2 bcMid = new Vector2(b).add(c).scl(0.5f);
+        Vector2 caMid = new Vector2(c).add(a).scl(0.5f);
+        if (!isPointInsidePolygon(abMid, polygon)) penalty++;
+        if (!isPointInsidePolygon(bcMid, polygon)) penalty++;
+        if (!isPointInsidePolygon(caMid, polygon)) penalty++;
+
+        return penalty;
+    }
+
+    private static boolean segmentIntersectsPolygonEdges(Vector2 a, Vector2 b, List<Vector2> polygon) {
+        for (int i = 0; i < polygon.size(); i++) {
+            Vector2 p = polygon.get(i);
+            Vector2 q = polygon.get((i + 1) % polygon.size());
+
+            if (a.epsilonEquals(p, EPSILON) || a.epsilonEquals(q, EPSILON)
+                || b.epsilonEquals(p, EPSILON) || b.epsilonEquals(q, EPSILON)) {
+                continue;
+            }
+
+            if (segmentsIntersect(a, b, p, q)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isPointInsidePolygon(Vector2 point, List<Vector2> polygon) {
+        boolean inside = false;
+        for (int i = 0, j = polygon.size() - 1; i < polygon.size(); j = i++) {
+            Vector2 vi = polygon.get(i);
+            Vector2 vj = polygon.get(j);
+            boolean crosses = ((vi.y > point.y) != (vj.y > point.y))
+                && (point.x < (vj.x - vi.x) * (point.y - vi.y) / ((vj.y - vi.y) + EPSILON) + vi.x);
+            if (crosses) {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    private static boolean segmentsIntersect(Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
+        float o1 = orientedArea(a, b, c);
+        float o2 = orientedArea(a, b, d);
+        float o3 = orientedArea(c, d, a);
+        float o4 = orientedArea(c, d, b);
+
+        if (Math.abs(o1) <= EPSILON && onSegment(a, b, c)) return true;
+        if (Math.abs(o2) <= EPSILON && onSegment(a, b, d)) return true;
+        if (Math.abs(o3) <= EPSILON && onSegment(c, d, a)) return true;
+        if (Math.abs(o4) <= EPSILON && onSegment(c, d, b)) return true;
+
+        return (o1 > 0f) != (o2 > 0f) && (o3 > 0f) != (o4 > 0f);
+    }
+
+    private static boolean onSegment(Vector2 a, Vector2 b, Vector2 p) {
+        return p.x >= Math.min(a.x, b.x) - EPSILON
+            && p.x <= Math.max(a.x, b.x) + EPSILON
+            && p.y >= Math.min(a.y, b.y) - EPSILON
+            && p.y <= Math.max(a.y, b.y) + EPSILON;
     }
 
     private static List<Vector2> copyTriangle(Vector2 a, Vector2 b, Vector2 c) {

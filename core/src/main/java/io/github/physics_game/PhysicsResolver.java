@@ -8,6 +8,8 @@ import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class PhysicsResolver {
@@ -615,5 +617,97 @@ public class PhysicsResolver {
             vertices.add(new Vector2(radius * (float) Math.cos(angle), radius * (float) Math.sin(angle)));
         }
         return vertices;
+    }
+
+    public static void printShape(List<Vector2> vertices) {
+        float res = 0.05f;
+        float minX = Float.MAX_VALUE, maxX = Float.MIN_VALUE, minY = Float.MAX_VALUE, maxY = Float.MIN_VALUE;
+        for(Vector2 v : vertices) {
+            if(v.x < minX) minX = v.x;
+            if(v.x > maxX) maxX = v.x;
+            if(v.y < minY) minY = v.y;
+            if(v.y > maxY) maxY = v.y;
+        }
+        minX -= 1f;
+        maxX += 1f;
+        minY -= 1f;
+        maxY += 1f;
+        float width = Math.max(Math.abs(minX), Math.abs(maxX)) + 1f;
+        float height = Math.max(Math.abs(minY), Math.abs(maxY)) + 1f;
+        ArrayList<ArrayList<Integer>> pointGrid = new ArrayList<>();
+        for(int y = (int)(maxY / res); y >= (int)(minY / res); y--) {
+            ArrayList<Integer> row = new ArrayList<>(Collections.nCopies((int)((maxX - minX) / res) + 1, -1));
+            pointGrid.add(row);
+        }
+
+        for(int i = 0; i < vertices.size(); i++) {
+            Vector2 v = vertices.get(i);
+            int xIndex = (int)((v.x - minX) / res);
+            int yIndex = (int)((v.y - minY) / res);
+            if(xIndex >= 0 && xIndex < pointGrid.get(0).size() && yIndex >= 0 && yIndex < pointGrid.size()) {
+                pointGrid.get(yIndex).set(xIndex, i);
+            }
+        }
+
+        for(int y = pointGrid.size() - 1; y >= 0; y--) {
+            StringBuilder sb = new StringBuilder();
+            for(int x = 0; x < pointGrid.get(0).size(); x++) {
+                if(pointGrid.get(y).get(x) >= 0) {
+                    sb.append((pointGrid.get(y).get(x) % 1000));
+                } else {
+                    sb.append("   ");
+                }
+            }
+            System.out.println(sb);
+        }
+    }
+
+    public static void printListShape(List<List<Vector2>> verticesList) {
+        float minX = Float.MAX_VALUE, maxX = Float.MIN_VALUE, minY = Float.MAX_VALUE, maxY = Float.MIN_VALUE;
+
+        for(List<Vector2> vertices : verticesList) {
+            for(Vector2 v : vertices) {
+                if(v.x < minX) minX = v.x;
+                if(v.x > maxX) maxX = v.x;
+                if(v.y < minY) minY = v.y;
+                if(v.y > maxY) maxY = v.y;
+            }
+        }
+        minX -= 1f;
+        maxX += 1f;
+        minY -= 1f;
+        maxY += 1f;
+        float res = 0.05f;
+
+        float width = Math.max(Math.abs(minX), Math.abs(maxX)) + 1f;
+        float height = Math.max(Math.abs(minY), Math.abs(maxY)) + 1f;
+        ArrayList<ArrayList<Integer>> pointGrid = new ArrayList<>();
+        for(int y = (int)(maxY / res); y >= (int)(minY / res); y--) {
+            ArrayList<Integer> row = new ArrayList<>(Collections.nCopies((int)((maxX - minX) / res) + 1, -1));
+            pointGrid.add(row);
+        }
+
+        for(List<Vector2> vertices : verticesList) {
+            for(int i = 0; i < vertices.size(); i++) {
+                Vector2 v = vertices.get(i);
+                int xIndex = (int)((v.x - minX) / res);
+                int yIndex = (int)((v.y - minY) / res);
+                if(xIndex >= 0 && xIndex < pointGrid.get(0).size() && yIndex >= 0 && yIndex < pointGrid.size()) {
+                    pointGrid.get(yIndex).set(xIndex, i);
+                }
+            }
+        }
+
+        for(int y = pointGrid.size() - 1; y >= 0; y--) {
+            StringBuilder sb = new StringBuilder();
+            for(int x = 0; x < pointGrid.get(0).size(); x++) {
+                if(pointGrid.get(y).get(x) >= 0) {
+                    sb.append((pointGrid.get(y).get(x) % 1000));
+                } else {
+                    sb.append("   ");
+                }
+            }
+            System.out.println(sb);
+        }
     }
 }

@@ -120,6 +120,14 @@ public class GameScreen extends ScreenAdapter {
             Gdx.app.log("Main", "Debug overlay " + (showDebugOverlay ? "ON" : "OFF"));
         }
 
+        if(Gdx.input.isKeyJustPressed(Input.Keys.D)) {
+            //run debug
+            float maxIndex = -1;
+            PhysicsObject lastObj = currentLevel.getPhysicsObjects().get(currentLevel.getPhysicsObjects().size() - 1);
+            drawTool.testAddPoint(true);
+            PhysicsResolver.printShape(lastObj.getVertices());
+        }
+
         if(Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             runPhysics = !runPhysics;
             Gdx.app.log("Main", "Physics " + (runPhysics ? "RUNNING" : "PAUSED"));
@@ -189,6 +197,9 @@ public class GameScreen extends ScreenAdapter {
                 } else if (obj instanceof UncollidableObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.RED);
                 }
+
+                //draw the outline
+                drawOutline(obj.getLocalBody(), Color.WHITE);
             }
 
             currentLevel.tick(delta);
@@ -300,6 +311,23 @@ public class GameScreen extends ScreenAdapter {
                 vertices[i * 2 + 1] = worldVertex.y;
             }
             shapeRenderer.polygon(vertices);
+        }
+    }
+
+    private void drawOutline(CustomContactHandler.PolygonBody body,
+                             Color color) {
+        if (body == null) {
+            return;
+        }
+        shapeRenderer.setColor(color);
+        Vector2 position = body.getPosition();
+        float angle = body.getRotationRadians();
+
+        for(int i = 0; i < body.getLocalVertices().size(); i++) {
+            Vector2 worldVertex1 = toWorld(body.getLocalVertices().get(i), position, angle);
+            Vector2 worldVertex2 = toWorld(body.getLocalVertices().get((i+1) % body.getLocalVertices().size()), position, angle);
+            shapeRenderer.line(worldVertex1.x, worldVertex1.y, worldVertex2.x, worldVertex2.y);
+
         }
     }
 
