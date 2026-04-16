@@ -2,11 +2,11 @@ package io.github.physics_game;
 
 import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.Stage;
-import com.badlogic.gdx.scenes.scene2d.ui.Skin;
-import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.*;
+import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
@@ -15,6 +15,9 @@ public class MainMenuScreen extends ScreenAdapter{
     private final MainGame game;
     private Stage stage;
     private Skin skin;
+
+    private Texture backgroundTexture;
+    private SpriteBatch batch;
 
     public MainMenuScreen(MainGame game) {
         this.game = game;
@@ -25,9 +28,12 @@ public class MainMenuScreen extends ScreenAdapter{
         stage = new Stage(new ScreenViewport());
         Gdx.input.setInputProcessor(stage);
 
+        batch = new SpriteBatch();
+        backgroundTexture = new Texture(Gdx.files.internal("menu.png"));
+
         skin = new Skin(Gdx.files.internal("uiskin.json"));
 
-        Label title = new Label("Physics Sketch Game", skin);
+        Label title = new Label("An Educational Physics Game", skin);
         TextButton playButton = new TextButton("Play", skin);
         TextButton quitButton = new TextButton("Quit", skin);
         TextButton helpButton = new TextButton("How to Play", skin);
@@ -70,6 +76,11 @@ public class MainMenuScreen extends ScreenAdapter{
         Gdx.gl.glClearColor(0.08f, 0.08f, 0.12f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        batch.begin();
+        // Draw texture starting at bottom-left (0,0) scaled to the screen size
+        batch.draw(backgroundTexture, 0, 0, stage.getWidth(), stage.getHeight());
+        batch.end();
+
         stage.act(delta);
         stage.draw();
     }
@@ -86,6 +97,7 @@ public class MainMenuScreen extends ScreenAdapter{
 
     @Override
     public void dispose() {
+        backgroundTexture.dispose();
         if (stage != null) stage.dispose();
         if (skin != null) skin.dispose();
     }

@@ -16,7 +16,7 @@ public class PhysicsResolver {
     final static float fixedStep = 1f / 60f;
     final static int NUM_VEL_ITERATIONS = 5;
     final static int NUM_POS_ITERATIONS = 2;
-    final static Vector2 GRAVITY = new Vector2(0, -6f);
+    final static Vector2 GRAVITY = new Vector2(0, -9.8f);
     public static void step(ArrayList<PhysicsObject> objects) {
         while(GameScreen.accumulator >= fixedStep) {
             // Step the physics simulation with a fixed time step. This ensures consistent behavior regardless of frame rate.

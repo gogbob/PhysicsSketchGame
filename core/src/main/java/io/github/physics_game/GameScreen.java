@@ -15,6 +15,7 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.levels.Level;
+import io.github.physics_game.levels.Level1;
 import io.github.physics_game.levels.TutorialLevel;
 import io.github.physics_game.object_types.*;
 
@@ -53,8 +54,9 @@ public class GameScreen extends ScreenAdapter {
     public static int BOTTOM_BUFFER_PX = 10;
     public static final float selectInfoPeriod = 0.1f;
 
-    public GameScreen(MainGame game) {
+    public GameScreen(MainGame game, Level selectedLevel) {
         this.game = game;
+        this.currentLevel = selectedLevel;
     }
 
     // throttle logging to once-per-second
@@ -99,11 +101,9 @@ public class GameScreen extends ScreenAdapter {
                 new Vector2(-0.7f, -0.7f)
             ),
             5, 5, 0);
-        TutorialLevel tutorialLevel = new TutorialLevel(viewPortWidth, viewPortHeight);
-        //exampleObject.setRotation((float)Math.PI);\
 
         drawTool = new DrawTool(camera, viewport, 0.5f);
-        currentLevel = tutorialLevel;
+
         Gdx.app.log("Main", "DrawTool created!");
 
         // Log startup info
