@@ -51,6 +51,7 @@ public class GameScreen extends ScreenAdapter {
     public static int SIDE_BUFFER_PX = 200;
     public static int TOP_BUFFER_PX = 10;
     public static int BOTTOM_BUFFER_PX = 10;
+    public static final float selectInfoPeriod = 0.1f;
 
     public GameScreen(MainGame game) {
         this.game = game;
@@ -58,6 +59,8 @@ public class GameScreen extends ScreenAdapter {
 
     // throttle logging to once-per-second
     float logTimer = 0f;
+    private float selectInfoTimer = selectInfoPeriod;
+    private String stringInfo = "";
 
     // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
@@ -287,49 +290,65 @@ public class GameScreen extends ScreenAdapter {
             winFont.draw(batch, layout3, (Gdx.graphics.getWidth() - layout3.width)/2f, y1 - 60);
         }
 
-        if(selectedObject != null && delta > 0f) {
-            PhysicsObject obj = null;
-            for(PhysicsObject o : currentLevel.getPhysicsObjects()) {
-                if(selectedObject != null) {
-                    if(o.getId() == selectedObject) {
-                        obj = o;
+        selectInfoTimer += delta;
+        System.out.println(selectInfoTimer);
+        if(selectedObject != null) {
+            if (selectInfoTimer >= selectInfoPeriod) {
+
+                while (selectInfoTimer >= selectInfoPeriod) selectInfoTimer -= selectInfoPeriod;
+                PhysicsObject obj = null;
+                for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
+                    if (selectedObject != null) {
+                        if (o.getId() == selectedObject) {
+                            obj = o;
+                        }
+                    }
+                }
+                if (obj == null) {
+                    selectedObject = null;
+                    Gdx.app.log("Main", "Selected object not found!");
+                    return;
+                }
+
+    // actual side buffers (these can differ from SIDE_BUFFER_PX depending on aspect/stretching)
+
+                String suffix = ((obj instanceof Charged) ? "Charged " : (obj instanceof AntigravityObject) ? "Antigravity " : "");
+                String type = ((obj instanceof DynamicObject) ? "Dynamic " : (obj instanceof StaticObject) ? "Static " : "");
+
+                StringBuilder builder = new StringBuilder();
+                // add buffer to stabilize
+                builder.append("                                                            \n");
+                builder.append(suffix + type + "Object: " + selectedObject);
+                builder.append(String.format("\nFriction: %+6.3f", obj.getFriction()) +
+                    String.format("\n Restitution: %+6.3f", obj.getRestitution()));
+                if (obj instanceof DynamicObject) {
+                    builder.append(String.format("\nLinear Velocity: (%+7.3f, %+7.3f)", obj.getLinearVelocity().x, obj.getLinearVelocity().y) +
+                        String.format("\nAngular Velocity: %+7.3f", obj.getAngularVelocity()) +
+                        String.format("\nLinear Acceleration: (%+7.3f, %+7.3f)", ((DynamicObject) obj).getCurrentLinearAcceleration(delta).x, ((DynamicObject) obj).getCurrentLinearAcceleration(delta).y) +
+                        String.format("\nAngular Acceleration: %+7.3f", ((DynamicObject) obj).getCurrentAngularAcceleration(delta)) +
+                        String.format("\nDensity: %+6.3f", obj.getDensity()) +
+                        String.format("\nMass: %+6.3f", ((DynamicObject) obj).getMass()) +
+                        String.format("\nInertia: %+6.3f", ((DynamicObject) obj).getInertia()));
+                }
+                if (obj instanceof Charged) {
+                    builder.append(String.format("\nCharge Density: %+6.3f", ((Charged) obj).getChargeDensity()));
+                }
+
+                stringInfo = builder.toString();
+
+                for(PhysicsObject o : currentLevel.getPhysicsObjects()) {
+                    if(o instanceof DynamicObject) {
+                        ((DynamicObject) o).setCurrentAngularAcceleration(0f);
+                        ((DynamicObject) o).setCurrentLinearAcceleration(new Vector2(0f, 0f));
                     }
                 }
             }
-            if(obj == null) {
-                selectedObject = null;
-                Gdx.app.log("Main", "Selected object not found!");
-                return;
-            }
-
-// actual side buffers (these can differ from SIDE_BUFFER_PX depending on aspect/stretching)
             int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth())/2;
             int rightPanelX = uiViewport.getScreenWidth() - panelW;
             int panelH = viewport.getScreenHeight();
             int panelY = (uiViewport.getScreenHeight() - panelH)/2;
-            String suffix = ((obj instanceof Charged) ? "Charged " : (obj instanceof AntigravityObject) ? "Antigravity " : "");
-            String type = ((obj instanceof DynamicObject) ? "Dynamic " : (obj instanceof StaticObject) ? "Static " : "");
 
-            StringBuilder builder = new StringBuilder();
-            // add buffer to stabilize
-            builder.append("                                                            \n");
-            builder.append(suffix + type + "Object: " + selectedObject);
-            builder.append(String.format("\nFriction: %+6.3f" , obj.getFriction())+
-                String.format("\n Restitution: %+6.3f" , obj.getRestitution()));
-            if(obj instanceof DynamicObject) {
-                builder.append(String.format("\nLinear Velocity: (%+7.3f, %+7.3f)" , obj.getLinearVelocity().x, obj.getLinearVelocity().y)  +
-                    String.format("\nAngular Velocity: %+7.3f" , obj.getAngularVelocity()) +
-                    String.format("\nLinear Acceleration: (%+7.3f, %+7.3f)" , ((DynamicObject) obj).getCurrentLinearAcceleration(delta).x, ((DynamicObject) obj).getCurrentLinearAcceleration(delta).y) +
-                    String.format("\nAngular Acceleration: %+7.3f" , ((DynamicObject) obj).getCurrentAngularAcceleration(delta)) +
-                    String.format("\nDensity: %+6.3f" , obj.getDensity()) +
-                    String.format("\nMass: %+6.3f" , ((DynamicObject) obj).getMass()) +
-                    String.format("\nInertia: %+6.3f" , ((DynamicObject) obj).getInertia()));
-            }
-            if(obj instanceof Charged) {
-                builder.append(String.format("\nCharge Density: %+6.3f" , ((Charged) obj).getChargeDensity()));
-            }
-
-            GlyphLayout layout1 = new GlyphLayout(winFont,   builder.toString());
+            GlyphLayout layout1 = new GlyphLayout(winFont,   stringInfo);
             float x = rightPanelX + 5f;           // fixed left padding
             float y = panelY + panelH - 20f;       // fixed top anchor
             winFont.setUseIntegerPositions(true);  // reduce subpixel shimmer
@@ -337,12 +356,6 @@ public class GameScreen extends ScreenAdapter {
             winFont.draw(batch, layout1, Math.round(x), Math.round(y));
         }
 
-        for(PhysicsObject o : currentLevel.getPhysicsObjects()) {
-            if(o instanceof DynamicObject) {
-                ((DynamicObject) o).setCurrentAngularAcceleration(0f);
-                ((DynamicObject) o).setCurrentLinearAcceleration(new Vector2(0f, 0f));
-            }
-        }
 
         batch.end();
 
