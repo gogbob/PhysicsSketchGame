@@ -11,12 +11,17 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import io.github.physics_game.levels.Level1;
+import io.github.physics_game.levels.TutorialLevel;
 import jdk.tools.jmod.Main;
 
 public class LevelScreen extends ScreenAdapter{
     private final MainGame game;
     private Stage stage;
     private Skin skin;
+
+    public static final float viewPortWidth = 40f;
+    public static final float viewPortHeight = 30f;
 
     private Texture backgroundTexture;
     private SpriteBatch batch;
@@ -42,6 +47,10 @@ public class LevelScreen extends ScreenAdapter{
         TextButton tutorialLevelButton = new TextButton("Tutorial", skin);
 
         TextButton level1Button = new TextButton("Level 1", skin);
+        TextButton level2Button = new TextButton("Level 2", skin);
+
+        TutorialLevel tutorialLevel = new TutorialLevel(viewPortWidth, viewPortHeight);
+        Level1 level1 = new Level1(viewPortWidth, viewPortHeight);
 
         backButton.addListener(new ClickListener() {
             @Override
@@ -53,15 +62,22 @@ public class LevelScreen extends ScreenAdapter{
         tutorialLevelButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new GameScreen(game));
+                game.setScreen(new GameScreen(game, tutorialLevel));
             }
         });
 
         level1Button.addListener(new ClickListener() {
            @Override
            public void clicked(InputEvent event, float x, float y) {
-
+                game.setScreen(new GameScreen(game, level1));
            }
+        });
+
+        level2Button.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+
+            }
         });
 
         Table root = new Table();
@@ -90,6 +106,12 @@ public class LevelScreen extends ScreenAdapter{
             .padBottom(30);
 
         content.add(level1Button)
+            .width(100)
+            .height(100)
+            .pad(20)
+            .padBottom(30);
+
+        content.add(level2Button)
             .width(100)
             .height(100)
             .pad(20)
