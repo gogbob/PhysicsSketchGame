@@ -33,7 +33,7 @@ public class MainMenuScreen extends ScreenAdapter{
 
         skin = new Skin(Gdx.files.internal("uiskin.json"));
 
-        Label title = new Label("Physics Sketch Game", skin);
+        Label title = new Label("An Educational Physics Game", skin);
         TextButton playButton = new TextButton("Play", skin);
         TextButton quitButton = new TextButton("Quit", skin);
         TextButton helpButton = new TextButton("How to Play", skin);
@@ -78,7 +78,7 @@ public class MainMenuScreen extends ScreenAdapter{
 
         batch.begin();
         // Draw texture starting at bottom-left (0,0) scaled to the screen size
-        batch.draw(backgroundTexture, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        batch.draw(backgroundTexture, 0, 0, stage.getWidth(), stage.getHeight());
         batch.end();
 
         stage.act(delta);
