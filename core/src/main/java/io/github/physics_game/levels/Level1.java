@@ -1,5 +1,6 @@
 package io.github.physics_game.levels;
 
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.object_types.*;
@@ -100,6 +101,7 @@ public class Level1 extends Level {
             cup
         );
         addPhysicsObject(cupInside);
+        setBackground(new Texture("background_forest.png"));
     }
 
     @Override

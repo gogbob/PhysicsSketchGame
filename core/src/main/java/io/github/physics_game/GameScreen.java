@@ -291,7 +291,6 @@ public class GameScreen extends ScreenAdapter {
         }
 
         selectInfoTimer += delta;
-        System.out.println(selectInfoTimer);
         if(selectedObject != null) {
             if (selectInfoTimer >= selectInfoPeriod) {
 
@@ -322,9 +321,9 @@ public class GameScreen extends ScreenAdapter {
                 builder.append(String.format("\nFriction: %+6.3f", obj.getFriction()) +
                     String.format("\n Restitution: %+6.3f", obj.getRestitution()));
                 if (obj instanceof DynamicObject) {
-                    builder.append(String.format("\nLinear Velocity: (%+7.3f, %+7.3f)", obj.getLinearVelocity().x, obj.getLinearVelocity().y) +
+                    builder.append(String.format("\nLinear Velocity: \n(%+7.3f, %+7.3f)", obj.getLinearVelocity().x, obj.getLinearVelocity().y) +
                         String.format("\nAngular Velocity: %+7.3f", obj.getAngularVelocity()) +
-                        String.format("\nLinear Acceleration: (%+7.3f, %+7.3f)", ((DynamicObject) obj).getCurrentLinearAcceleration(delta).x, ((DynamicObject) obj).getCurrentLinearAcceleration(delta).y) +
+                        String.format("\nLinear Acceleration: \n(%+7.3f, %+7.3f)", ((DynamicObject) obj).getCurrentLinearAcceleration(delta).x, ((DynamicObject) obj).getCurrentLinearAcceleration(delta).y) +
                         String.format("\nAngular Acceleration: %+7.3f", ((DynamicObject) obj).getCurrentAngularAcceleration(delta)) +
                         String.format("\nDensity: %+6.3f", obj.getDensity()) +
                         String.format("\nMass: %+6.3f", ((DynamicObject) obj).getMass()) +
@@ -392,7 +391,7 @@ public class GameScreen extends ScreenAdapter {
 
     public Integer isPointInsideObjects(Vector2 point) {
         for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-            if(!(obj instanceof UncollidableObject || obj instanceof StaticObject)) {
+            if(!(obj instanceof UncollidableObject)) {
                 if(obj.isPointInsideObject(point)) {
                     return obj.getId();
                 }
