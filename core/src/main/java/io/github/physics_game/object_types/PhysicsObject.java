@@ -97,6 +97,26 @@ public abstract class PhysicsObject {
         return centered;
     }
 
+    public boolean isPointInsideObject(Vector2 point) {
+        for(List<Vector2> convexPolygon : concaveLocalBest) {
+            //check if it is on the left side of all edges
+            boolean isInside = true;
+            for(int i = 0; i < convexPolygon.size(); i++) {
+                Vector2 a = CustomContactHandler.toWorld(this.getPosition(), this.getRotation(), new Vector2(convexPolygon.get(i)));
+                Vector2 b = CustomContactHandler.toWorld(this.getPosition(), this.getRotation(), new Vector2(convexPolygon.get((i + 1) % convexPolygon.size())));
+                Vector2 edge = new Vector2(b).sub(a);
+
+                if(edge.crs(new Vector2(point).sub(a)) < 0) {
+                    isInside = false;
+                }
+            }
+            if(isInside) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     public Vector2 getCenter()  {
         return getPosition();

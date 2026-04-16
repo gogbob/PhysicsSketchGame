@@ -12,6 +12,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.levels.Level;
 import io.github.physics_game.levels.TutorialLevel;
@@ -20,6 +21,9 @@ import io.github.physics_game.object_types.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static com.badlogic.gdx.Input.Keys.B;
+import static com.badlogic.gdx.utils.JsonValue.ValueType.object;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
 public class GameScreen extends ScreenAdapter {
@@ -32,15 +36,21 @@ public class GameScreen extends ScreenAdapter {
     private Texture ballImage;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
+    private OrthographicCamera uiCamera;
+    private ScreenViewport uiViewport;
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
     private float levelTimer = 0f;
     private int finalScore = -1;
     private int finalStars = 0;
+    private Integer selectedObject = null;
     private boolean scoreCalculated = false;
     public static final float viewPortWidth = 40f;
     public static final float viewPortHeight = 30f;
+    public static int SIDE_BUFFER_PX = 200;
+    public static int TOP_BUFFER_PX = 10;
+    public static int BOTTOM_BUFFER_PX = 10;
 
     public GameScreen(MainGame game) {
         this.game = game;
@@ -69,6 +79,9 @@ public class GameScreen extends ScreenAdapter {
         camera = new OrthographicCamera();
         viewport = new FitViewport(viewPortWidth, viewPortHeight, camera); // world units: 20 x 15
         viewport.apply(true);
+        uiCamera = new OrthographicCamera();
+        uiViewport = new ScreenViewport(uiCamera);
+        uiViewport.apply(true);
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
         winFont = new BitmapFont();
@@ -96,15 +109,28 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
-        PhysicsObject drawnObject = drawTool.update(drawType);
-        if(drawnObject != null) {
-            if (drawnObject instanceof DynamicObject) {
-                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                currentLevel.addPhysicsObject(drawnObject);
-                currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
+        boolean isSelecting = false;
+        if(Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
+            if(i != null) {
+                selectedObject = i;
+                isSelecting = true;
             } else {
-                currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                currentLevel.addPhysicsObject(drawnObject);
+                isSelecting = false;
+            }
+        }
+        if(!isSelecting) {
+            PhysicsObject drawnObject = drawTool.update(drawType);
+            if(drawnObject != null) {
+                runPhysics = true;
+                if (drawnObject instanceof DynamicObject) {
+                    currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                    currentLevel.addPhysicsObject(drawnObject);
+                    currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
+                } else {
+                    currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                    currentLevel.addPhysicsObject(drawnObject);
+                }
             }
         }
         if (!currentLevel.isComplete()) {
@@ -143,7 +169,20 @@ public class GameScreen extends ScreenAdapter {
         }
 
         // clear the screen
-        ScreenUtils.clear(Color.BLACK);
+        ScreenUtils.clear(Color.GRAY);
+        viewport.apply();
+        camera.update();
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        // create the background
+        Texture txtBackground = currentLevel.getBackground();
+        if(txtBackground != null) {
+            batch.setColor(new Color(0.8f, 0.8f, 0.8f, 1.0f));
+            batch.draw(txtBackground, 0, 0, viewport.getWorldWidth(), viewport.getWorldHeight());
+        } else {
+            Gdx.app.log("Main", "Background texture is null!");
+        }
+        batch.end();
 
 
         if(!showDebugOverlay) {
@@ -174,9 +213,21 @@ public class GameScreen extends ScreenAdapter {
                     drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), obj.getColor());
                 }
             }
+            shapeRenderer.end();
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+
+            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
+                if(selectedObject != null) {
+                    if(obj.getId() == selectedObject) {
+                        drawOutline(obj.getLocalBody(), Color.BLUE);
+                    }
+                }
+            }
+            shapeRenderer.end();
+
             currentLevel.tick(delta);
 
-            shapeRenderer.end();
+
         } else {
             //Debug view
             ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
@@ -214,6 +265,8 @@ public class GameScreen extends ScreenAdapter {
         //camera.update();
         //batch.setProjectionMatrix(camera.combined);
         //generate UI Here
+        uiViewport.apply();
+        batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
 
         if(currentLevel.isComplete()) {
@@ -232,7 +285,63 @@ public class GameScreen extends ScreenAdapter {
             GlyphLayout layout3 = new GlyphLayout(winFont, "Stars: " + finalStars);
             winFont.setColor(Color.YELLOW);
             winFont.draw(batch, layout3, (Gdx.graphics.getWidth() - layout3.width)/2f, y1 - 60);
+        }
 
+        if(selectedObject != null && delta > 0f) {
+            PhysicsObject obj = null;
+            for(PhysicsObject o : currentLevel.getPhysicsObjects()) {
+                if(selectedObject != null) {
+                    if(o.getId() == selectedObject) {
+                        obj = o;
+                    }
+                }
+            }
+            if(obj == null) {
+                selectedObject = null;
+                Gdx.app.log("Main", "Selected object not found!");
+                return;
+            }
+
+// actual side buffers (these can differ from SIDE_BUFFER_PX depending on aspect/stretching)
+            int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth())/2;
+            int rightPanelX = uiViewport.getScreenWidth() - panelW;
+            int panelH = viewport.getScreenHeight();
+            int panelY = (uiViewport.getScreenHeight() - panelH)/2;
+            String suffix = ((obj instanceof Charged) ? "Charged " : (obj instanceof AntigravityObject) ? "Antigravity " : "");
+            String type = ((obj instanceof DynamicObject) ? "Dynamic " : (obj instanceof StaticObject) ? "Static " : "");
+
+            StringBuilder builder = new StringBuilder();
+            // add buffer to stabilize
+            builder.append("                                                            \n");
+            builder.append(suffix + type + "Object: " + selectedObject);
+            builder.append(String.format("\nFriction: %+6.3f" , obj.getFriction())+
+                String.format("\n Restitution: %+6.3f" , obj.getRestitution()));
+            if(obj instanceof DynamicObject) {
+                builder.append(String.format("\nLinear Velocity: (%+7.3f, %+7.3f)" , obj.getLinearVelocity().x, obj.getLinearVelocity().y)  +
+                    String.format("\nAngular Velocity: %+7.3f" , obj.getAngularVelocity()) +
+                    String.format("\nLinear Acceleration: (%+7.3f, %+7.3f)" , ((DynamicObject) obj).getCurrentLinearAcceleration(delta).x, ((DynamicObject) obj).getCurrentLinearAcceleration(delta).y) +
+                    String.format("\nAngular Acceleration: %+7.3f" , ((DynamicObject) obj).getCurrentAngularAcceleration(delta)) +
+                    String.format("\nDensity: %+6.3f" , obj.getDensity()) +
+                    String.format("\nMass: %+6.3f" , ((DynamicObject) obj).getMass()) +
+                    String.format("\nInertia: %+6.3f" , ((DynamicObject) obj).getInertia()));
+            }
+            if(obj instanceof Charged) {
+                builder.append(String.format("\nCharge Density: %+6.3f" , ((Charged) obj).getChargeDensity()));
+            }
+
+            GlyphLayout layout1 = new GlyphLayout(winFont,   builder.toString());
+            float x = rightPanelX + 5f;           // fixed left padding
+            float y = panelY + panelH - 20f;       // fixed top anchor
+            winFont.setUseIntegerPositions(true);  // reduce subpixel shimmer
+            winFont.setFixedWidthGlyphs("0123456789+-.,() ");
+            winFont.draw(batch, layout1, Math.round(x), Math.round(y));
+        }
+
+        for(PhysicsObject o : currentLevel.getPhysicsObjects()) {
+            if(o instanceof DynamicObject) {
+                ((DynamicObject) o).setCurrentAngularAcceleration(0f);
+                ((DynamicObject) o).setCurrentLinearAcceleration(new Vector2(0f, 0f));
+            }
         }
 
         batch.end();
@@ -250,8 +359,34 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void resize(int width, int height) {
-        // keep viewport in sync with window size
-        if (viewport != null) viewport.update(width, height, true);
+        if (viewport != null) {
+
+            int worldW = Math.min((int)((height - TOP_BUFFER_PX - BOTTOM_BUFFER_PX) * viewPortWidth/viewPortHeight), width - 2 * SIDE_BUFFER_PX);
+            int worldH = (int)(worldW * viewPortHeight/viewPortWidth);
+            int worldX = (width - worldW)/2;
+            int worldY = (height - worldH)/2;
+
+            // Update with the size the world should live in
+            viewport.update(worldW, worldH, true);
+            // Then place it in the center region of the window
+            viewport.setScreenBounds(worldX, worldY, worldW, worldH);
+        }
+
+        if (uiViewport != null) {
+            uiViewport.update(width, height, true);
+        }
+    }
+
+    public Integer isPointInsideObjects(Vector2 point) {
+        for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
+            if(!(obj instanceof UncollidableObject || obj instanceof StaticObject)) {
+                if(obj.isPointInsideObject(point)) {
+                    return obj.getId();
+                }
+            }
+        }
+
+        return null;
     }
 
     private void input() {

@@ -15,6 +15,8 @@ public class DynamicObject extends PhysicsObject {
     private float density;
     private float mass = 0f;
     private float inertia = 0f;
+    private Vector2 currentLinearAcceleration = new Vector2();
+    private float currentAngularAcceleration = 0f;
 
 
     public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices,
@@ -51,6 +53,7 @@ public class DynamicObject extends PhysicsObject {
         return currentAngularVelocity;
     }
     public void setLinearVelocity(Vector2 velocity) {
+        currentLinearAcceleration.add(new Vector2(velocity).sub(currentVelocity));
         if (velocity == null) {
             this.currentVelocity.setZero();
         } else {
@@ -58,7 +61,20 @@ public class DynamicObject extends PhysicsObject {
         }
     }
     public void setAngularVelocity(float velocity) {
+        currentAngularAcceleration += velocity;
         this.currentAngularVelocity = velocity;
+    }
+    public Vector2 getCurrentLinearAcceleration(float delta) {
+        return new Vector2(currentLinearAcceleration).scl(1f/delta);
+    }
+    public float getCurrentAngularAcceleration(float delta) {
+        return currentAngularAcceleration / delta;
+    }
+    public void setCurrentLinearAcceleration(Vector2 acceleration) {
+        currentLinearAcceleration.set(acceleration);
+    }
+    public void setCurrentAngularAcceleration(float acceleration) {
+        currentAngularAcceleration = acceleration;
     }
     public void updatePosition(float delta) {
         Vector2 linearVelocity = new Vector2(getLinearVelocity());
