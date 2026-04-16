@@ -2,6 +2,7 @@ package io.github.physics_game;
 
 public class ScoreCalculator {
     private static final int BaseScore= 100;
+
     private static final float TIME_PENALTY = 2.0f;
     private static final int SHAPE_PENALTY = 15;
 
@@ -31,5 +32,7 @@ public class ScoreCalculator {
         if (score >= 50) return 2; // 2 stars
         return 1; // 1 stars
     }
+
+
 
 }
