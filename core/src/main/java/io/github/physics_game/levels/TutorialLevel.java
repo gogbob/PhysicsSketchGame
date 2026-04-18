@@ -1,5 +1,6 @@
 package io.github.physics_game.levels;
 
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.object_types.*;
@@ -52,6 +53,8 @@ public class TutorialLevel extends Level {
 
         this.cupInside = new FollowingUncollidableField(2, cupInsideVertices, 5f, 2f, 0f, cup);
         addPhysicsObject(cupInside);
+
+        setBackground(new Texture("background_forest.png"));
     }
 
     @Override

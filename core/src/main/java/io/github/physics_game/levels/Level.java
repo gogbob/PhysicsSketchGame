@@ -1,6 +1,7 @@
 package io.github.physics_game.levels;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.object_types.PhysicsObject;
 import io.github.physics_game.object_types.StaticObject;
@@ -14,23 +15,29 @@ public abstract class Level {
     private String levelName;
     private ArrayList<PhysicsObject> physicsObjects = new ArrayList<>();
     private int numDrawnObjects;
+    private Texture background;
 
     public Level(int levelId, String levelName, ArrayList<PhysicsObject> internalObjects, float viewPortWidth, float viewPortHeight) {
         this.levelId = levelId;
         this.levelName = levelName;
         physicsObjects.addAll(internalObjects);
-        List<Vector2> floorPoly = Arrays.asList(new Vector2(0, 0), new Vector2(viewPortWidth, 0), new Vector2(viewPortWidth, 1), new Vector2(0, 1));
+        float wallWidth = 1f;
+        float floorHeight = 1;
+        List<Vector2> floorPoly = Arrays.asList(new Vector2(0, 0), new Vector2(viewPortWidth, 0), new Vector2(viewPortWidth, floorHeight), new Vector2(0, floorHeight));
         StaticObject floor = new StaticObject(-1, 0.5f, 0.5f, floorPoly, 0, 0, 0);
+        StaticObject ceiling = new StaticObject(-2, 0.5f, 0.5f, floorPoly, 0, viewPortHeight - floorHeight, 0);
 
-        List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, viewPortHeight*2), new Vector2(0, viewPortHeight*2));
-        StaticObject leftWall = new StaticObject(-2, 0.5f, 0.5f, wallPoly, 0, 0, 0);
-        StaticObject rightWall = new StaticObject(-3, 0.5f, 0.5f, wallPoly, viewPortWidth - 1, 0, 0);
+        List<Vector2> wallPoly = Arrays.asList(new Vector2(0, 0), new Vector2(wallWidth, 0), new Vector2(wallWidth, viewPortHeight), new Vector2(0, viewPortHeight));
+        StaticObject leftWall = new StaticObject(-3, 0.5f, 0.5f, wallPoly, 0, 0, 0);
+        StaticObject rightWall = new StaticObject(-4, 0.5f, 0.5f, wallPoly, viewPortWidth - wallWidth, 0, 0);
 
         floor.setColor(Color.GRAY);
+        ceiling.setColor(Color.GRAY);
         leftWall.setColor(Color.GRAY);
         rightWall.setColor(Color.GRAY);
 
         physicsObjects.add(floor);
+        physicsObjects.add(ceiling);
         physicsObjects.add(leftWall);
         physicsObjects.add(rightWall);
     }
@@ -46,6 +53,12 @@ public abstract class Level {
     }
     public String getLevelName() {
         return levelName;
+    }
+    public Texture getBackground() {
+        return background;
+    }
+    public void setBackground(Texture background) {
+        this.background = background;
     }
     public void setNumDrawnObjects(int numDrawnObjects) {
         this.numDrawnObjects = numDrawnObjects;
