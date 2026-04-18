@@ -7,6 +7,9 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import io.github.physics_game.collision.ContactManifold;
+import io.github.physics_game.collision.CustomContactHandler;
+import io.github.physics_game.levels.Level;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
@@ -85,23 +88,27 @@ public class DrawTool {
     }
 
     // call the method each frame
-    public synchronized PhysicsObject update(DrawType drawType) {
+    public synchronized PhysicsObject update(DrawType drawType, Level currentLevel) {
         if(lock.tryLock()) {
             try {
+                // release mouse = done + create object
+                if ((!Gdx.input.isButtonPressed(Input.Buttons.LEFT) || currentLevel.getDrawLeft() <= 0.0001f) && drawing) {
+                    if(currentLevel.getDrawLeft() <= 0.0001f) System.out.println("No more Draw");
+                    return finishDrawing(drawType, currentLevel);
+                }
                 // press mouse = start to draw
-                if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-                    return startDrawing(drawType);
+                if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && currentLevel.getDrawLeft() >= toolWidth) {
+                    currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
+                        currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth);
+                    return startDrawing(drawType, currentLevel);
                 }
 
                 // continue press mouse = continue to draw
                 if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing && getMousePosition().sub(prevPosition).len() > minDist) {
-                    return addPoint(false);
+                    return addPoint(false, currentLevel);
                 }
 
-                // release mouse = done + create object
-                if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
-                    return finishDrawing(drawType);
-                }
+
             } finally {
                 lock.unlock();
             }
@@ -111,7 +118,19 @@ public class DrawTool {
     }
 
     // start drawing method (make a circle)
-    private StaticObject startDrawing(DrawType drawType) {
+    private StaticObject startDrawing(DrawType drawType, Level currentLevel) {
+        Vector2 pos = getMousePosition();
+
+        PhysicsObject tempCircle = new StaticObject(2000, 1.0f, 1.0f, PhysicsResolver.getCircleVertices(12, toolWidth), pos.x, pos.y, 0f);
+        for(PhysicsObject object : currentLevel.getPhysicsObjects()) {
+            if(!(object instanceof UncollidableObject)) {
+                ContactManifold manifold = CustomContactHandler.detect(tempCircle, object);
+                if(manifold.isColliding() && manifold.getPointCount() > 0) {
+                    //invalid place to draw
+                    return null;
+                }
+            }
+        }
         drawing = true;
         if(drawType != null) this.drawType = drawType;
         exteriorLoop.clear();
@@ -128,7 +147,6 @@ public class DrawTool {
         minY = -50;
         maxY = 50;
         resetGridField();
-        Vector2 pos = getMousePosition();
 
         referencePoint = new Vector2(pos.x, pos.y);
 
@@ -161,9 +179,48 @@ public class DrawTool {
     }
 
     // add point method
-    private PhysicsObject addPoint(boolean buildDynamic) {
+    private PhysicsObject addPoint(boolean buildDynamic, Level currentLevel) {
         Vector2 pos = getMousePosition();
         Vector2 delta = new Vector2(pos).sub(prevPosition);
+
+        //update delta if there is too much being drawn
+        if(delta.len() > currentLevel.getDrawLeft()) {
+            delta.nor().scl(currentLevel.getDrawLeft());
+            pos = new Vector2(prevPosition).add(delta);
+        }
+        currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
+            currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + delta.len());
+
+        List<Vector2> circleVertTemp = PhysicsResolver.getCircleVertices(12, toolWidth);
+        List<Vector2> segmentTemp = new ArrayList<>();
+
+
+        for(int i = 0; i < circleVertTemp.size(); i++) {
+            Vector2 edge = new Vector2(circleVertTemp.get(i)).sub(circleVertTemp.get((i + 1) % circleVertTemp.size()));
+            //check if the edge normal points with the delta
+            Vector2 normal = new Vector2(edge.y, -edge.x);
+            if(delta.dot(normal) >= 0) {
+                if(segmentTemp.size() == 0) {
+                    segmentTemp.add(new Vector2(circleVertTemp.get(i)).add(delta));
+                    segmentTemp.add(new Vector2(circleVertTemp.get((i + 1) % circleVertTemp.size())).add(delta));
+                } else {
+                    segmentTemp.add(new Vector2(circleVertTemp.get((i + 1) % circleVertTemp.size())).add(delta));
+                }
+            }
+        }
+        segmentTemp.add(new Vector2(-delta.y, delta.x).nor().scl(toolWidth));
+        segmentTemp.add(new Vector2(delta.y, -delta.x).nor().scl(toolWidth));
+
+        PhysicsObject tempCircle = new StaticObject(2000, 1.0f, 1.0f, segmentTemp, prevPosition.x, prevPosition.y, 0f);
+        for(PhysicsObject object : currentLevel.getPhysicsObjects()) {
+            if(!(object instanceof UncollidableObject) && object.getId() < 1000) {
+                ContactManifold manifold = CustomContactHandler.detect(tempCircle, object);
+                if(manifold.isColliding() && manifold.getPointCount() > 0) {
+                    //invalid place to draw
+                    return null;
+                }
+            }
+        }
         addPixelValues(pos, delta);
         updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
         prevPosition = pos;
@@ -1112,11 +1169,12 @@ public class DrawTool {
         }
     }
     // finish drawing + create object method
-    private DynamicObject finishDrawing(DrawType drawType) {
+    private DynamicObject finishDrawing(DrawType drawType, Level currentLevel) {
+        DynamicObject temp = (DynamicObject)addPoint(true, currentLevel);
+        if(temp == null) return null;
         drawing = false;
-        DynamicObject temp = (DynamicObject)addPoint(true);
         if(drawType != null) this.drawType = drawType;
-        return (DynamicObject)addPoint(true);
+        return (DynamicObject)addPoint(true, currentLevel);
     }
     // get mouse position in world methode
     private Vector2 getMousePosition() {

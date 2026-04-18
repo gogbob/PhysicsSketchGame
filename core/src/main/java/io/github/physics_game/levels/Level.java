@@ -3,21 +3,32 @@ package io.github.physics_game.levels;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.DrawType;
 import io.github.physics_game.object_types.PhysicsObject;
 import io.github.physics_game.object_types.StaticObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public abstract class Level {
     private int levelId;
     private String levelName;
     private ArrayList<PhysicsObject> physicsObjects = new ArrayList<>();
+    private final ArrayList<DrawType> drawTypes;
+    private final ArrayList<Float> drawAmounts;
+    private ArrayList<Float> currentDrawnAmounts;
+    private int selectedPaint = 0;
     private int numDrawnObjects;
     private Texture background;
+    private float levelTimer = 0f;
 
-    public Level(int levelId, String levelName, ArrayList<PhysicsObject> internalObjects, float viewPortWidth, float viewPortHeight) {
+    public Level(int levelId, String levelName, ArrayList<PhysicsObject> internalObjects, ArrayList<DrawType> drawTypes, ArrayList<Float> drawAmounts, float viewPortWidth, float viewPortHeight) {
+        if(drawTypes.size() != drawAmounts.size()) {
+            throw new IllegalArgumentException("drawTypes and drawAmounts must be the same size");
+        }
+
         this.levelId = levelId;
         this.levelName = levelName;
         physicsObjects.addAll(internalObjects);
@@ -40,6 +51,9 @@ public abstract class Level {
         physicsObjects.add(ceiling);
         physicsObjects.add(leftWall);
         physicsObjects.add(rightWall);
+        this.drawTypes = drawTypes;
+        this.drawAmounts = drawAmounts;
+        this.currentDrawnAmounts = new ArrayList<>(Collections.nCopies(drawAmounts.size(), 0f));
     }
 
     public ArrayList<PhysicsObject> getPhysicsObjects() {
@@ -48,7 +62,29 @@ public abstract class Level {
     public void addPhysicsObject(PhysicsObject obj) {
         physicsObjects.add(obj);
     }
-     public int getLevelId() {
+    public ArrayList<DrawType> getDrawTypes() {
+        return drawTypes;
+    }
+    public ArrayList<Float> getDrawAmounts() {
+        return drawAmounts;
+    }
+    public ArrayList<Float> getCurrentDrawnAmounts() {
+        return currentDrawnAmounts;
+    }
+    public float getCurrentDrawnProportion() {
+        float total = 0f;
+        for(int i = 0; i < drawAmounts.size(); i++) {
+            total += ((currentDrawnAmounts.get(i) / drawAmounts.get(i)) / currentDrawnAmounts.size());
+        }
+        return total;
+    }
+    public int getSelectedPaint() {
+        return selectedPaint;
+    }
+    public float getDrawLeft() {
+        return getDrawAmounts().get(getSelectedPaint()) - getCurrentDrawnAmounts().get(getSelectedPaint());
+    }
+    public int getLevelId() {
         return levelId;
     }
     public String getLevelName() {
@@ -66,9 +102,32 @@ public abstract class Level {
     public int getNumDrawnObjects() {
         return numDrawnObjects;
     }
+    public void setLevelTimer(float levelTimer) {
+        this.levelTimer = levelTimer;
+    }
+    public float getLevelTimer() {
+        return levelTimer;
+    }
+
 
     public abstract boolean isComplete();
     public abstract LevelTickData tick(float deltaTime);
+    public void reinitialize() {
+        for(int i = 0; i < physicsObjects.size(); i++) {
+            if(physicsObjects.get(i).getId() >= 100) {
+                physicsObjects.remove(i);
+                i--;
+            } else {
+                physicsObjects.get(i).reinitialize();
+            }
+        }
+
+        for(int i = 0; i < drawAmounts.size(); i++) {
+            drawAmounts.set(i, 0f);
+        }
+
+        this.levelTimer = 0f;
+    }
 
     public class LevelTickData {
         private Float timeLeft = null;

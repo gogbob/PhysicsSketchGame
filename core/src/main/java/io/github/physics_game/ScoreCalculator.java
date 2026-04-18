@@ -4,13 +4,13 @@ public class ScoreCalculator {
     private static final int BaseScore= 100;
 
     private static final float TIME_PENALTY = 2.0f;
-    private static final int SHAPE_PENALTY = 15;
+    private static final int SHAPE_PENALTY = 100;
 
-    public static int calculateScore(int shapesUsed, float timeUsed, int shapePenalty, float timePenalty) {
+    public static int calculateScore(float timeUsed, float shapeProportion, int shapePenalty, float timePenalty) {
         int score = BaseScore;
 
         // shape penalty
-        score -= shapesUsed * shapePenalty;
+        if(shapeProportion >= 0.5f) score -= (int)((shapeProportion - 0.5f) * shapePenalty);
 
         // time penalty
         if (timeUsed > 30f) {
@@ -21,8 +21,8 @@ public class ScoreCalculator {
         return Math.max(0, Math.min(100, score));
     }
 
-    public static int calculateScore(int shapesUsed, float timeUsed) {
-        return calculateScore(shapesUsed, timeUsed,
+    public static int calculateScore(float timeUsed, float shapeProportion) {
+        return calculateScore(shapeProportion, timeUsed,
             SHAPE_PENALTY, TIME_PENALTY);
     }
 
@@ -32,7 +32,5 @@ public class ScoreCalculator {
         if (score >= 50) return 2; // 2 stars
         return 1; // 1 stars
     }
-
-
 
 }

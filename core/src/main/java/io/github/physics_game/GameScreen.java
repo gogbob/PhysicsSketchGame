@@ -15,16 +15,11 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.levels.Level;
-import io.github.physics_game.levels.Level1;
-import io.github.physics_game.levels.TutorialLevel;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static com.badlogic.gdx.Input.Keys.B;
-import static com.badlogic.gdx.utils.JsonValue.ValueType.object;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
 public class GameScreen extends ScreenAdapter {
@@ -42,7 +37,6 @@ public class GameScreen extends ScreenAdapter {
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
-    private float levelTimer = 0f;
     private int finalScore = -1;
     private int finalStars = 0;
     private Integer selectedObject = null;
@@ -123,7 +117,7 @@ public class GameScreen extends ScreenAdapter {
             }
         }
         if(!isSelecting) {
-            PhysicsObject drawnObject = drawTool.update(drawType);
+            PhysicsObject drawnObject = drawTool.update(drawType, currentLevel);
             if(drawnObject != null) {
                 runPhysics = true;
                 if (drawnObject instanceof DynamicObject) {
@@ -135,9 +129,6 @@ public class GameScreen extends ScreenAdapter {
                     currentLevel.addPhysicsObject(drawnObject);
                 }
             }
-        }
-        if (!currentLevel.isComplete()) {
-            levelTimer += delta;
         }
 
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
@@ -155,6 +146,11 @@ public class GameScreen extends ScreenAdapter {
             PhysicsObject lastObj = currentLevel.getPhysicsObjects().get(currentLevel.getPhysicsObjects().size() - 1);
             drawTool.testAddPoint(true);
             PhysicsResolver.printShape(lastObj.getVertices());
+        }
+
+        if(Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            currentLevel.reinitialize();
+            runPhysics = false;
         }
 
         if(Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
@@ -198,7 +194,7 @@ public class GameScreen extends ScreenAdapter {
                 if (!scoreCalculated) {
                     finalScore = ScoreCalculator.calculateScore(
                         currentLevel.getNumDrawnObjects(),
-                        levelTimer
+                        currentLevel.getLevelTimer()
                     );
                     finalStars = ScoreCalculator.calculateStars(finalScore);
                     scoreCalculated = true;
@@ -288,12 +284,46 @@ public class GameScreen extends ScreenAdapter {
             GlyphLayout layout3 = new GlyphLayout(winFont, "Stars: " + finalStars);
             winFont.setColor(Color.YELLOW);
             winFont.draw(batch, layout3, (Gdx.graphics.getWidth() - layout3.width)/2f, y1 - 60);
+
+            game.currentScores.get(currentLevel.getLevelId()).setNewBestScore(currentLevel.getLevelTimer(), currentLevel.getCurrentDrawnProportion());
         }
+
+        // LEFT PANEL
+
+        int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth())/2;
+        int panelH = viewport.getScreenHeight();
+        int panelY = (uiViewport.getScreenHeight() - panelH)/2;
+
+        StringBuilder levelInfoBuilder = new StringBuilder();
+        levelInfoBuilder.append("Level: " + currentLevel.getLevelName());
+        levelInfoBuilder.append("\n\nTime: " + (int)(currentLevel.getLevelTimer() / 60f) +
+            ":" + (int)(currentLevel.getLevelTimer()) +
+            "." + ((int)(currentLevel.getLevelTimer() * 1000)%1000));
+        levelInfoBuilder.append("\nPercent paint used: " + ((int)(currentLevel.getCurrentDrawnProportion() * 100f) % 100) + "%");
+
+        levelInfoBuilder.append("\n Level Best: ");
+        if(game.currentScores.get(currentLevel.getLevelId()) == null) {
+            levelInfoBuilder.append("\n ---- ");
+        } else {
+            levelInfoBuilder.append("\n Best Time: " + game.currentScores.get(currentLevel.getLevelId()).getBestTime());
+            levelInfoBuilder.append("\n Best Paint: " + (int)(game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion() * 100f) + "%");
+            levelInfoBuilder.append("\n Stars: " + game.currentScores.get(currentLevel.getLevelId()).getNumStars());
+        }
+
+        GlyphLayout layoutLevelInfo = new GlyphLayout(winFont, levelInfoBuilder.toString());
+        float leftPanelX = 5f;           // fixed left padding
+        float leftPanelY = panelY + panelH - 20f;       // fixed top anchor
+        winFont.setUseIntegerPositions(true);  // reduce subpixel shimmer
+        winFont.setFixedWidthGlyphs("0123456789+-.,() ");
+        winFont.draw(batch, layoutLevelInfo, Math.round(leftPanelX), Math.round(leftPanelY));
+
+
+        // RIGHT PANEL
 
         selectInfoTimer += delta;
         if(selectedObject != null) {
             if (selectInfoTimer >= selectInfoPeriod) {
-
+                float temp = selectInfoTimer;
                 while (selectInfoTimer >= selectInfoPeriod) selectInfoTimer -= selectInfoPeriod;
                 PhysicsObject obj = null;
                 for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
@@ -314,26 +344,26 @@ public class GameScreen extends ScreenAdapter {
                 String suffix = ((obj instanceof Charged) ? "Charged " : (obj instanceof AntigravityObject) ? "Antigravity " : "");
                 String type = ((obj instanceof DynamicObject) ? "Dynamic " : (obj instanceof StaticObject) ? "Static " : "");
 
-                StringBuilder builder = new StringBuilder();
+                StringBuilder selectInfoBuilder = new StringBuilder();
                 // add buffer to stabilize
-                builder.append("                                                            \n");
-                builder.append(suffix + type + "Object: " + selectedObject);
-                builder.append(String.format("\nFriction: %+6.3f", obj.getFriction()) +
+                selectInfoBuilder.append("                                                            \n");
+                selectInfoBuilder.append(suffix + type + "Object: " + selectedObject);
+                selectInfoBuilder.append(String.format("\nFriction: %+6.3f", obj.getFriction()) +
                     String.format("\n Restitution: %+6.3f", obj.getRestitution()));
                 if (obj instanceof DynamicObject) {
-                    builder.append(String.format("\nLinear Velocity: \n(%+7.3f, %+7.3f)", obj.getLinearVelocity().x, obj.getLinearVelocity().y) +
+                    selectInfoBuilder.append(String.format("\nLinear Velocity: \n(%+7.3f, %+7.3f)", obj.getLinearVelocity().x, obj.getLinearVelocity().y) +
                         String.format("\nAngular Velocity: %+7.3f", obj.getAngularVelocity()) +
-                        String.format("\nLinear Acceleration: \n(%+7.3f, %+7.3f)", ((DynamicObject) obj).getCurrentLinearAcceleration(delta).x, ((DynamicObject) obj).getCurrentLinearAcceleration(delta).y) +
-                        String.format("\nAngular Acceleration: %+7.3f", ((DynamicObject) obj).getCurrentAngularAcceleration(delta)) +
+                        String.format("\nLinear Acceleration: \n(%+7.3f, %+7.3f)", ((DynamicObject) obj).getCurrentLinearAcceleration(temp).x, ((DynamicObject) obj).getCurrentLinearAcceleration(temp).y) +
+                        String.format("\nAngular Acceleration: %+7.3f", ((DynamicObject) obj).getCurrentAngularAcceleration(temp)) +
                         String.format("\nDensity: %+6.3f", obj.getDensity()) +
                         String.format("\nMass: %+6.3f", ((DynamicObject) obj).getMass()) +
                         String.format("\nInertia: %+6.3f", ((DynamicObject) obj).getInertia()));
                 }
                 if (obj instanceof Charged) {
-                    builder.append(String.format("\nCharge Density: %+6.3f", ((Charged) obj).getChargeDensity()));
+                    selectInfoBuilder.append(String.format("\nCharge Density: %+6.3f", ((Charged) obj).getChargeDensity()));
                 }
 
-                stringInfo = builder.toString();
+                stringInfo = selectInfoBuilder.toString();
 
                 for(PhysicsObject o : currentLevel.getPhysicsObjects()) {
                     if(o instanceof DynamicObject) {
@@ -342,17 +372,13 @@ public class GameScreen extends ScreenAdapter {
                     }
                 }
             }
-            int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth())/2;
-            int rightPanelX = uiViewport.getScreenWidth() - panelW;
-            int panelH = viewport.getScreenHeight();
-            int panelY = (uiViewport.getScreenHeight() - panelH)/2;
+            float rightPanelX = uiViewport.getScreenWidth() - panelW + 5f;
 
-            GlyphLayout layout1 = new GlyphLayout(winFont,   stringInfo);
-            float x = rightPanelX + 5f;           // fixed left padding
-            float y = panelY + panelH - 20f;       // fixed top anchor
+            GlyphLayout layoutSelectInfo = new GlyphLayout(winFont,   stringInfo);
+            float rightPanelY = panelY + panelH - 20f;       // fixed top anchor
             winFont.setUseIntegerPositions(true);  // reduce subpixel shimmer
             winFont.setFixedWidthGlyphs("0123456789+-.,() ");
-            winFont.draw(batch, layout1, Math.round(x), Math.round(y));
+            winFont.draw(batch, layoutSelectInfo, Math.round(rightPanelX), Math.round(rightPanelY));
         }
 
 

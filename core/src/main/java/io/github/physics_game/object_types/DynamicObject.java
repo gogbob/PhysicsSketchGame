@@ -83,11 +83,15 @@ public class DynamicObject extends PhysicsObject {
         setPosition(position);
         setRotation(angle);
     }
+
+    @Override
     public void reinitialize() {
             setPosition(new Vector2(getStartX(), getStartY()));
             setRotation(0f);
             currentVelocity.setZero();
+            currentLinearAcceleration.setZero();
             currentAngularVelocity = 0f;
+            currentAngularAcceleration = 0f;
     }
 
     public DebugForce applyForce(Vector2 force, Vector2 point, Color color, boolean isRun, boolean isDebug) {

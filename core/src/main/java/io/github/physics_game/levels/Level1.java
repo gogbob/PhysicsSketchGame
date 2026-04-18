@@ -2,11 +2,13 @@ package io.github.physics_game.levels;
 
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.DrawType;
 import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class Level1 extends Level {
@@ -20,7 +22,8 @@ public class Level1 extends Level {
 
 
     public Level1(float viewPortWidth, float viewPortHeight) {
-        super(2, "Drop Into the Cup", new ArrayList<>(), viewPortWidth, viewPortHeight);
+        super(2, "Drop Into the Cup", new ArrayList<>(), new ArrayList<>(Arrays.asList(DrawType.NORMAL)),
+            new ArrayList<>(Arrays.asList(1f)), viewPortWidth, viewPortHeight);
 
         List<Vector2> platformVertices = new ArrayList<>(
             Arrays.asList(
@@ -111,6 +114,7 @@ public class Level1 extends Level {
 
     @Override
     public LevelTickData tick(float deltaTime) {
+        if(!isComplete) setLevelTimer(getLevelTimer() + deltaTime);
         if (cupInside.getTriggerIds().contains(ball.getId())) {
             if (!hasEnteredCup) {
                 System.out.println("Ball entered the cup!");
