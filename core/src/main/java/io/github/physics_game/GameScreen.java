@@ -302,8 +302,26 @@ public class GameScreen extends ScreenAdapter {
 
         //camera.update();
         //batch.setProjectionMatrix(camera.combined);
-        //generate UI Here
+
         uiViewport.apply();
+
+        //PANELS
+
+        batch.setProjectionMatrix(uiCamera.combined);
+        batch.begin();
+
+        int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth())/2;
+        int panelH = viewport.getScreenHeight();
+        int panelY = (uiViewport.getScreenHeight() - panelH)/2;
+
+        batch.setColor(0f, 0f, 0f, 0.6f);
+        batch.draw(panelBgTexture, uiViewport.getScreenWidth() - panelW, 0, panelW + 20f, uiViewport.getScreenHeight());
+        batch.draw(panelBgTexture, 0, 0, panelW, uiViewport.getScreenHeight());
+        batch.setColor(Color.WHITE);
+
+        batch.end();
+
+        //generate UI Here
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
 
@@ -332,10 +350,6 @@ public class GameScreen extends ScreenAdapter {
         }
 
         // LEFT PANEL
-
-        int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth())/2;
-        int panelH = viewport.getScreenHeight();
-        int panelY = (uiViewport.getScreenHeight() - panelH)/2;
 
 
         StringBuilder levelInfoBuilder = new StringBuilder();
@@ -399,7 +413,6 @@ public class GameScreen extends ScreenAdapter {
         }
 
         batch.end();
-
 
         // RIGHT PANEL
 
@@ -483,6 +496,9 @@ public class GameScreen extends ScreenAdapter {
                     sb.append("----------------\n");
                     sb.append(String.format(" m   %8.3f kg\n", mass));
                     sb.append(String.format(" u   %8.3f\n", selectedObj.getFriction()));
+                    if(selectedObj instanceof Charged) {
+                        sb.append(String.format(" q   %8.3f C/kg\n", ((Charged) selectedObj).getChargeDensity()));
+                    }
                     sb.append("----------------\n");
                     sb.append(String.format(" KE  %8.3f J\n", ke));
                     sb.append(String.format(" PE  %8.3f J\n", pe));
@@ -498,13 +514,11 @@ public class GameScreen extends ScreenAdapter {
         if(!showGraphs) {
             batch.setProjectionMatrix(uiCamera.combined);
             batch.begin();
-            batch.setColor(0f, 0f, 0f, 0.6f);
-            batch.draw(panelBgTexture, 0, panelY, panelW, panelH);
             batch.setColor(Color.WHITE);
             winFont.setColor(Color.CYAN);
             winFont.setUseIntegerPositions(true);
             winFont.setFixedWidthGlyphs("0123456789+-.,() ");
-            winFont.draw(batch, physicsDataString, uiViewport.getScreenWidth() - panelW + 5f, panelY + panelH - 320f);
+            winFont.draw(batch, physicsDataString, uiViewport.getScreenWidth() - panelW + 5f, panelY + panelH - 20f);
             batch.end();
         } else {
             renderGraphOverlay();
@@ -533,9 +547,6 @@ public class GameScreen extends ScreenAdapter {
         }
 
         batch.end();
-
-        renderStaticObjectTooltip();
-
     }
 
     @Override
