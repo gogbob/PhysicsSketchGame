@@ -81,6 +81,9 @@ public abstract class Level {
     public int getSelectedPaint() {
         return selectedPaint;
     }
+    public void setSelectedPaint(int selectedPaint) {
+        this.selectedPaint = selectedPaint;
+    }
     public float getDrawLeft() {
         return getDrawAmounts().get(getSelectedPaint()) - getCurrentDrawnAmounts().get(getSelectedPaint());
     }
@@ -122,8 +125,8 @@ public abstract class Level {
             }
         }
 
-        for(int i = 0; i < drawAmounts.size(); i++) {
-            drawAmounts.set(i, 0f);
+        for(int i = 0; i < currentDrawnAmounts.size(); i++) {
+            currentDrawnAmounts.set(i, 0f);
         }
 
         this.levelTimer = 0f;

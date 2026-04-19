@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -46,6 +47,9 @@ public class GameScreen extends ScreenAdapter {
     public static int SIDE_BUFFER_PX = 200;
     public static int TOP_BUFFER_PX = 10;
     public static int BOTTOM_BUFFER_PX = 10;
+    public static int BUTTON_WIDTH = 240;
+    public static int BUTTON_HEIGHT = 120;
+    public static int BUTTON_STARTY = 400;
     public static final float selectInfoPeriod = 0.1f;
 
     public GameScreen(MainGame game, Level selectedLevel) {
@@ -58,16 +62,10 @@ public class GameScreen extends ScreenAdapter {
     private float selectInfoTimer = selectInfoPeriod;
     private String stringInfo = "";
 
-    // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
 
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
-    private static final float NORMAL_DEBUG_LENGTH = 0.6f;
-    private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
-    private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
-    private DynamicObject dynamicObject;
-    private StaticObject floorObject;
     private Level currentLevel;
     private DrawTool drawTool;
 
@@ -96,6 +94,8 @@ public class GameScreen extends ScreenAdapter {
             ),
             5, 5, 0);
 
+        drawType = currentLevel.getDrawTypes().get(currentLevel.getSelectedPaint());
+
         drawTool = new DrawTool(camera, viewport, 0.5f);
 
         Gdx.app.log("Main", "DrawTool created!");
@@ -108,15 +108,38 @@ public class GameScreen extends ScreenAdapter {
     public void render(float delta) {
         boolean isSelecting = false;
         if(Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
-            if(i != null) {
-                selectedObject = i;
-                isSelecting = true;
-            } else {
-                isSelecting = false;
+            float mx = Gdx.input.getX();
+            float my = uiViewport.getScreenHeight() - Gdx.input.getY() - 1;
+            if((mx < 5 + BUTTON_WIDTH) && my >= BUTTON_STARTY && my < BUTTON_STARTY + (BUTTON_HEIGHT + 5) * currentLevel.getDrawTypes().size()) {
+                if((((int) my) - BUTTON_STARTY) % (BUTTON_HEIGHT + 5) < BUTTON_HEIGHT) {
+                    System.out.println("Selecting button: " + ((currentLevel.getDrawTypes().size() - 1) - (((int) my) - BUTTON_STARTY) / (BUTTON_HEIGHT + 5)) % currentLevel.getDrawTypes().size());
+                    currentLevel.setSelectedPaint(((currentLevel.getDrawTypes().size() - 1) - (((int) my) - BUTTON_STARTY) / (BUTTON_HEIGHT + 5)) % currentLevel.getDrawTypes().size());
+
+                    drawType = currentLevel.getDrawTypes().get(currentLevel.getSelectedPaint());
+                }
+            } else if(mx < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
+                Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
+                if(i != null) {
+                    System.out.println("Selecting");
+                    selectedObject = i;
+                    isSelecting = true;
+                } else {
+                    System.out.println("Clicked on empty space, starting draw");
+                    PhysicsObject drawnObject = drawTool.update(drawType, currentLevel);
+                    if(drawnObject != null) {
+                        runPhysics = true;
+                        if (drawnObject instanceof DynamicObject) {
+                            currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                            currentLevel.addPhysicsObject(drawnObject);
+                            currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
+                        } else {
+                            currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
+                            currentLevel.addPhysicsObject(drawnObject);
+                        }
+                    }
+                }
             }
-        }
-        if(!isSelecting) {
+        } else if(Gdx.input.getX() < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && Gdx.input.getX() > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
             PhysicsObject drawnObject = drawTool.update(drawType, currentLevel);
             if(drawnObject != null) {
                 runPhysics = true;
@@ -130,6 +153,7 @@ public class GameScreen extends ScreenAdapter {
                 }
             }
         }
+
 
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
@@ -184,26 +208,24 @@ public class GameScreen extends ScreenAdapter {
         batch.end();
 
 
+        ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects(), showDebugOverlay, showDebugOverlay);
+
+        if(currentLevel.isComplete()) {
+            if (!scoreCalculated) {
+                finalScore = ScoreCalculator.calculateScore(
+                    currentLevel.getNumDrawnObjects(),
+                    currentLevel.getLevelTimer()
+                );
+                finalStars = ScoreCalculator.calculateStars(finalScore);
+                scoreCalculated = true;
+
+                Gdx.app.log("Main", "Level complete!");
+                Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
+            }
+        }
+
         if(!showDebugOverlay) {
             //Normal view
-            if(runPhysics){
-                PhysicsResolver.step(currentLevel.getPhysicsObjects());
-            }
-
-            if(currentLevel.isComplete()) {
-                if (!scoreCalculated) {
-                    finalScore = ScoreCalculator.calculateScore(
-                        currentLevel.getNumDrawnObjects(),
-                        currentLevel.getLevelTimer()
-                    );
-                    finalStars = ScoreCalculator.calculateStars(finalScore);
-                    scoreCalculated = true;
-
-                    Gdx.app.log("Main", "Level complete!");
-                    Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
-                }
-            }
-
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
             int i = 1;
@@ -223,18 +245,7 @@ public class GameScreen extends ScreenAdapter {
                 }
             }
             shapeRenderer.end();
-
-            currentLevel.tick(delta);
-
-
         } else {
-            //Debug view
-            ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
-
-            if(currentLevel.isComplete()) {
-                Gdx.app.log("Main", "Level complete! Loading next level...");
-            }
-
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
             for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
@@ -251,15 +262,18 @@ public class GameScreen extends ScreenAdapter {
                 //draw the outline
                 drawOutline(obj.getLocalBody(), Color.WHITE);
             }
-
-            currentLevel.tick(delta);
-
-            for(DebugForce f : forces) {
-                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
-            }
-
             shapeRenderer.end();
         }
+
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+
+        for(DebugForce f : forces) {
+            drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
+        }
+
+        shapeRenderer.end();
+
+        if(runPhysics) currentLevel.tick(delta);
 
         //camera.update();
         //batch.setProjectionMatrix(camera.combined);
@@ -285,6 +299,10 @@ public class GameScreen extends ScreenAdapter {
             winFont.setColor(Color.YELLOW);
             winFont.draw(batch, layout3, (Gdx.graphics.getWidth() - layout3.width)/2f, y1 - 60);
 
+            if(game.currentScores.get(currentLevel.getLevelId()) == null) {
+                game.currentScores.add(currentLevel.getLevelId(), new ScoreLevel(currentLevel.getLevelTimer(), currentLevel.getCurrentDrawnProportion()));
+            }
+
             game.currentScores.get(currentLevel.getLevelId()).setNewBestScore(currentLevel.getLevelTimer(), currentLevel.getCurrentDrawnProportion());
         }
 
@@ -293,6 +311,7 @@ public class GameScreen extends ScreenAdapter {
         int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth())/2;
         int panelH = viewport.getScreenHeight();
         int panelY = (uiViewport.getScreenHeight() - panelH)/2;
+
 
         StringBuilder levelInfoBuilder = new StringBuilder();
         levelInfoBuilder.append("Level: " + currentLevel.getLevelName());
@@ -316,6 +335,43 @@ public class GameScreen extends ScreenAdapter {
         winFont.setUseIntegerPositions(true);  // reduce subpixel shimmer
         winFont.setFixedWidthGlyphs("0123456789+-.,() ");
         winFont.draw(batch, layoutLevelInfo, Math.round(leftPanelX), Math.round(leftPanelY));
+
+
+        float trackY = 0f;
+
+        //show the paint selection buttons
+        for(int i = 0; i < MainGame.drawTypeButtons.size(); i++) {
+            if(currentLevel.getDrawTypes().contains(MainGame.drawTypeButtons.get(i).drawType)) {
+                int ind = currentLevel.getDrawTypes().indexOf(MainGame.drawTypeButtons.get(i).drawType);
+
+                int rectStartX = 48;
+                int rectStartY = 35;
+                int rectTotalWidth = 162;
+                int rectTotalHeight = 30;
+
+
+                float leftWidth = rectTotalWidth * currentLevel.getCurrentDrawnAmounts().get(ind) / currentLevel.getDrawAmounts().get(ind);
+
+                if(currentLevel.getSelectedPaint() == ind) {
+                    Texture whiteRegion = new Texture("select_region.png");
+                    if(currentLevel.getDrawAmounts().get(ind) - currentLevel.getCurrentDrawnAmounts().get(ind) < 0.001f) {
+                        whiteRegion = new Texture("full_region.png");
+                    }
+
+                    batch.draw(whiteRegion, 5 + rectStartX, leftPanelY - BUTTON_HEIGHT - trackY - BUTTON_STARTY + rectStartY, leftWidth, rectTotalHeight);
+                    batch.draw(MainGame.drawTypeButtons.get(i).onTex, leftPanelX, leftPanelY - BUTTON_HEIGHT - trackY - BUTTON_STARTY, BUTTON_WIDTH, BUTTON_HEIGHT);
+                    trackY += BUTTON_HEIGHT + 5;
+                } else {
+                    Texture whiteRegion = new Texture("white_region.png");
+                    if(currentLevel.getDrawAmounts().get(ind) - currentLevel.getCurrentDrawnAmounts().get(ind) < 0.001f) {
+                        whiteRegion = new Texture("full_region.png");
+                    }
+                    batch.draw(whiteRegion, 5 + rectStartX, leftPanelY - BUTTON_HEIGHT - trackY - BUTTON_STARTY + rectStartY, leftWidth, rectTotalHeight);
+                    batch.draw(MainGame.drawTypeButtons.get(i).offTex, leftPanelX, leftPanelY - BUTTON_HEIGHT - trackY - BUTTON_STARTY, BUTTON_WIDTH, BUTTON_HEIGHT);
+                    trackY += BUTTON_HEIGHT + 5;
+                }
+            }
+        }
 
 
         // RIGHT PANEL
@@ -417,7 +473,7 @@ public class GameScreen extends ScreenAdapter {
 
     public Integer isPointInsideObjects(Vector2 point) {
         for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-            if(!(obj instanceof UncollidableObject)) {
+            if(!(obj instanceof UncollidableObject) && obj.getId() < 1000) {
                 if(obj.isPointInsideObject(point)) {
                     return obj.getId();
                 }

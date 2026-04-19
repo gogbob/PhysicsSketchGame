@@ -22,8 +22,8 @@ public class Level1 extends Level {
 
 
     public Level1(float viewPortWidth, float viewPortHeight) {
-        super(2, "Drop Into the Cup", new ArrayList<>(), new ArrayList<>(Arrays.asList(DrawType.NORMAL)),
-            new ArrayList<>(Arrays.asList(1f)), viewPortWidth, viewPortHeight);
+        super(2, "Drop Into the Cup", new ArrayList<>(), new ArrayList<>(Arrays.asList(DrawType.NORMAL, DrawType.POSITIVE)),
+            new ArrayList<>(Arrays.asList(100f, 50f)), viewPortWidth, viewPortHeight);
 
         List<Vector2> platformVertices = new ArrayList<>(
             Arrays.asList(

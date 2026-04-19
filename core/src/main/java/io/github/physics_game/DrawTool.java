@@ -92,7 +92,7 @@ public class DrawTool {
         if(lock.tryLock()) {
             try {
                 // release mouse = done + create object
-                if ((!Gdx.input.isButtonPressed(Input.Buttons.LEFT) || currentLevel.getDrawLeft() <= 0.0001f) && drawing) {
+                if ((!Gdx.input.isButtonPressed(Input.Buttons.LEFT) || currentLevel.getDrawLeft() <= 0.0001f || Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) && drawing) {
                     if(currentLevel.getDrawLeft() <= 0.0001f) System.out.println("No more Draw");
                     return finishDrawing(drawType, currentLevel);
                 }
@@ -188,8 +188,6 @@ public class DrawTool {
             delta.nor().scl(currentLevel.getDrawLeft());
             pos = new Vector2(prevPosition).add(delta);
         }
-        currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
-            currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + delta.len());
 
         List<Vector2> circleVertTemp = PhysicsResolver.getCircleVertices(12, toolWidth);
         List<Vector2> segmentTemp = new ArrayList<>();
@@ -221,6 +219,10 @@ public class DrawTool {
                 }
             }
         }
+
+        currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
+            currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + delta.len());
+
         addPixelValues(pos, delta);
         updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
         prevPosition = pos;
