@@ -84,6 +84,11 @@ public class DrawTool {
         this.toolWidth = toolWidth;
     }
 
+    public void reset() {
+        drawing = false;
+        nextId = 100;
+    }
+
     // call the method each frame
     public synchronized PhysicsObject update(DrawType drawType) {
         if(lock.tryLock()) {

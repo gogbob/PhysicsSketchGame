@@ -3,6 +3,7 @@ package io.github.physics_game.levels;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.object_types.DynamicObject;
 import io.github.physics_game.object_types.PhysicsObject;
 import io.github.physics_game.object_types.StaticObject;
 
@@ -65,6 +66,14 @@ public abstract class Level {
     }
     public int getNumDrawnObjects() {
         return numDrawnObjects;
+    }
+
+    public void reset() {
+        physicsObjects.removeIf(obj -> obj.getId() >= 100); // 100+ = all player-drawn objects
+        for (PhysicsObject obj : physicsObjects) {
+            if (obj instanceof DynamicObject) ((DynamicObject) obj).reinitialize();
+        }
+        numDrawnObjects = 0;
     }
 
     public abstract boolean isComplete();
