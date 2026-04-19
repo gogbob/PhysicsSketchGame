@@ -103,6 +103,7 @@ public class DrawTool {
                     return addPoint(false);
                 }
 
+                // draw tool
                 // release mouse = done + create object
                 if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing) {
                     return finishDrawing(drawType);
