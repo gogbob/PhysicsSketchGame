@@ -22,17 +22,15 @@ public class PhysicsResolver {
     public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects, boolean showVelocities, boolean showForces) {
         ArrayList<DebugForce> forces = new ArrayList<>(); // empty force arrayList
 
-        if(showVelocities) {
-            for(PhysicsObject obj : objects) {
-                if (obj instanceof DynamicObject) {
-                    DebugForce velForce = new DebugForce(((DynamicObject) obj).getCenter(), // the vector starts from the center of object
-                        new Vector2(((DynamicObject) obj).getLinearVelocity()).scl(2f)); // the vector's direction & length
-                    velForce.setColor(Color.GREEN); // velocity vector color
-                    forces.add(velForce); // add it in force list
-                }
+        for(PhysicsObject obj : objects) {
+            if (obj instanceof DynamicObject) {
+                DebugForce velForce = new DebugForce(((DynamicObject) obj).getCenter(),
+                    new Vector2(((DynamicObject) obj).getLinearVelocity()));
+                velForce.setColor(Color.GREEN);
+                velForce.setType(DebugForce.Type.VELOCITY);
+                forces.add(velForce);
             }
         }
-
 
         // create arrayList for collision
         ArrayList<ContactManifold> collisions = new ArrayList<>();
@@ -41,6 +39,7 @@ public class PhysicsResolver {
             for (int j = i + 1; j < objects.size(); j++) {
                 PhysicsObject obj1 = objects.get(i);
                 PhysicsObject obj2 = objects.get(j);
+                if (!broadphaseOverlap(obj1, obj2)) continue; // AABB broadphase
                 ContactManifold manifold = CustomContactHandler.detect(obj1, obj2); // check if they collide
                 if(manifold.isColliding() && manifold.getPointCount() > 0) { // if yes and have valid contact point = add into collision list
                     collisions.add(manifold); // if time accumulated is not enought for physics step then go here
@@ -54,20 +53,24 @@ public class PhysicsResolver {
             for (int i = 0; i < objects.size(); i++) {
                 PhysicsObject obj = objects.get(i);
                 if (obj instanceof DynamicObject) {
-                    if(obj instanceof AntigravityObject){ // give gravity vector for antigravity object
+                    if(obj instanceof AntigravityObject){
                         DynamicObject dynObj = (DynamicObject) obj;
-                        forces.add(new DebugForce(dynObj.getCenter(),
-                            new Vector2(GRAVITY).scl(dynObj.getMass()).scl(0.1f)));
-                        // F = mg*0.1 (gravity was reduced here)
+                        DebugForce gf = new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass()).scl(0.1f));
+                        gf.setColor(new Color(1f, 0.55f, 0f, 1f));
+                        gf.setType(DebugForce.Type.GRAVITY);
+                        forces.add(gf);
                     } else {
                         DynamicObject dynObj = (DynamicObject) obj;
-                        forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass())));
-                    } // normal object : F = mg
+                        DebugForce gf = new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass()));
+                        gf.setColor(new Color(1f, 0.55f, 0f, 1f));
+                        gf.setType(DebugForce.Type.GRAVITY);
+                        forces.add(gf);
+                    }
                 }
 
                 for(int j = i + 1; j < objects.size(); j++) {
                     PhysicsObject other = objects.get(j);
-                    // if both are charged, but you don't have static-static interaction (would result in no change)
+                    // both charged + 1 is dynamic
                     if((obj instanceof Charged && other instanceof Charged) && (obj instanceof DynamicObject || other instanceof DynamicObject)) {
                         //This one only show the vector, DOES NOT change objects' state
                         List<DebugForce> debugCharges = ((Charged) obj).applyChargeForcePair(other, false);
@@ -97,14 +100,23 @@ public class PhysicsResolver {
                         Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
                         Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(0.1f).scl(fixedStep));
                         dynObj.setLinearVelocity(newVelocity);
+                        DebugForce gf = new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(0.1f).scl(dynObj.getMass()));
+                        gf.setColor(new Color(1f, 0.55f, 0f, 1f));
+                        gf.setType(DebugForce.Type.GRAVITY);
+                        forces.add(gf);
                         // update reduced gravity velocity (same formula)
-                        if(showForces) forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(0.1f).scl(dynObj.getMass())));
+                        if(showForces) forces.add(gf);
                     } else {
                         Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
                         Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
                         dynObj.setLinearVelocity(newVelocity);
-                        if(showForces) forces.add(new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass())));
-                    } // update normal gravity velocity
+                        DebugForce gf = new DebugForce(dynObj.getCenter(), new Vector2(GRAVITY).scl(dynObj.getMass()));
+                        gf.setColor(new Color(1f, 0.55f, 0f, 1f));
+                        gf.setType(DebugForce.Type.GRAVITY);
+                        forces.add(gf);
+                        // update reduced gravity velocity (same formula)
+                        if(showForces) forces.add(gf);
+                    }
                 }
                 // apply charged force
                 for(int j = i + 1; j < objects.size(); j++) {
@@ -124,6 +136,7 @@ public class PhysicsResolver {
                 for (int j = i + 1; j < objects.size(); j++) {
                     PhysicsObject obj1 = objects.get(i);
                     PhysicsObject obj2 = objects.get(j);
+                    if (!broadphaseOverlap(obj1, obj2)) continue; // AABB broadphase
                     ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
                     if(manifold.isColliding() && manifold.getPointCount() > 0) {
                         collisions.add(manifold);
@@ -136,7 +149,7 @@ public class PhysicsResolver {
             //RESOLVE COLLISIONS
             for(int i = 0; i < NUM_VEL_ITERATIONS; i++) {
                 for (ContactManifold coll : collisions) {
-                    resolveCollision(coll, showForces, forces, i, true);
+                    resolveCollision(coll, true, forces, i, true);
                 } // Really DO the resolve of collision
             }
             // update position
@@ -268,8 +281,11 @@ public class PhysicsResolver {
         float invInertiaA = (obj1 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj1).getInertia();
         float invInertiaB = (obj2 instanceof StaticObject) ? 0f : 1f / ((DynamicObject) obj2).getInertia();
 
-        // Compute normal impulse
-        float kN = invMassA + invMassB + Math.abs((2*n.y*n.x*rA.y*rA.x - n.x*n.x*rA.y*rA.y  - n.y*n.y*rA.x*rA.x)*invInertiaA + (2*n.y*n.x*rB.y*rB.x - n.x*n.x*rB.y*rB.y  - n.y*n.y*rB.x*rB.x)*invInertiaB);
+        // Effective normal mass: k_n = Σ(1/m) + Σ((r × n)² / I)
+        // (r × n) is the scalar 2D cross product; squaring it keeps it non-negative.
+        float rAxN = rA.x * n.y - rA.y * n.x;
+        float rBxN = rB.x * n.y - rB.y * n.x;
+        float kN = invMassA + invMassB + rAxN * rAxN * invInertiaA + rBxN * rBxN * invInertiaB;
         // jn = -Vn+bias)/kN
         if (kN <= 0f) return null;
 
@@ -295,30 +311,14 @@ public class PhysicsResolver {
         Vector2 impulseN = new Vector2(n).scl(jn);
         // Jn = jn*n
 
-        Vector2 oldRelativeVel = new Vector2(relativeVel); // keep the relative velocity
-        if(obj1.getId() == 0 || obj2.getId() == 0) { // did not understand what this part is for...
-            int a = 0; // is ball
-        }
-
-        if(obj1 instanceof DynamicObject) { // apply impluese to onj1
+        if(obj1 instanceof DynamicObject) {
             DebugForce df = ((DynamicObject)obj1).applyForce(new Vector2(impulseN).scl(-1f), cp, new Color(1f, 0f, 0f, 1f / (iteration + 1)), isRun, isDebug);
-            if(df != null) debugForces.add(df);
+            if(df != null) { df.setType(DebugForce.Type.IMPULSE_NORMAL); debugForces.add(df); }
         }
-        // Apply impulse to obj2
         if(obj2 instanceof DynamicObject) {
             DebugForce df = ((DynamicObject)obj2).applyForce(new Vector2(impulseN), cp, new Color(1f, 0f, 0f, 1f / (iteration + 1)), isRun, isDebug);
-            if(df != null) debugForces.add(df);
+            if(df != null) { df.setType(DebugForce.Type.IMPULSE_NORMAL); debugForces.add(df); }
         }
-
-        //do check of general equation to see if the impulse value fits
-        vA = getContactVelocity(obj1, rA, obj1.getLinearVelocity(), obj1.getAngularVelocity());
-        vB = getContactVelocity(obj2, rB, obj2.getLinearVelocity(), obj2.getAngularVelocity());
-        relativeVel = new Vector2(vB).sub(vA);
-
-        // check if test result meet the expected recovery coefficient
-        if(relativeVel.dot(n) > -restitution*(oldRelativeVel.dot(n)) + 0.01f || relativeVel.dot(n) < -restitution*(oldRelativeVel.dot(n)) - 0.01f)
-            return null;
-        // v'n = -e*vn
         return impulseN;
     }
 
@@ -347,16 +347,18 @@ public class PhysicsResolver {
         // If there is significant tangential motion = normalize the tangent
         if (!tangent.epsilonEquals(Vector2.Zero, 1e-12f)) {
             tangent = tangent.nor();
-            float effectiveTangentialMass = invMassA + invMassB + Math.abs((2*rA.x*rA.y*tangent.y*tangent.x - rA.y*rA.y*tangent.x*tangent.x - rA.x*rA.x*tangent.y*tangent.y) * invInertiaA +
-                (2*rB.x*rB.y*tangent.y*tangent.x - rB.y*rB.y*tangent.x* tangent.x - rB.x * rB.x*tangent.y * tangent.y) * invInertiaB);
+            // Effective tangential mass: k_t = Σ(1/m) + Σ((r × t)² / I)
+            float rAxT = rA.x * tangent.y - rA.y * tangent.x;
+            float rBxT = rB.x * tangent.y - rB.y * tangent.x;
+            float effectiveTangentialMass = invMassA + invMassB + rAxT * rAxT * invInertiaA + rBxT * rBxT * invInertiaB;
             //impulse which would bring the relative tangential velocity to zero
             float jt = -relativeVel.dot(tangent) / effectiveTangentialMass;
 
             float temp = contact.accumulatedFrictionImpulse;
             contact.accumulatedFrictionImpulse = contact.accumulatedFrictionImpulse + jt;
 
-            //Clamping due to Coulomb's law of friction: |jt| <= μ * j
-            float mu = (obj1.getFriction() < obj2.getFriction())? (obj1.getFriction() * 4 + obj2.getFriction())  / 5f: (obj1.getFriction() + obj2.getFriction() * 4)  / 5f;
+            //Clamping due to Coulomb's law of friction: |jt| <= μ * jn (geometric mean, Coulomb model)
+            float mu = (float) Math.sqrt(obj1.getFriction() * obj2.getFriction());
             if (Math.abs(contact.accumulatedFrictionImpulse) > mu * contact.accumulatedNormalImpulse) {
                 contact.accumulatedFrictionImpulse = mu * contact.accumulatedNormalImpulse * Math.signum(jt);
             }
@@ -369,11 +371,11 @@ public class PhysicsResolver {
             // Apply friction impulse to object A (opposite direction)
             if(obj1 instanceof DynamicObject) {
                 DebugForce df = ((DynamicObject)obj1).applyForce(new Vector2(frictionImpulse).scl(-1f), cp, new Color(0f, 0f, 1f, 1f / (iteration + 1)), isRun, isDebug);
-                if(df != null) debugForces.add(df);
+                if(df != null) { df.setType(DebugForce.Type.IMPULSE_FRICTION); debugForces.add(df); }
             }
             if(obj2 instanceof DynamicObject) {
                 DebugForce df = ((DynamicObject)obj2).applyForce(new Vector2(frictionImpulse), cp, new Color(0f, 0f, 1f, 1f / (iteration + 1)), isRun, isDebug);
-                if(df != null) debugForces.add(df);
+                if(df != null) { df.setType(DebugForce.Type.IMPULSE_FRICTION); debugForces.add(df); }
             }
 
             vA = getContactVelocity(obj1, rA, obj1.getLinearVelocity(), obj1.getAngularVelocity());
@@ -420,11 +422,16 @@ public class PhysicsResolver {
 
 
     public static float getMomentOfInertiaTriangle(Vector2 a, Vector2 b, Vector2 c, float mass) {
-        //I_z = (m/6) * (a^2 + b^2 + c^2) where a, b, c are the distances from the center of mass to the vertices
-        float inertia = (mass *
-            (a.dst2(getCenterOfMassTriangle(a, b, c)) + b.dst2(getCenterOfMassTriangle(a, b, c)) +
-                c.dst2(getCenterOfMassTriangle(a, b, c)))) / 6f;
-        return inertia;
+        // Exact formula derived from the 2D area integral over barycentric coordinates:
+        // I_z = (m/6) * (|ra|² + |rb|² + |rc|² + ra·rb + rb·rc + rc·ra)
+        // where ra,rb,rc are vertex positions relative to the centroid.
+        // The previous formula omitted the cross-dot terms, underestimating inertia.
+        Vector2 com = getCenterOfMassTriangle(a, b, c);
+        Vector2 ra = new Vector2(a).sub(com);
+        Vector2 rb = new Vector2(b).sub(com);
+        Vector2 rc = new Vector2(c).sub(com);
+        return (mass / 6f) * (ra.dot(ra) + rb.dot(rb) + rc.dot(rc)
+                            + ra.dot(rb) + rb.dot(rc) + rc.dot(ra));
     }
 
     // Compute center of mass of a polygon by decomposing into triangles
@@ -550,6 +557,28 @@ public class PhysicsResolver {
             }
         }
         return inertia;
+    }
+
+    // Returns the bounding radius of an object (max distance from center to any local vertex).
+    // Used for conservative AABB broadphase: two objects can only collide if their bounding
+    // circles overlap, i.e. dist(centers) <= r1 + r2.
+    private static float getBoundingRadius(PhysicsObject obj) {
+        float maxDistSq = 0f;
+        for (Vector2 v : obj.getVertices()) {
+            float dSq = v.x * v.x + v.y * v.y;
+            if (dSq > maxDistSq) maxDistSq = dSq;
+        }
+        return (float) Math.sqrt(maxDistSq);
+    }
+
+    // Returns true if obj1 and obj2 are close enough to possibly collide (AABB broadphase).
+    private static boolean broadphaseOverlap(PhysicsObject obj1, PhysicsObject obj2) {
+        Vector2 c1 = obj1.getCenter();
+        Vector2 c2 = obj2.getCenter();
+        float combinedRadius = getBoundingRadius(obj1) + getBoundingRadius(obj2);
+        float dx = c1.x - c2.x;
+        float dy = c1.y - c2.y;
+        return dx * dx + dy * dy <= combinedRadius * combinedRadius;
     }
 
     // Generate polygon vertices approximating a circle

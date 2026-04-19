@@ -3,6 +3,8 @@ package io.github.physics_game;
 import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
@@ -16,11 +18,16 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.levels.Level;
+import io.github.physics_game.levels.Level1;
+import io.github.physics_game.levels.TutorialLevel;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static com.badlogic.gdx.Input.Keys.B;
+import static com.badlogic.gdx.utils.JsonValue.ValueType.object;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
 public class GameScreen extends ScreenAdapter {
@@ -38,6 +45,7 @@ public class GameScreen extends ScreenAdapter {
     public static float accumulator = 0f;
     final float GRAVITY = -9.8f;
     BitmapFont winFont;
+    private float levelTimer = 0f;
     private int finalScore = -1;
     private int finalStars = 0;
     private Integer selectedObject = null;
@@ -61,13 +69,39 @@ public class GameScreen extends ScreenAdapter {
     float logTimer = 0f;
     private float selectInfoTimer = selectInfoPeriod;
     private String stringInfo = "";
+    private float physicsDataTimer = selectInfoPeriod;
+    private String physicsDataString = "";
+    private float physicsElapsedTime = 0f;
+    private final Vector2 lastClickPos = new Vector2();
 
+    // Graph recording
+    private boolean showGraphs = false;
+    private static final int MAX_GRAPH_SAMPLES = 300; // 30 s at 10 Hz
+    private final List<Float> gTime  = new ArrayList<>();
+    private final List<Float> gPosX  = new ArrayList<>();
+    private final List<Float> gPosY  = new ArrayList<>();
+    private final List<Float> gVelX  = new ArrayList<>();
+    private final List<Float> gVelY  = new ArrayList<>();
+    private final List<Float> gSpeed = new ArrayList<>();
+    private final List<Float> gAccX  = new ArrayList<>();
+    private final List<Float> gAccY  = new ArrayList<>();
+    private final List<Float> gKE    = new ArrayList<>();
+    private final List<Float> gPE    = new ArrayList<>();
+    private final List<Float> gTE    = new ArrayList<>();
+
+    // Box2D body built from ear-clipped triangles of the same concave polygon.
     private ShapeRenderer shapeRenderer;
 
     private boolean showDebugOverlay = false;
     private boolean runPhysics = false;
+    private static final float NORMAL_DEBUG_LENGTH = 0.6f;
+    private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
+    private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
+    private DynamicObject dynamicObject;
+    private StaticObject floorObject;
     private Level currentLevel;
     private DrawTool drawTool;
+    private Texture panelBgTexture;
 
 
     @Override
@@ -83,6 +117,11 @@ public class GameScreen extends ScreenAdapter {
         shapeRenderer = new ShapeRenderer();
         winFont = new BitmapFont();
         winFont.setColor(Color.WHITE);
+        Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pm.setColor(1f, 1f, 1f, 1f);
+        pm.fill();
+        panelBgTexture = new Texture(pm);
+        pm.dispose();
         DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
@@ -110,6 +149,10 @@ public class GameScreen extends ScreenAdapter {
         if(Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             float mx = Gdx.input.getX();
             float my = uiViewport.getScreenHeight() - Gdx.input.getY() - 1;
+            int panelW = (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2;
+            int btnY   = (uiViewport.getScreenHeight() - viewport.getScreenHeight()) / 2 + 8;
+            int btnW   = panelW - 16;
+            int btnH   = 28;
             if((mx < 5 + BUTTON_WIDTH) && my >= BUTTON_STARTY && my < BUTTON_STARTY + (BUTTON_HEIGHT + 5) * currentLevel.getDrawTypes().size()) {
                 if((((int) my) - BUTTON_STARTY) % (BUTTON_HEIGHT + 5) < BUTTON_HEIGHT) {
                     System.out.println("Selecting button: " + ((currentLevel.getDrawTypes().size() - 1) - (((int) my) - BUTTON_STARTY) / (BUTTON_HEIGHT + 5)) % currentLevel.getDrawTypes().size());
@@ -117,6 +160,9 @@ public class GameScreen extends ScreenAdapter {
 
                     drawType = currentLevel.getDrawTypes().get(currentLevel.getSelectedPaint());
                 }
+            } else if (mx >= 8 && mx <= 8 + btnW && my >= btnY && my <= btnY + btnH) {
+                resetLevel();
+                isSelecting = true; // consume the click
             } else if(mx < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
                 Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
                 if(i != null) {
@@ -158,6 +204,7 @@ public class GameScreen extends ScreenAdapter {
         if(runPhysics) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
         logTimer += delta;
+        if (runPhysics) physicsElapsedTime += delta;
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
             showDebugOverlay = !showDebugOverlay;
@@ -189,6 +236,14 @@ public class GameScreen extends ScreenAdapter {
 
         if(Gdx.input.isKeyJustPressed(Input.Keys.G)) {
             drawType = (drawType == DrawType.POSITIVE)? DrawType.NEGATIVE : DrawType.POSITIVE;
+        }
+
+        if(Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            resetLevel();
+        }
+
+        if(Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            showGraphs = !showGraphs;
         }
 
         // clear the screen
@@ -376,8 +431,104 @@ public class GameScreen extends ScreenAdapter {
 
         // RIGHT PANEL
 
+        // Physics Data Panel (left side)
+        physicsDataTimer += delta;
+        if (physicsDataTimer >= selectInfoPeriod) {
+            while (physicsDataTimer >= selectInfoPeriod) physicsDataTimer -= selectInfoPeriod;
+            DynamicObject mainObj = null;
+            for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
+                if (o instanceof DynamicObject) { mainObj = (DynamicObject) o; break; }
+            }
+            if (mainObj != null) {
+                Vector2 pos    = mainObj.getPosition();
+                Vector2 vel    = mainObj.getLinearVelocity();
+                float speed    = vel.len();
+                float mass     = mainObj.getMass();
+                float inertia  = mainObj.getInertia();
+                float omega    = mainObj.getAngularVelocity();
+                float ke       = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
+                float pe       = mass * 9.8f * pos.y;
+                // use selectInfoPeriod as divisor → average a over this update interval
+                Vector2 accel  = mainObj.getCurrentLinearAcceleration(selectInfoPeriod);
+                float angAccel = mainObj.getCurrentAngularAcceleration(selectInfoPeriod);
+                // reset accumulator so each interval is independent (fixes drift bug)
+                mainObj.setCurrentLinearAcceleration(new Vector2());
+                mainObj.setCurrentAngularAcceleration(0f);
+                // record snapshot for graphs — freeze data once level is complete
+                if (runPhysics && !currentLevel.isComplete()) {
+                    gTime.add(physicsElapsedTime);
+                    gPosX.add(pos.x);    gPosY.add(pos.y);
+                    gVelX.add(vel.x);    gVelY.add(vel.y);
+                    gSpeed.add(speed);
+                    gAccX.add(accel.x);  gAccY.add(accel.y);
+                    gKE.add(ke);         gPE.add(pe);         gTE.add(ke + pe);
+                    while (gTime.size() > MAX_GRAPH_SAMPLES) {
+                        gTime.remove(0);  gPosX.remove(0);  gPosY.remove(0);
+                        gVelX.remove(0);  gVelY.remove(0);  gSpeed.remove(0);
+                        gAccX.remove(0);  gAccY.remove(0);
+                        gKE.remove(0);    gPE.remove(0);    gTE.remove(0);
+                    }
+                }
+                StringBuilder sb = new StringBuilder();
+                sb.append("  PHYSICS DATA  \n");
+                sb.append("----------------\n");
+                sb.append(String.format(" t   %8.2f s\n",    physicsElapsedTime));
+                sb.append("----------------\n");
+                sb.append(String.format(" x   %+8.3f m\n",   pos.x));
+                sb.append(String.format(" y   %+8.3f m\n",   pos.y));
+                sb.append("----------------\n");
+                sb.append(String.format(" vx  %+8.3f\n",     vel.x));
+                sb.append(String.format(" vy  %+8.3f\n",     vel.y));
+                sb.append(String.format("|v|  %8.3f m/s\n",  speed));
+                sb.append("----------------\n");
+                sb.append(String.format(" ax  %+8.3f\n",     accel.x));
+                sb.append(String.format(" ay  %+8.3f\n",     accel.y));
+                sb.append(String.format(" w   %+8.3f r/s\n", omega));
+                sb.append("----------------\n");
+                sb.append(String.format(" m   %8.3f kg\n",   mass));
+                sb.append(String.format(" u   %8.3f\n",      mainObj.getFriction()));
+                sb.append("----------------\n");
+                sb.append(String.format(" KE  %8.3f J\n",    ke));
+                sb.append(String.format(" PE  %8.3f J\n",    pe));
+                sb.append(String.format(" E   %8.3f J",      ke + pe));
+                physicsDataString = sb.toString();
+            } else {
+                physicsDataString = "";
+            }
+        }
+        if (!physicsDataString.isEmpty()) {
+            batch.setColor(0f, 0f, 0f, 0.6f);
+            batch.draw(panelBgTexture, 0, panelY, panelW, panelH);
+            batch.setColor(Color.WHITE);
+            winFont.setColor(Color.CYAN);
+            winFont.setUseIntegerPositions(true);
+            winFont.setFixedWidthGlyphs("0123456789+-.,() ");
+            winFont.draw(batch, physicsDataString, 8f, panelY + panelH - 20f);
+        }
+
+        // Key hints — above restart button
+        {
+            int btnY   = (uiViewport.getScreenHeight() - viewport.getScreenHeight()) / 2 + 8;
+            winFont.setColor(new Color(0.7f, 0.7f, 0.7f, 1f));
+            winFont.draw(batch, "[P]  show / hide graphs", 8f, btnY + 28 + 46);
+            winFont.draw(batch, "[click]  object info",    8f, btnY + 28 + 30);
+        }
+
+        // Restart button — bottom of left panel
+        {
+            int btnY   = (uiViewport.getScreenHeight() - viewport.getScreenHeight()) / 2 + 8;
+            int btnW   = panelW - 16;
+            int btnH   = 28;
+            batch.setColor(0.75f, 0.15f, 0.15f, 0.92f);
+            batch.draw(panelBgTexture, 8, btnY, btnW, btnH);
+            batch.setColor(Color.WHITE);
+            winFont.setColor(Color.WHITE);
+            GlyphLayout rl = new GlyphLayout(winFont, "RESTART  [R]");
+            winFont.draw(batch, rl, 8 + (btnW - rl.width) / 2f, btnY + (btnH + rl.height) / 2f);
+        }
+
         selectInfoTimer += delta;
-        if(selectedObject != null) {
+        if(!showGraphs && selectedObject != null) {
             if (selectInfoTimer >= selectInfoPeriod) {
                 float temp = selectInfoTimer;
                 while (selectInfoTimer >= selectInfoPeriod) selectInfoTimer -= selectInfoPeriod;
@@ -440,11 +591,14 @@ public class GameScreen extends ScreenAdapter {
 
         batch.end();
 
+        if (showGraphs) renderGraphOverlay();
+        renderStaticObjectTooltip();
     }
 
     @Override
     public void dispose() {
-        debugRenderer.dispose();
+        if (debugRenderer != null) debugRenderer.dispose();
+        if (panelBgTexture != null) panelBgTexture.dispose();
         if (batch != null) batch.dispose();
         if (image != null) image.dispose();
         if (ballImage != null) ballImage.dispose();
@@ -481,6 +635,26 @@ public class GameScreen extends ScreenAdapter {
         }
 
         return null;
+    }
+
+    private void resetLevel() {
+        currentLevel.reinitialize();
+        drawTool.reset();
+        gTime.clear();  gPosX.clear();  gPosY.clear();
+        gVelX.clear();  gVelY.clear();  gSpeed.clear();
+        gAccX.clear();  gAccY.clear();
+        gKE.clear();    gPE.clear();    gTE.clear();
+        levelTimer = 0f;
+        physicsElapsedTime = 0f;
+        accumulator = 0f;
+        runPhysics = false;
+        finalScore = -1;
+        finalStars = 0;
+        scoreCalculated = false;
+        selectedObject = null;
+        stringInfo = "";
+        physicsDataString = "";
+        physicsDataTimer = selectInfoPeriod;
     }
 
     private void input() {
@@ -589,5 +763,150 @@ public class GameScreen extends ScreenAdapter {
             local.x * cos - local.y * sin + position.x,
             local.x * sin + local.y * cos + position.y
         );
+    }
+
+    // 9 mini-graphs stacked in the right panel — game world stays fully visible.
+    @SuppressWarnings("unchecked")
+    private void renderGraphOverlay() {
+        if (gTime.size() < 2) return;
+        int panelW = (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2;
+        int rightX  = uiViewport.getScreenWidth() - panelW;
+        int panelH  = viewport.getScreenHeight();
+        int panelY  = (uiViewport.getScreenHeight() - panelH) / 2;
+        if (panelW < 20) return;
+
+        final int N = 9;
+        final float PAD = 3f, GAP = 2f;
+        float cellW = panelW - PAD * 2;
+        float cellH = (panelH - PAD * 2 - GAP * (N - 1)) / N;
+
+        String[] labels = { "X Pos (m)", "Y Pos (m)", "Speed m/s",
+                            "Vel X",     "Vel Y",     "Acc Y m/s2",
+                            "KE (J)",    "PE (J)",    "E_tot (J)" };
+        List<Float>[] sets = new List[]{ gPosX, gPosY, gSpeed,
+                                         gVelX, gVelY, gAccY,
+                                         gKE,   gPE,   gTE };
+        Color[] cols = {
+            Color.CYAN,   Color.GREEN,  Color.YELLOW,
+            Color.ORANGE, Color.CORAL,  Color.RED,
+            Color.GOLD,   new Color(0.8f, 0.4f, 1f, 1f), Color.WHITE
+        };
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.setProjectionMatrix(uiCamera.combined);
+
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0.08f, 0.95f);
+        shapeRenderer.rect(rightX, panelY, panelW, panelH);
+        for (int i = 0; i < N; i++) {
+            float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
+            shapeRenderer.setColor(0.04f, 0.04f, 0.16f, 1f);
+            shapeRenderer.rect(rightX + PAD, cy, cellW, cellH);
+        }
+        shapeRenderer.end();
+
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        for (int i = 0; i < N; i++) {
+            float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
+            drawGraphLines(rightX + PAD, cy, cellW, cellH, sets[i], cols[i]);
+        }
+        shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.setProjectionMatrix(uiCamera.combined);
+        batch.begin();
+        winFont.setUseIntegerPositions(true);
+        for (int i = 0; i < N; i++) {
+            float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
+            List<Float> data = sets[i];
+            if (data.isEmpty()) continue;
+            float last = data.get(data.size() - 1);
+            float vMin = last, vMax = last;
+            for (float v : data) { if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
+            float tx = rightX + PAD + 2;
+            winFont.setColor(cols[i]);
+            winFont.draw(batch, labels[i], tx, cy + cellH - 1);
+            winFont.setColor(Color.WHITE);
+            winFont.draw(batch, String.format("%+.2f", last), tx, cy + cellH - 12);
+            winFont.setColor(new Color(0.5f, 0.5f, 0.5f, 1f));
+            winFont.draw(batch, String.format("%.1f", vMax), tx, cy + cellH * 0.72f);
+            winFont.draw(batch, String.format("%.1f", vMin), tx, cy + 10f);
+        }
+        batch.end();
+    }
+
+    private void drawGraphLines(float cx, float cy, float gW, float gH,
+                                List<Float> values, Color lineColor) {
+        if (gTime.size() < 2 || values.size() < 2) return;
+        float PT = gH * 0.30f, PB = gH * 0.14f;
+        float px = cx + 3f, py = cy + PB;
+        float pw = gW - 6f,  ph = gH - PB - PT;
+        if (ph < 4f) return;
+
+        float tMin = gTime.get(0), tMax = gTime.get(gTime.size() - 1);
+        float vMin = Float.MAX_VALUE, vMax = -Float.MAX_VALUE;
+        for (float v : values) { if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
+        float tRange = Math.max(tMax - tMin, 0.001f);
+        float vRange = vMax - vMin;
+        if (vRange < 0.001f) { vMin -= 0.5f; vMax += 0.5f; vRange = 1f; }
+
+        shapeRenderer.setColor(0.15f, 0.15f, 0.28f, 1f);
+        for (int k = 1; k < 4; k++) shapeRenderer.line(px, py + ph * k / 4f, px + pw, py + ph * k / 4f);
+
+        if (vMin < 0 && vMax > 0) {
+            shapeRenderer.setColor(0.45f, 0.45f, 0.55f, 1f);
+            float zy = py + ph * (-vMin / vRange);
+            shapeRenderer.line(px, zy, px + pw, zy);
+        }
+
+        shapeRenderer.setColor(0.4f, 0.4f, 0.52f, 1f);
+        shapeRenderer.line(px, py, px + pw, py);
+        shapeRenderer.line(px, py, px, py + ph);
+
+        shapeRenderer.setColor(lineColor);
+        int n = Math.min(gTime.size(), values.size());
+        for (int i = 1; i < n; i++) {
+            float x1 = px + pw * ((gTime.get(i - 1) - tMin) / tRange);
+            float y1 = py + ph * ((values.get(i - 1) - vMin) / vRange);
+            float x2 = px + pw * ((gTime.get(i)     - tMin) / tRange);
+            float y2 = py + ph * ((values.get(i)     - vMin) / vRange);
+            shapeRenderer.line(x1, y1, x2, y2);
+        }
+    }
+
+    private void renderStaticObjectTooltip() {
+        if (selectedObject == null) return;
+        PhysicsObject obj = null;
+        for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
+            if (o.getId() == selectedObject) { obj = o; break; }
+        }
+        if (!(obj instanceof StaticObject)) return;
+
+        String tip = String.format("Static Object  #%d\nFriction:    %.3f\nRestitution: %.3f\nDensity:     %.3f",
+            obj.getId(), obj.getFriction(), obj.getRestitution(), obj.getDensity());
+        GlyphLayout gl = new GlyphLayout(winFont, tip);
+        float bw = gl.width + 14f, bh = gl.height + 12f;
+        float tx = Math.min(lastClickPos.x + 14, uiViewport.getScreenWidth() - bw - 6);
+        float ty = Math.min(lastClickPos.y + bh + 20, uiViewport.getScreenHeight() - 6f);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.setProjectionMatrix(uiCamera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0.08f, 0.08f, 0f, 0.88f);
+        shapeRenderer.rect(tx - 4, ty - bh - 2, bw, bh);
+        shapeRenderer.end();
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(Color.YELLOW);
+        shapeRenderer.rect(tx - 4, ty - bh - 2, bw, bh);
+        shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        batch.setProjectionMatrix(uiCamera.combined);
+        batch.begin();
+        winFont.setColor(Color.YELLOW);
+        winFont.draw(batch, tip, tx, ty - 4);
+        batch.end();
     }
 }

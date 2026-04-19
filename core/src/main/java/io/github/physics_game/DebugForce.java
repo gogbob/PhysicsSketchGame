@@ -4,9 +4,11 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 
 public class DebugForce {
+    public enum Type { VELOCITY, GRAVITY, IMPULSE_NORMAL, IMPULSE_FRICTION }
     private Vector2 position = new Vector2();
     private Vector2 force = new Vector2();
     private Color color = Color.RED;
+    private Type type = Type.IMPULSE_NORMAL;
 
     public DebugForce(float x, float y, float forceX, float forceY) {
         this.position.set(x, y);
@@ -49,4 +51,6 @@ public class DebugForce {
     public Color getColor() {
         return color;
     }
+    public Type getType() { return type; }
+    public void setType(Type type) { this.type = type; }
 }

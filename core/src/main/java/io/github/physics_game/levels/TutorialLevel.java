@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class TutorialLevel extends Level {
-    private final float timeToComplete = 1.5f; // Time in seconds to complete the level
+    private final float timeToComplete = 0.8f; // Time in seconds to complete the level
     private float elapsedTimeInside = 0f;
     //private float elapsedTimeOutside = timeToComplete;
     private FollowingUncollidableField cupInside;
@@ -57,6 +57,13 @@ public class TutorialLevel extends Level {
         addPhysicsObject(cupInside);
 
         setBackground(new Texture("background_forest.png"));
+    }
+
+    @Override
+    public void reset() {
+        super.reset();
+        isComplete = false;
+        elapsedTimeInside = 0f;
     }
 
     @Override
