@@ -16,6 +16,7 @@ public abstract class Level {
     private int levelId;
     private String levelName;
     private ArrayList<PhysicsObject> physicsObjects = new ArrayList<>();
+    private boolean runPhysics;
     private final ArrayList<DrawType> drawTypes;
     private final ArrayList<Float> drawAmounts;
     private ArrayList<Float> currentDrawnAmounts;
@@ -61,6 +62,12 @@ public abstract class Level {
     }
     public void addPhysicsObject(PhysicsObject obj) {
         physicsObjects.add(obj);
+    }
+    public boolean getRunPhysics() {
+        return runPhysics;
+    }
+    public void setRunPhysics(boolean runPhysics) {
+        this.runPhysics = runPhysics;
     }
     public ArrayList<DrawType> getDrawTypes() {
         return drawTypes;
@@ -116,6 +123,7 @@ public abstract class Level {
     public abstract boolean isComplete();
     public abstract LevelTickData tick(float deltaTime);
     public void reinitialize() {
+        setRunPhysics(false);
         for(int i = 0; i < physicsObjects.size(); i++) {
             if(physicsObjects.get(i).getId() >= 100) {
                 physicsObjects.remove(i);

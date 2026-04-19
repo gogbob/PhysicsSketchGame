@@ -19,7 +19,7 @@ public class PhysicsResolver {
     final static Vector2 GRAVITY = new Vector2(0, -9.8f); // gravity vector
 
     // get everything that need to be calculate with physics
-    public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects, boolean showVelocities, boolean showForces) {
+    public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects) {
         ArrayList<DebugForce> forces = new ArrayList<>(); // empty force arrayList
 
         for(PhysicsObject obj : objects) {
@@ -47,7 +47,7 @@ public class PhysicsResolver {
             }
         }
 
-        if(GameScreen.accumulator < fixedStep && showForces) {
+        if(GameScreen.accumulator < fixedStep) {
             //this does not run the physics, since there are no ticks to render
             //so it is simply to show the current forces being applied at the current time frame
             for (int i = 0; i < objects.size(); i++) {
@@ -105,7 +105,7 @@ public class PhysicsResolver {
                         gf.setType(DebugForce.Type.GRAVITY);
                         forces.add(gf);
                         // update reduced gravity velocity (same formula)
-                        if(showForces) forces.add(gf);
+                        forces.add(gf);
                     } else {
                         Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
                         Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
@@ -115,7 +115,7 @@ public class PhysicsResolver {
                         gf.setType(DebugForce.Type.GRAVITY);
                         forces.add(gf);
                         // update reduced gravity velocity (same formula)
-                        if(showForces) forces.add(gf);
+                        forces.add(gf);
                     }
                 }
                 // apply charged force
@@ -124,7 +124,7 @@ public class PhysicsResolver {
                     if((obj instanceof Charged && other instanceof Charged) && (obj instanceof DynamicObject || other instanceof DynamicObject)) {
                         // add charged force + return debug charge
                         List<DebugForce> debugCharges = ((Charged) obj).applyChargeForcePair(other, true);
-                        if(showForces) forces.addAll(debugCharges);
+                        forces.addAll(debugCharges);
                     }
                 }
             }

@@ -1,6 +1,7 @@
 package io.github.physics_game.collision;
 
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.PhysicsResolver;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -8,7 +9,7 @@ import java.util.List;
 
 public final class EarClippingDecomposer {
     private static final float EPSILON = 1e-8f;
-    private static final float CONVEX_EPSILON = 1e-6f;
+    private static final float CONVEX_EPSILON = 1e-8f;
 
     private EarClippingDecomposer() {
     }
@@ -63,6 +64,14 @@ public final class EarClippingDecomposer {
             }
 
             if (!earFound) {
+                List<Vector2> temp = new ArrayList<>();
+
+                for(int i = 0; i < indices.size(); i++) {
+                    temp.add(cleaned.get(indices.get(i)));
+                }
+
+                PhysicsResolver.printShape(temp);
+
                 // If strict ear selection fails, clip the least-bad local ear instead of arbitrary fan splitting.
                 int bestFallbackEar = selectBestFallbackEar(indices, cleaned);
                 if (bestFallbackEar < 0) {
@@ -156,6 +165,42 @@ public final class EarClippingDecomposer {
 
             Vector2 p = vertices.get(idx);
             if (isPointInsideOrOnTriangle(p, a, b, c)) {
+                Vector2 pPrev = vertices.get(((idx - 1) + vertices.size()) % vertices.size());
+                Vector2 pNext = vertices.get(((idx + 1) + vertices.size()) % vertices.size());
+                Vector2 e1 = new Vector2(p).sub(pPrev);
+                Vector2 e2 = new Vector2(pNext).sub(p);
+                float e1Angle = e1.nor().angleDeg();
+                float e2Angle = e2.nor().angleDeg();
+                if(p.epsilonEquals(a, 0.01f)) {
+                    Vector2 a1 = new Vector2(a).sub(c);
+                    Vector2 a2 = new Vector2(b).sub(a);
+                    //make sure that both e1 and e2 are outside a1 and a2's ranges
+                    float angle1 = a1.nor().angleDeg();
+                    float angle2 = a2.nor().angleDeg();
+                    if(!((e1Angle > angle1 && e1Angle < angle2) || (e2Angle > angle1 && e2Angle < angle2))) {
+                        continue;
+                    }
+                }
+                if(p.epsilonEquals(b, 0.01f)) {
+                    Vector2 b1 = new Vector2(c).sub(b);
+                    Vector2 b2 = new Vector2(b).sub(a);
+                    float angle1 = b1.nor().angleDeg();
+                    float angle2 = b2.nor().angleDeg();
+
+                    if(!((e1Angle > angle1 && e1Angle < angle2) || (e2Angle > angle1 && e2Angle < angle2))) {
+                        continue;
+                    }
+                }
+                if(p.epsilonEquals(c, 0.01f)) {
+                    Vector2 c1 = new Vector2(c).sub(b);
+                    Vector2 c2 = new Vector2(a).sub(c);
+                    float angle1 = c1.nor().angleDeg();
+                    float angle2 = c2.nor().angleDeg();
+
+                    if(!((e1Angle > angle1 && e1Angle < angle2) || (e2Angle > angle1 && e2Angle < angle2))) {
+                        continue;
+                    }
+                }
                 count++;
             }
         }

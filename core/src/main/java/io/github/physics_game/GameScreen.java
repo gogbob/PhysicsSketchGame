@@ -12,6 +12,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
@@ -36,16 +37,12 @@ public class GameScreen extends ScreenAdapter {
     private DrawType drawType = DrawType.POSITIVE;
     private SpriteBatch batch;
     FitViewport viewport;
-    private Texture image;
-    private Texture ballImage;
     OrthographicCamera camera;
     Box2DDebugRenderer debugRenderer;
     private OrthographicCamera uiCamera;
     private ScreenViewport uiViewport;
     public static float accumulator = 0f;
-    final float GRAVITY = -9.8f;
     BitmapFont winFont;
-    private float levelTimer = 0f;
     private int finalScore = -1;
     private int finalStars = 0;
     private Integer selectedObject = null;
@@ -68,15 +65,13 @@ public class GameScreen extends ScreenAdapter {
     // throttle logging to once-per-second
     float logTimer = 0f;
     private float selectInfoTimer = selectInfoPeriod;
-    private String stringInfo = "";
     private float physicsDataTimer = selectInfoPeriod;
     private String physicsDataString = "";
-    private float physicsElapsedTime = 0f;
     private final Vector2 lastClickPos = new Vector2();
 
     // Graph recording
     private boolean showGraphs = false;
-    private static final int MAX_GRAPH_SAMPLES = 300; // 30 s at 10 Hz
+    private static final int MAX_GRAPH_SAMPLES = 50; // 5 s at 10 Hz
     private final List<Float> gTime  = new ArrayList<>();
     private final List<Float> gPosX  = new ArrayList<>();
     private final List<Float> gPosY  = new ArrayList<>();
@@ -93,12 +88,6 @@ public class GameScreen extends ScreenAdapter {
     private ShapeRenderer shapeRenderer;
 
     private boolean showDebugOverlay = false;
-    private boolean runPhysics = false;
-    private static final float NORMAL_DEBUG_LENGTH = 0.6f;
-    private static final float CONTACT_MARK_HALF_SIZE = 0.08f;
-    private final int NUM_ITERATIONS = 5; // number of iterations for collision resolution
-    private DynamicObject dynamicObject;
-    private StaticObject floorObject;
     private Level currentLevel;
     private DrawTool drawTool;
     private Texture panelBgTexture;
@@ -135,7 +124,7 @@ public class GameScreen extends ScreenAdapter {
 
         drawType = currentLevel.getDrawTypes().get(currentLevel.getSelectedPaint());
 
-        drawTool = new DrawTool(camera, viewport, 0.5f);
+        drawTool = new DrawTool(0.5f);
 
         Gdx.app.log("Main", "DrawTool created!");
 
@@ -171,40 +160,23 @@ public class GameScreen extends ScreenAdapter {
                     isSelecting = true;
                 } else {
                     System.out.println("Clicked on empty space, starting draw");
-                    PhysicsObject drawnObject = drawTool.update(drawType, currentLevel);
-                    if(drawnObject != null) {
-                        runPhysics = true;
-                        if (drawnObject instanceof DynamicObject) {
-                            currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                            currentLevel.addPhysicsObject(drawnObject);
-                            currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
-                        } else {
-                            currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                            currentLevel.addPhysicsObject(drawnObject);
-                        }
-                    }
+                    Vector3 worldPos = viewport.unproject(new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
+                    drawTool.update(drawType, currentLevel, 1, worldPos.x, worldPos.y);
                 }
             }
         } else if(Gdx.input.getX() < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && Gdx.input.getX() > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
-            PhysicsObject drawnObject = drawTool.update(drawType, currentLevel);
-            if(drawnObject != null) {
-                runPhysics = true;
-                if (drawnObject instanceof DynamicObject) {
-                    currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                    currentLevel.addPhysicsObject(drawnObject);
-                    currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
-                } else {
-                    currentLevel.getPhysicsObjects().removeIf(obj -> obj.getId() >= 1000);
-                    currentLevel.addPhysicsObject(drawnObject);
-                }
-            }
+            Vector3 worldPos = viewport.unproject(new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
+            drawTool.update(drawType, currentLevel, Gdx.input.isButtonPressed(Input.Buttons.LEFT) ? 2 : 0, worldPos.x, worldPos.y);
         }
 
 
-        if(runPhysics) accumulator += Math.min(delta, 0.25f);
+        if(currentLevel.getRunPhysics()) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
+        System.out.println(currentLevel.getRunPhysics());
+        System.out.println(accumulator);
+
         logTimer += delta;
-        if (runPhysics) physicsElapsedTime += delta;
+        if (currentLevel.getRunPhysics()) currentLevel.setLevelTimer(currentLevel.getLevelTimer() + delta);
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
             showDebugOverlay = !showDebugOverlay;
@@ -221,12 +193,11 @@ public class GameScreen extends ScreenAdapter {
 
         if(Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             currentLevel.reinitialize();
-            runPhysics = false;
         }
 
         if(Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
-            runPhysics = !runPhysics;
-            Gdx.app.log("Main", "Physics " + (runPhysics ? "RUNNING" : "PAUSED"));
+            currentLevel.setRunPhysics(!currentLevel.getRunPhysics());
+            Gdx.app.log("Main", "Physics " + (currentLevel.getRunPhysics() ? "RUNNING" : "PAUSED"));
         }
         //make stepping key
         if(Gdx.input.isKeyJustPressed(Input.Keys.E)) {
@@ -261,9 +232,7 @@ public class GameScreen extends ScreenAdapter {
             Gdx.app.log("Main", "Background texture is null!");
         }
         batch.end();
-
-
-        ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects(), showDebugOverlay, showDebugOverlay);
+        ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
 
         if(currentLevel.isComplete()) {
             if (!scoreCalculated) {
@@ -323,12 +292,13 @@ public class GameScreen extends ScreenAdapter {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
 
         for(DebugForce f : forces) {
-            drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
+            if(f.getType() == DebugForce.Type.GRAVITY ||  f.getType() == DebugForce.Type.VELOCITY)
+                drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
         }
 
         shapeRenderer.end();
 
-        if(runPhysics) currentLevel.tick(delta);
+        if(currentLevel.getRunPhysics()) currentLevel.tick(delta);
 
         //camera.update();
         //batch.setProjectionMatrix(camera.combined);
@@ -428,84 +398,119 @@ public class GameScreen extends ScreenAdapter {
             }
         }
 
+        batch.end();
+
 
         // RIGHT PANEL
 
         // Physics Data Panel (left side)
         physicsDataTimer += delta;
+
         if (physicsDataTimer >= selectInfoPeriod) {
+            float temp = physicsDataTimer;
             while (physicsDataTimer >= selectInfoPeriod) physicsDataTimer -= selectInfoPeriod;
-            DynamicObject mainObj = null;
+            PhysicsObject selectedObj = null;
             for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
-                if (o instanceof DynamicObject) { mainObj = (DynamicObject) o; break; }
-            }
-            if (mainObj != null) {
-                Vector2 pos    = mainObj.getPosition();
-                Vector2 vel    = mainObj.getLinearVelocity();
-                float speed    = vel.len();
-                float mass     = mainObj.getMass();
-                float inertia  = mainObj.getInertia();
-                float omega    = mainObj.getAngularVelocity();
-                float ke       = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
-                float pe       = mass * 9.8f * pos.y;
-                // use selectInfoPeriod as divisor → average a over this update interval
-                Vector2 accel  = mainObj.getCurrentLinearAcceleration(selectInfoPeriod);
-                float angAccel = mainObj.getCurrentAngularAcceleration(selectInfoPeriod);
-                // reset accumulator so each interval is independent (fixes drift bug)
-                mainObj.setCurrentLinearAcceleration(new Vector2());
-                mainObj.setCurrentAngularAcceleration(0f);
-                // record snapshot for graphs — freeze data once level is complete
-                if (runPhysics && !currentLevel.isComplete()) {
-                    gTime.add(physicsElapsedTime);
-                    gPosX.add(pos.x);    gPosY.add(pos.y);
-                    gVelX.add(vel.x);    gVelY.add(vel.y);
-                    gSpeed.add(speed);
-                    gAccX.add(accel.x);  gAccY.add(accel.y);
-                    gKE.add(ke);         gPE.add(pe);         gTE.add(ke + pe);
-                    while (gTime.size() > MAX_GRAPH_SAMPLES) {
-                        gTime.remove(0);  gPosX.remove(0);  gPosY.remove(0);
-                        gVelX.remove(0);  gVelY.remove(0);  gSpeed.remove(0);
-                        gAccX.remove(0);  gAccY.remove(0);
-                        gKE.remove(0);    gPE.remove(0);    gTE.remove(0);
+                if (selectedObject != null) {
+                    if (o.getId() == selectedObject) {
+                        selectedObj = o;
                     }
                 }
-                StringBuilder sb = new StringBuilder();
-                sb.append("  PHYSICS DATA  \n");
-                sb.append("----------------\n");
-                sb.append(String.format(" t   %8.2f s\n",    physicsElapsedTime));
-                sb.append("----------------\n");
-                sb.append(String.format(" x   %+8.3f m\n",   pos.x));
-                sb.append(String.format(" y   %+8.3f m\n",   pos.y));
-                sb.append("----------------\n");
-                sb.append(String.format(" vx  %+8.3f\n",     vel.x));
-                sb.append(String.format(" vy  %+8.3f\n",     vel.y));
-                sb.append(String.format("|v|  %8.3f m/s\n",  speed));
-                sb.append("----------------\n");
-                sb.append(String.format(" ax  %+8.3f\n",     accel.x));
-                sb.append(String.format(" ay  %+8.3f\n",     accel.y));
-                sb.append(String.format(" w   %+8.3f r/s\n", omega));
-                sb.append("----------------\n");
-                sb.append(String.format(" m   %8.3f kg\n",   mass));
-                sb.append(String.format(" u   %8.3f\n",      mainObj.getFriction()));
-                sb.append("----------------\n");
-                sb.append(String.format(" KE  %8.3f J\n",    ke));
-                sb.append(String.format(" PE  %8.3f J\n",    pe));
-                sb.append(String.format(" E   %8.3f J",      ke + pe));
-                physicsDataString = sb.toString();
+            }
+            if (selectedObj != null) {
+                Vector2 pos = selectedObj.getPosition();
+                Vector2 vel = (selectedObj instanceof DynamicObject)? ((DynamicObject) selectedObj).getLinearVelocity() : new Vector2();
+                float speed = vel.len();
+                float mass = (selectedObj instanceof DynamicObject)? ((DynamicObject) selectedObj).getMass() : 0f;
+                float inertia = (selectedObj instanceof DynamicObject)? ((DynamicObject) selectedObj).getInertia() : 0f;
+                float omega = (selectedObj instanceof DynamicObject)? ((DynamicObject) selectedObj).getAngularVelocity() : 0f;
+                float ke = 0.5f * mass * vel.dot(vel) + 0.5f * inertia * omega * omega;
+                float pe = mass * 9.8f * pos.y;
+                // use selectInfoPeriod as divisor → average a over this update interval
+                Vector2 accel = (selectedObj instanceof DynamicObject)? ((DynamicObject) selectedObj).getCurrentLinearAcceleration(temp) : new Vector2();
+                float angAccel = (selectedObj instanceof DynamicObject)? ((DynamicObject) selectedObj).getCurrentAngularAcceleration(temp) : 0f;
+                // reset accumulator so each interval is independent (fixes drift bug)
+                if(selectedObj instanceof DynamicObject) {
+                    ((DynamicObject)selectedObj).setCurrentLinearAcceleration(new Vector2());
+                    ((DynamicObject)selectedObj).setCurrentAngularAcceleration(0f);
+                }
+
+                // record snapshot for graphs — freeze data once level is complete
+                if (currentLevel.getRunPhysics()) {
+                    gTime.add(currentLevel.getLevelTimer());
+                    gPosX.add(pos.x);
+                    gPosY.add(pos.y);
+                    gVelX.add(vel.x);
+                    gVelY.add(vel.y);
+                    gSpeed.add(speed);
+                    gAccX.add(accel.x);
+                    gAccY.add(accel.y);
+                    gKE.add(ke);
+                    gPE.add(pe);
+                    gTE.add(ke + pe);
+                    while (gTime.size() > MAX_GRAPH_SAMPLES) {
+                        System.out.println("Update graph");
+                        gTime.remove(0);
+                        gPosX.remove(0);
+                        gPosY.remove(0);
+                        gVelX.remove(0);
+                        gVelY.remove(0);
+                        gSpeed.remove(0);
+                        gAccX.remove(0);
+                        gAccY.remove(0);
+                        gKE.remove(0);
+                        gPE.remove(0);
+                        gTE.remove(0);
+                    }
+                }
+
+                if (!showGraphs && selectedObject != null) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("  PHYSICS DATA  \n");
+                    sb.append("----------------\n");
+                    sb.append(String.format(" t   %8.2f s\n", currentLevel.getLevelTimer()));
+                    sb.append("----------------\n");
+                    sb.append(String.format(" x   %+8.3f m\n", pos.x));
+                    sb.append(String.format(" y   %+8.3f m\n", pos.y));
+                    sb.append("----------------\n");
+                    sb.append(String.format(" vx  %+8.3f\n", vel.x));
+                    sb.append(String.format(" vy  %+8.3f\n", vel.y));
+                    sb.append(String.format("|v|  %8.3f m/s\n", speed));
+                    sb.append("----------------\n");
+                    sb.append(String.format(" ax  %+8.3f\n", accel.x));
+                    sb.append(String.format(" ay  %+8.3f\n", accel.y));
+                    sb.append(String.format(" w   %+8.3f r/s\n", omega));
+                    sb.append("----------------\n");
+                    sb.append(String.format(" m   %8.3f kg\n", mass));
+                    sb.append(String.format(" u   %8.3f\n", selectedObj.getFriction()));
+                    sb.append("----------------\n");
+                    sb.append(String.format(" KE  %8.3f J\n", ke));
+                    sb.append(String.format(" PE  %8.3f J\n", pe));
+                    sb.append(String.format(" E   %8.3f J", ke + pe));
+                    physicsDataString = sb.toString();
+
+                }
             } else {
                 physicsDataString = "";
             }
         }
-        if (!physicsDataString.isEmpty()) {
+
+        if(!showGraphs) {
+            batch.setProjectionMatrix(uiCamera.combined);
+            batch.begin();
             batch.setColor(0f, 0f, 0f, 0.6f);
             batch.draw(panelBgTexture, 0, panelY, panelW, panelH);
             batch.setColor(Color.WHITE);
             winFont.setColor(Color.CYAN);
             winFont.setUseIntegerPositions(true);
             winFont.setFixedWidthGlyphs("0123456789+-.,() ");
-            winFont.draw(batch, physicsDataString, 8f, panelY + panelH - 20f);
+            winFont.draw(batch, physicsDataString, uiViewport.getScreenWidth() - panelW + 5f, panelY + panelH - 320f);
+            batch.end();
+        } else {
+            renderGraphOverlay();
         }
 
+        batch.begin();
         // Key hints — above restart button
         {
             int btnY   = (uiViewport.getScreenHeight() - viewport.getScreenHeight()) / 2 + 8;
@@ -527,72 +532,10 @@ public class GameScreen extends ScreenAdapter {
             winFont.draw(batch, rl, 8 + (btnW - rl.width) / 2f, btnY + (btnH + rl.height) / 2f);
         }
 
-        selectInfoTimer += delta;
-        if(!showGraphs && selectedObject != null) {
-            if (selectInfoTimer >= selectInfoPeriod) {
-                float temp = selectInfoTimer;
-                while (selectInfoTimer >= selectInfoPeriod) selectInfoTimer -= selectInfoPeriod;
-                PhysicsObject obj = null;
-                for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
-                    if (selectedObject != null) {
-                        if (o.getId() == selectedObject) {
-                            obj = o;
-                        }
-                    }
-                }
-                if (obj == null) {
-                    selectedObject = null;
-                    Gdx.app.log("Main", "Selected object not found!");
-                    return;
-                }
-
-    // actual side buffers (these can differ from SIDE_BUFFER_PX depending on aspect/stretching)
-
-                String suffix = ((obj instanceof Charged) ? "Charged " : (obj instanceof AntigravityObject) ? "Antigravity " : "");
-                String type = ((obj instanceof DynamicObject) ? "Dynamic " : (obj instanceof StaticObject) ? "Static " : "");
-
-                StringBuilder selectInfoBuilder = new StringBuilder();
-                // add buffer to stabilize
-                selectInfoBuilder.append("                                                            \n");
-                selectInfoBuilder.append(suffix + type + "Object: " + selectedObject);
-                selectInfoBuilder.append(String.format("\nFriction: %+6.3f", obj.getFriction()) +
-                    String.format("\n Restitution: %+6.3f", obj.getRestitution()));
-                if (obj instanceof DynamicObject) {
-                    selectInfoBuilder.append(String.format("\nLinear Velocity: \n(%+7.3f, %+7.3f)", obj.getLinearVelocity().x, obj.getLinearVelocity().y) +
-                        String.format("\nAngular Velocity: %+7.3f", obj.getAngularVelocity()) +
-                        String.format("\nLinear Acceleration: \n(%+7.3f, %+7.3f)", ((DynamicObject) obj).getCurrentLinearAcceleration(temp).x, ((DynamicObject) obj).getCurrentLinearAcceleration(temp).y) +
-                        String.format("\nAngular Acceleration: %+7.3f", ((DynamicObject) obj).getCurrentAngularAcceleration(temp)) +
-                        String.format("\nDensity: %+6.3f", obj.getDensity()) +
-                        String.format("\nMass: %+6.3f", ((DynamicObject) obj).getMass()) +
-                        String.format("\nInertia: %+6.3f", ((DynamicObject) obj).getInertia()));
-                }
-                if (obj instanceof Charged) {
-                    selectInfoBuilder.append(String.format("\nCharge Density: %+6.3f", ((Charged) obj).getChargeDensity()));
-                }
-
-                stringInfo = selectInfoBuilder.toString();
-
-                for(PhysicsObject o : currentLevel.getPhysicsObjects()) {
-                    if(o instanceof DynamicObject) {
-                        ((DynamicObject) o).setCurrentAngularAcceleration(0f);
-                        ((DynamicObject) o).setCurrentLinearAcceleration(new Vector2(0f, 0f));
-                    }
-                }
-            }
-            float rightPanelX = uiViewport.getScreenWidth() - panelW + 5f;
-
-            GlyphLayout layoutSelectInfo = new GlyphLayout(winFont,   stringInfo);
-            float rightPanelY = panelY + panelH - 20f;       // fixed top anchor
-            winFont.setUseIntegerPositions(true);  // reduce subpixel shimmer
-            winFont.setFixedWidthGlyphs("0123456789+-.,() ");
-            winFont.draw(batch, layoutSelectInfo, Math.round(rightPanelX), Math.round(rightPanelY));
-        }
-
-
         batch.end();
 
-        if (showGraphs) renderGraphOverlay();
         renderStaticObjectTooltip();
+
     }
 
     @Override
@@ -600,8 +543,6 @@ public class GameScreen extends ScreenAdapter {
         if (debugRenderer != null) debugRenderer.dispose();
         if (panelBgTexture != null) panelBgTexture.dispose();
         if (batch != null) batch.dispose();
-        if (image != null) image.dispose();
-        if (ballImage != null) ballImage.dispose();
         if (shapeRenderer != null) shapeRenderer.dispose();
     }
 
@@ -644,15 +585,11 @@ public class GameScreen extends ScreenAdapter {
         gVelX.clear();  gVelY.clear();  gSpeed.clear();
         gAccX.clear();  gAccY.clear();
         gKE.clear();    gPE.clear();    gTE.clear();
-        levelTimer = 0f;
-        physicsElapsedTime = 0f;
         accumulator = 0f;
-        runPhysics = false;
         finalScore = -1;
         finalStars = 0;
         scoreCalculated = false;
         selectedObject = null;
-        stringInfo = "";
         physicsDataString = "";
         physicsDataTimer = selectInfoPeriod;
     }
@@ -798,7 +735,7 @@ public class GameScreen extends ScreenAdapter {
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(0f, 0f, 0.08f, 0.95f);
-        shapeRenderer.rect(rightX, panelY, panelW, panelH);
+        shapeRenderer.rect(rightX, panelY - 400, panelW, panelH - 400);
         for (int i = 0; i < N; i++) {
             float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
             shapeRenderer.setColor(0.04f, 0.04f, 0.16f, 1f);

@@ -60,13 +60,6 @@ public class TutorialLevel extends Level {
     }
 
     @Override
-    public void reset() {
-        super.reset();
-        isComplete = false;
-        elapsedTimeInside = 0f;
-    }
-
-    @Override
     public boolean isComplete() {
         return isComplete;
     }

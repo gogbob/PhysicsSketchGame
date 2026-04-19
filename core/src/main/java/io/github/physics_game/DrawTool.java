@@ -1,12 +1,8 @@
 package io.github.physics_game;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.graphics.Camera;
+
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.math.Vector3;
-import com.badlogic.gdx.utils.viewport.Viewport;
 import io.github.physics_game.collision.ContactManifold;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.levels.Level;
@@ -30,14 +26,13 @@ public class DrawTool {
     private static final float ISO_LEVEL = 0.9f;
     public static final float minDist = 0.5f;
 
+    private long elapsedTime = 0;
     private ReentrantLock lock = new ReentrantLock();
     public float chargeDensity = 2.0f;
     private boolean drawing; // check if it's drawing or not
-    private final Camera camera;
+    private Vector2 worldPos = new Vector2();
     private DrawType drawType = DrawType.NORMAL;
-    private final Viewport viewport;
     private int nextId; // give id to objects
-    private List<Vector2> circleShape;
     private final float toolWidth; // the width of the tool (the radius of the circle)
     private final float density = 0.1f;
     private float mass = 0f;
@@ -79,47 +74,63 @@ public class DrawTool {
         {-1,-1,-1,-1}         // 15 1111
     };
 
-    public DrawTool(Camera camera, Viewport viewport, float toolWidth) {
-        this.camera = camera;
-        this.viewport = viewport;
+    public DrawTool(float toolWidth) {
         this.drawing = false;
         this.nextId = 100;  // object drew by player = start from 100
         this.toolWidth = toolWidth;
     }
 
+    public void reset() {
+        nextId = 100;
+        drawing = false;
+    }
+
     // call the method each frame
-    public synchronized PhysicsObject update(DrawType drawType, Level currentLevel) {
+    public synchronized void update(DrawType drawType, Level currentLevel, int inputKey, float worldPosX, float worldPosY) {
         if(lock.tryLock()) {
             try {
+                elapsedTime = System.currentTimeMillis();
+                PhysicsObject obj = null;
+                worldPos.set(worldPosX, worldPosY);
                 // release mouse = done + create object
-                if ((!Gdx.input.isButtonPressed(Input.Buttons.LEFT) || currentLevel.getDrawLeft() <= 0.0001f || Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) && drawing) {
+                if ((!(inputKey == 2) || currentLevel.getDrawLeft() <= 0.0001f || (inputKey == 1)) && drawing) {
                     if(currentLevel.getDrawLeft() <= 0.0001f) System.out.println("No more Draw");
-                    return finishDrawing(drawType, currentLevel);
+                    obj = finishDrawing(drawType, currentLevel);
                 }
+
                 // press mouse = start to draw
-                if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && currentLevel.getDrawLeft() >= toolWidth) {
+                if ((inputKey == 1) && currentLevel.getDrawLeft() >= toolWidth) {
                     currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
                         currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth);
-                    return startDrawing(drawType, currentLevel);
+                    obj = startDrawing(drawType, currentLevel);
                 }
 
                 // continue press mouse = continue to draw
-                if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && drawing && getMousePosition().sub(prevPosition).len() > minDist) {
-                    return addPoint(false, currentLevel);
+                if ((inputKey == 2) && drawing && new Vector2(worldPos).sub(prevPosition).len() > minDist) {
+                    obj = addPoint(false, currentLevel);
                 }
 
+                if(obj != null) {
+                    currentLevel.setRunPhysics(true);
+                    if (obj instanceof DynamicObject) {
+                        currentLevel.getPhysicsObjects().removeIf(o -> o.getId() >= 1000);
+                        currentLevel.addPhysicsObject(obj);
+                        currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
+                    } else {
+                        currentLevel.getPhysicsObjects().removeIf(o -> o.getId() >= 1000);
+                        currentLevel.addPhysicsObject(obj);
+                    }
+                }
 
             } finally {
                 lock.unlock();
             }
         }
-
-        return null;
     }
 
     // start drawing method (make a circle)
     private StaticObject startDrawing(DrawType drawType, Level currentLevel) {
-        Vector2 pos = getMousePosition();
+        Vector2 pos = new Vector2(worldPos);
 
         PhysicsObject tempCircle = new StaticObject(2000, 1.0f, 1.0f, PhysicsResolver.getCircleVertices(12, toolWidth), pos.x, pos.y, 0f);
         for(PhysicsObject object : currentLevel.getPhysicsObjects()) {
@@ -166,12 +177,17 @@ public class DrawTool {
             }
         }
 
+        System.out.println("Elapsed time draw circle: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
         List<Vector2> contour = generateLocalContours(false);
 
         referencePoint = pos;
 
         prevPosition = pos;
         PhysicsObject preview = buildCurrentObject(contour, false);
+        System.out.println("Elapsed time build object: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
         if(preview instanceof StaticObject) {
             return (StaticObject) preview;
         }
@@ -180,7 +196,7 @@ public class DrawTool {
 
     // add point method
     private PhysicsObject addPoint(boolean buildDynamic, Level currentLevel) {
-        Vector2 pos = getMousePosition();
+        Vector2 pos = new Vector2(worldPos);
         Vector2 delta = new Vector2(pos).sub(prevPosition);
 
         //update delta if there is too much being drawn
@@ -192,6 +208,8 @@ public class DrawTool {
         List<Vector2> circleVertTemp = PhysicsResolver.getCircleVertices(12, toolWidth);
         List<Vector2> segmentTemp = new ArrayList<>();
 
+        System.out.println("Elapsed time create init: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
 
         for(int i = 0; i < circleVertTemp.size(); i++) {
             Vector2 edge = new Vector2(circleVertTemp.get(i)).sub(circleVertTemp.get((i + 1) % circleVertTemp.size()));
@@ -209,10 +227,13 @@ public class DrawTool {
         segmentTemp.add(new Vector2(-delta.y, delta.x).nor().scl(toolWidth));
         segmentTemp.add(new Vector2(delta.y, -delta.x).nor().scl(toolWidth));
 
-        PhysicsObject tempCircle = new StaticObject(2000, 1.0f, 1.0f, segmentTemp, prevPosition.x, prevPosition.y, 0f);
+        System.out.println("Elapsed time create temp segment: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
+        PhysicsObject tempSegment = new StaticObject(2000, 1.0f, 1.0f, segmentTemp, prevPosition.x, prevPosition.y, 0f);
         for(PhysicsObject object : currentLevel.getPhysicsObjects()) {
             if(!(object instanceof UncollidableObject) && object.getId() < 1000) {
-                ContactManifold manifold = CustomContactHandler.detect(tempCircle, object);
+                ContactManifold manifold = CustomContactHandler.detect(tempSegment, object);
                 if(manifold.isColliding() && manifold.getPointCount() > 0) {
                     //invalid place to draw
                     return null;
@@ -223,11 +244,21 @@ public class DrawTool {
         currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
             currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + delta.len());
 
+        System.out.println("Elapsed time find intersection: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
         addPixelValues(pos, delta);
+        System.out.println("Elapsed time draw segment: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
         updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
         prevPosition = pos;
         List<Vector2> contour = generateLocalContours(false);
-        return buildCurrentObject(contour, buildDynamic);
+        PhysicsObject temp = buildCurrentObject(contour, buildDynamic);
+
+        System.out.println("Elapsed time build object: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
+        return temp;
     }
 
     public void testAddPoint(boolean buildDynamic) {
@@ -353,6 +384,9 @@ public class DrawTool {
             }
         }
 
+        System.out.println("Elapsed time create pixel segments: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
         exteriorLoop = new ArrayList<>();
         interiorLoops = new ArrayList<>();
 
@@ -380,6 +414,9 @@ public class DrawTool {
             }
         }
 
+        System.out.println("Elapsed time find loops: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
         if(foundLoops.isEmpty()) {
             return;
         }
@@ -405,6 +442,9 @@ public class DrawTool {
             }
         }
 
+        System.out.println("Elapsed time differentiate inner-outer: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
         if(debug) {
             List<List<Vector2>> allLoops = new ArrayList<>();
             allLoops.add(exteriorLoop);
@@ -416,11 +456,16 @@ public class DrawTool {
             exteriorLoop = connectInteriorLoopsToExterior(exteriorLoop, interiorLoops);
         }
 
+        System.out.println("Elapsed time connect interior to exterior: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
+
         if(debug) {
             PhysicsResolver.printShape(exteriorLoop);
         }
 
         exteriorLoop = normalizeMergedLoop(exteriorLoop);
+        System.out.println("Elapsed time normalize: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
+        elapsedTime = System.currentTimeMillis();
     }
 
     private void addSegment(Vector2 a, Vector2 b, List<MarchingSegment> segments, Map<String, List<Integer>> adjacency) {
@@ -681,7 +726,7 @@ public class DrawTool {
 
     private PhysicsObject buildCurrentObject(List<Vector2> contour, boolean dynamicObject) {
         if(contour == null) {
-            Gdx.app.log("ERROR", "contour is null");
+            System.out.println("Error: contour is null");
             return null;
         }
 
@@ -695,20 +740,20 @@ public class DrawTool {
             if(drawType == DrawType.ANTIGRAVITY) {
                 obj = new AntigravityObject(nextId, 0.5f, 0.4f, density, cleaned,
                     referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
-                Gdx.app.log("Draw Tool", "Creating Antigravity object");
+                System.out.println("Creating Antigravity object");
             } else if(drawType == DrawType.POSITIVE ||  drawType == DrawType.NEGATIVE) {
                 obj = new ChargedDynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
                     referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments, (drawType == DrawType.POSITIVE)? chargeDensity : -chargeDensity);
-                Gdx.app.log("Draw Tool", "Creating Charged object");
+                System.out.println("Creating Charged object");
             } else if(drawType == DrawType.ICY) {
                 obj = new DynamicObject(nextId, 0.00f, 0.4f, density, cleaned,
                     referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
-                Gdx.app.log("Draw Tool", "Creating Icy object");
+                System.out.println("Creating Icy object");
                 obj.setColor(new Color(0.8f, 0.8f, 1.0f, 1));
             } else {
                 obj = new DynamicObject(nextId, 0.5f, 0.4f, density, cleaned,
                     referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
-                Gdx.app.log("Draw Tool", "Creating Normal object");
+                System.out.println("Creating Normal object");
             }
             nextId++;
             return obj;
@@ -1177,18 +1222,6 @@ public class DrawTool {
         drawing = false;
         if(drawType != null) this.drawType = drawType;
         return (DynamicObject)addPoint(true, currentLevel);
-    }
-    // get mouse position in world methode
-    private Vector2 getMousePosition() {
-        // the position of mouse on screen
-        int screenX = Gdx.input.getX();
-        int screenY = Gdx.input.getY();
-
-        // change into the position in game world
-        Vector3 screenPos = new Vector3(screenX, screenY, 0);
-        Vector3 worldPos = viewport.unproject(screenPos);
-
-        return new Vector2(worldPos.x, worldPos.y);
     }
 
     // check if it is drawing or not
