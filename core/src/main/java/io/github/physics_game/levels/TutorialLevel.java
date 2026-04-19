@@ -2,6 +2,7 @@ package io.github.physics_game.levels;
 
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
+import io.github.physics_game.DrawType;
 import io.github.physics_game.PhysicsResolver;
 import io.github.physics_game.object_types.*;
 
@@ -20,7 +21,8 @@ public class TutorialLevel extends Level {
     private static final float TIME_PENALTY = 1.0f;
 
     public TutorialLevel(float viewPortWidth, float viewPortHeight) {
-        super(0, "Tutorial Level", new ArrayList<>(), viewPortWidth, viewPortHeight);
+        super(0, "Tutorial Level", new ArrayList<>(), new ArrayList<>(Arrays.asList(DrawType.NORMAL)),
+            new ArrayList<>(Arrays.asList(100f)), viewPortWidth, viewPortHeight);
 
         List<Vector2> cupVertices = new ArrayList<>(
             Arrays.asList(
@@ -71,6 +73,7 @@ public class TutorialLevel extends Level {
 
     @Override
     public LevelTickData tick(float deltaTime) {
+        if(!isComplete) setLevelTimer(getLevelTimer() + deltaTime);
         if (cupInside.getTriggerIds().contains(ball.getId())) {
             elapsedTimeInside += deltaTime;
             System.out.println("Ball is inside the cup!");

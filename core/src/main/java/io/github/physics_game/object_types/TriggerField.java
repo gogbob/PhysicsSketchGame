@@ -26,4 +26,10 @@ public class TriggerField extends UncollidableObject implements Triggerable {
     public void addTriggerId(int id) {
         triggerIds.add(id);
     }
+
+    @Override
+    public void reinitialize() {
+        super.reinitialize();
+        triggerIds = new ArrayList<>();
+    }
 }
