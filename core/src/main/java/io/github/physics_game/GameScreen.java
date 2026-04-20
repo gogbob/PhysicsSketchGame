@@ -256,14 +256,18 @@ public class GameScreen extends ScreenAdapter {
                 Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
             }
         }
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
 
         if(!showDebugOverlay) {
             //Normal view
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setProjectionMatrix(camera.combined);
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+
             int i = 1;
             for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-                if(!(obj instanceof UncollidableObject)) {
+                if(!(obj instanceof UncollidableObject) || obj instanceof NoDrawField) {
                     drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), obj.getColor());
                 }
             }
@@ -297,6 +301,8 @@ public class GameScreen extends ScreenAdapter {
             }
             shapeRenderer.end();
         }
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
 

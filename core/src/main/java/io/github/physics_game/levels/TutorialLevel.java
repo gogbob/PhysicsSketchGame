@@ -46,13 +46,13 @@ public class TutorialLevel extends Level {
         );
 
         List<Vector2> circleVertices = PhysicsResolver.getCircleVertices(12, 0.5f);
-        this.ball = new DynamicObject(0, 0.5f, 0.5f, 1f, circleVertices, 6f, 4f, 0f);
+        this.ball = new DynamicObject(0, 0.5f, 0.5f, 1f, circleVertices, 6f, 6f, 0f);
         addPhysicsObject(ball);
 
-        DynamicObject cup = new DynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 2f, 0f);
+        DynamicObject cup = new DynamicObject(1, 0.5f, 0.5f, 1f, cupVertices, 5f, 4f, 0f);
         addPhysicsObject(cup);
 
-        this.cupInside = new FollowingUncollidableField(2, cupInsideVertices, 5f, 2f, 0f, cup);
+        this.cupInside = new FollowingUncollidableField(2, cupInsideVertices, 5f, 4f, 0f, cup);
         addPhysicsObject(cupInside);
 
         setBackground(new Texture("background_forest.png"));
@@ -75,12 +75,12 @@ public class TutorialLevel extends Level {
 
     @Override
     public LevelTickData tick(float deltaTime) {
-        if (cupInside.getTriggerIds().contains(ball.getId())) {
+        if (!cupInside.getTriggerIds().contains(ball.getId())) {
             elapsedTimeInside += deltaTime;
-            System.out.println("Ball is inside the cup!");
+            System.out.println("Ball is outside the cup!");
 
             if (elapsedTimeInside >= timeToComplete) {
-                System.out.println("Ball stayed inside the cup long enough! You win");
+                System.out.println("Ball stayed outside the cup long enough! You win");
                 isComplete = true;
             }
         } else {

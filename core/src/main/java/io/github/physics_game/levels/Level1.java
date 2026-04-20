@@ -40,7 +40,7 @@ public class Level1 extends Level {
             0.5f,
             platformVertices,
             4.0f,
-            8.0f,
+            20.0f,
             -0.25f   // slight slope so the ball naturally rolls right
         );
         addPhysicsObject(platform);
@@ -55,7 +55,7 @@ public class Level1 extends Level {
             1f,
             circleVertices,
             2.8f,
-            9.0f,
+            21.5f,
             0f
         );
         addPhysicsObject(ball);
@@ -77,8 +77,8 @@ public class Level1 extends Level {
         List<Vector2> cupInsideVertices = new ArrayList<>(
             Arrays.asList(
                 new Vector2(2.7f, 0.4f),
-                new Vector2(3.5f, 5f),
-                new Vector2(-0.5f, 5f),
+                new Vector2(3.2f, 0.4f + 4.6f * (5f / 6f)),
+                new Vector2(-0.2f, 0.4f + 4.6f * (5f / 6f)),
                 new Vector2(0.3f, 0.4f)
             )
         );
@@ -89,16 +89,34 @@ public class Level1 extends Level {
             0.5f,
             1f,
             cupVertices,
-            14.0f,
+            25.0f,
             1.5f,
             0f
         );
         addPhysicsObject(cup);
 
+        List<Vector2> noDrawZone = new ArrayList<>(
+            Arrays.asList(
+                new Vector2(getWorldBounds().x/2, floorHeight),
+                new Vector2(getWorldBounds().x - wallWidth, floorHeight),
+                new Vector2(getWorldBounds().x - wallWidth, getWorldBounds().y - floorHeight),
+                new Vector2(getWorldBounds().x/2, getWorldBounds().y - floorHeight)
+            )
+        );
+
+        NoDrawField noDrawField = new NoDrawField(
+            14,
+            noDrawZone,
+            0f,
+            0f,
+            0f
+        );
+        addPhysicsObject(noDrawField);
+
         this.cupInside = new FollowingUncollidableField(
             13,
             cupInsideVertices,
-            14.0f,
+            25.0f,
             1.5f,
             0f,
             cup

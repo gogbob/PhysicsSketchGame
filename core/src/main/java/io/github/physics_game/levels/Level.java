@@ -14,6 +14,9 @@ import java.util.Collections;
 import java.util.List;
 
 public abstract class Level {
+    public static final float wallWidth = 1f;
+    public static final float floorHeight = 1f;
+
     private int levelId;
     private String levelName;
     private ArrayList<PhysicsObject> physicsObjects = new ArrayList<>();
@@ -27,6 +30,7 @@ public abstract class Level {
     private Texture background;
     private float levelTimer = 0f;
     private String description;
+    private Vector2 viewPortDim = new Vector2();
 
     public Level(int levelId, String levelName, ArrayList<PhysicsObject> internalObjects, ArrayList<DrawType> drawTypes, ArrayList<Float> drawAmounts, float viewPortWidth, float viewPortHeight) {
         if(drawTypes.size() != drawAmounts.size()) {
@@ -35,9 +39,8 @@ public abstract class Level {
 
         this.levelId = levelId;
         this.levelName = levelName;
+        this.viewPortDim = new Vector2(viewPortWidth, viewPortHeight);
         physicsObjects.addAll(internalObjects);
-        float wallWidth = 1f;
-        float floorHeight = 1;
         List<Vector2> floorPoly = Arrays.asList(new Vector2(0, 0), new Vector2(viewPortWidth, 0), new Vector2(viewPortWidth, floorHeight), new Vector2(0, floorHeight));
         StaticObject floor = new StaticObject(-1, 0.5f, 0.5f, floorPoly, 0, 0, 0);
         StaticObject ceiling = new StaticObject(-2, 0.5f, 0.5f, floorPoly, 0, viewPortHeight - floorHeight, 0);
@@ -133,6 +136,9 @@ public abstract class Level {
     }
     public float getFreeProp() {
         return freeProp;
+    }
+    public Vector2 getWorldBounds() {
+        return viewPortDim;
     }
 
     public abstract boolean isComplete();

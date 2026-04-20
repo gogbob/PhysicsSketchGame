@@ -134,7 +134,7 @@ public class DrawTool {
 
         PhysicsObject tempCircle = new StaticObject(2000, 1.0f, 1.0f, PhysicsResolver.getCircleVertices(12, toolWidth), pos.x, pos.y, 0f);
         for(PhysicsObject object : currentLevel.getPhysicsObjects()) {
-            if(!(object instanceof UncollidableObject)) {
+            if(!(object instanceof UncollidableObject) || (object instanceof NoDrawField)) {
                 ContactManifold manifold = CustomContactHandler.detect(tempCircle, object);
                 if(manifold.isColliding() && manifold.getPointCount() > 0) {
                     //invalid place to draw
@@ -232,7 +232,7 @@ public class DrawTool {
 
         PhysicsObject tempSegment = new StaticObject(2000, 1.0f, 1.0f, segmentTemp, prevPosition.x, prevPosition.y, 0f);
         for(PhysicsObject object : currentLevel.getPhysicsObjects()) {
-            if(!(object instanceof UncollidableObject) && object.getId() < 1000) {
+            if((!(object instanceof UncollidableObject) || (object instanceof NoDrawField)) && object.getId() < 1000) {
                 ContactManifold manifold = CustomContactHandler.detect(tempSegment, object);
                 if(manifold.isColliding() && manifold.getPointCount() > 0) {
                     //invalid place to draw
