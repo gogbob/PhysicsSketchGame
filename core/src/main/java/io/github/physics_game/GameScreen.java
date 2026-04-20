@@ -71,7 +71,7 @@ public class GameScreen extends ScreenAdapter {
 
     // Graph recording
     private boolean showGraphs = false;
-    private static final int MAX_GRAPH_SAMPLES = 300; // 30 s at 10 Hz
+    private static final int MAX_GRAPH_SAMPLES = 50; // 5 s at 10 Hz
     private final List<Float> gTime  = new ArrayList<>();
     private final List<Float> gPosX  = new ArrayList<>();
     private final List<Float> gPosY  = new ArrayList<>();
@@ -322,9 +322,6 @@ public class GameScreen extends ScreenAdapter {
         batch.end();
 
         //generate UI Here
-        uiViewport.apply();
-        batch.setProjectionMatrix(uiCamera.combined);
-        batch.begin();
 
         // Physics Data Panel (left side)
         physicsDataTimer += delta;

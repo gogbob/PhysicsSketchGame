@@ -105,13 +105,11 @@ public class Level1 extends Level {
         );
         addPhysicsObject(cupInside);
         setBackground(new Texture("background_forest.png"));
-        setFreeObjects(1);
     }
 
     @Override
-    public void reset() {
-        super.reset();
-        isComplete = false;
+    public void reinitialize() {
+        super.reinitialize();
         hasEnteredCup = false;
         elapsedTimeInside = 0f;
     }
