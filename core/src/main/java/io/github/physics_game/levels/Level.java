@@ -16,6 +16,7 @@ public abstract class Level {
     private String levelName;
     private ArrayList<PhysicsObject> physicsObjects = new ArrayList<>();
     private int numDrawnObjects;
+    private int freeObjects = 0; // objects player can use without score penalty
     private Texture background;
 
     public Level(int levelId, String levelName, ArrayList<PhysicsObject> internalObjects, float viewPortWidth, float viewPortHeight) {
@@ -67,6 +68,8 @@ public abstract class Level {
     public int getNumDrawnObjects() {
         return numDrawnObjects;
     }
+    public int getFreeObjects() { return freeObjects; }
+    public void setFreeObjects(int freeObjects) { this.freeObjects = freeObjects; }
 
     public void reset() {
         physicsObjects.removeIf(obj -> obj.getId() >= 100); // 100+ = all player-drawn objects

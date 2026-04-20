@@ -240,18 +240,15 @@ public class GameScreen extends ScreenAdapter {
                 PhysicsResolver.step(currentLevel.getPhysicsObjects());
             }
 
-            if(currentLevel.isComplete()) {
-                if (!scoreCalculated) {
-                    finalScore = ScoreCalculator.calculateScore(
-                        currentLevel.getNumDrawnObjects(),
-                        levelTimer
-                    );
-                    finalStars = ScoreCalculator.calculateStars(finalScore);
-                    scoreCalculated = true;
-
-                    Gdx.app.log("Main", "Level complete!");
-                    Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
-                }
+            if(currentLevel.isComplete() && !scoreCalculated) {
+                finalScore = ScoreCalculator.calculateScore(
+                    currentLevel.getNumDrawnObjects(),
+                    levelTimer,
+                    currentLevel.getFreeObjects()
+                );
+                finalStars = ScoreCalculator.calculateStars(finalScore);
+                scoreCalculated = true;
+                Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
             }
 
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -317,24 +314,6 @@ public class GameScreen extends ScreenAdapter {
         uiViewport.apply();
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
-
-        if(currentLevel.isComplete()) {
-            GlyphLayout layout1 = new GlyphLayout(winFont, "Level Complete!");
-            winFont.setColor(Color.GREEN);
-
-            float x1 = (Gdx.graphics.getWidth() - layout1.width) / 2f;
-            float y1 = Gdx.graphics.getHeight() * 0.75f;
-
-            winFont.draw(batch, layout1, x1, y1);
-
-            GlyphLayout layout2 = new GlyphLayout(winFont, "Score: " + finalScore);
-            winFont.setColor(Color.WHITE);
-            winFont.draw(batch, layout2, (Gdx.graphics.getWidth() - layout2.width)/2f, y1 - 30);
-
-            GlyphLayout layout3 = new GlyphLayout(winFont, "Stars: " + finalStars);
-            winFont.setColor(Color.YELLOW);
-            winFont.draw(batch, layout3, (Gdx.graphics.getWidth() - layout3.width)/2f, y1 - 60);
-        }
 
         // Physics Data Panel (left side)
         physicsDataTimer += delta;
@@ -507,6 +486,124 @@ public class GameScreen extends ScreenAdapter {
 
         if (showGraphs) renderGraphOverlay();
         renderStaticObjectTooltip();
+        renderCompletionOverlay();
+    }
+
+    // Draws a filled 5-pointed star centred at (cx, cy). Must be inside ShapeType.Filled.
+    private void drawStar(float cx, float cy, float outerR, Color color) {
+        shapeRenderer.setColor(color);
+        float innerR = outerR * 0.42f;
+        for (int i = 0; i < 5; i++) {
+            float a1 = (float)(Math.PI / 2 + 2 * Math.PI * i       / 5);
+            float ai = (float)(Math.PI / 2 + 2 * Math.PI * i       / 5 + Math.PI / 5);
+            float a2 = (float)(Math.PI / 2 + 2 * Math.PI * (i + 1) / 5);
+            shapeRenderer.triangle(
+                cx + outerR * (float)Math.cos(a1), cy + outerR * (float)Math.sin(a1),
+                cx + innerR * (float)Math.cos(ai), cy + innerR * (float)Math.sin(ai),
+                cx, cy);
+            shapeRenderer.triangle(
+                cx + innerR * (float)Math.cos(ai), cy + innerR * (float)Math.sin(ai),
+                cx + outerR * (float)Math.cos(a2), cy + outerR * (float)Math.sin(a2),
+                cx, cy);
+        }
+    }
+
+    private void renderCompletionOverlay() {
+        if (!currentLevel.isComplete()) return;
+
+        int sw = uiViewport.getScreenWidth();
+        int sh = uiViewport.getScreenHeight();
+        int vx = viewport.getScreenX();
+        int vy = viewport.getScreenY();
+        int vw = viewport.getScreenWidth();
+        int vh = viewport.getScreenHeight();
+
+        int pW = Math.min(vw - 40, 330);
+        int pH = 230;
+        int pX = vx + (vw - pW) / 2;
+        int pY = vy + (vh - pH) / 2;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.setProjectionMatrix(uiCamera.combined);
+
+        // Filled pass: panel bg + stars
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0.04f, 0.06f, 0.20f, 0.97f);
+        shapeRenderer.rect(pX, pY, pW, pH);
+
+        float starCY = pY + pH - 72f;
+        for (int i = 0; i < 3; i++) {
+            float sx = pX + pW / 2f + (i - 1) * 48f;
+            Color sc = (i < finalStars) ? Color.GOLD : new Color(0.22f, 0.22f, 0.28f, 1f);
+            drawStar(sx, starCY, 17f, sc);
+        }
+        shapeRenderer.end();
+
+        // Line pass: border + dividers
+        Gdx.gl.glLineWidth(2f);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(Color.GOLD);
+        shapeRenderer.rect(pX, pY, pW, pH);
+        shapeRenderer.setColor(new Color(1f, 0.85f, 0f, 0.35f));
+        shapeRenderer.rect(pX + 3, pY + 3, pW - 6, pH - 6);
+        shapeRenderer.setColor(new Color(1f, 0.85f, 0f, 0.3f));
+        shapeRenderer.line(pX + 14, pY + pH - 32, pX + pW - 14, pY + pH - 32);
+        shapeRenderer.end();
+        Gdx.gl.glLineWidth(1f);
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        // Text pass
+        batch.setProjectionMatrix(uiCamera.combined);
+        batch.begin();
+
+        // Title with drop shadow
+        winFont.getData().setScale(1.55f);
+        GlyphLayout titleL = new GlyphLayout(winFont, "LEVEL  COMPLETE!");
+        float tx = pX + (pW - titleL.width) / 2f;
+        float ty = pY + pH - 10f;
+        winFont.setColor(0f, 0f, 0f, 0.55f);
+        winFont.draw(batch, "LEVEL  COMPLETE!", tx + 2, ty - 2);
+        winFont.setColor(Color.GOLD);
+        winFont.draw(batch, "LEVEL  COMPLETE!", tx, ty);
+        winFont.getData().setScale(1f);
+
+        // Stars label
+        winFont.setColor(new Color(0.7f, 0.7f, 0.7f, 1f));
+        String starsText = finalStars == 3 ? "Perfect!" : finalStars == 2 ? "Good job!" : "Keep going!";
+        GlyphLayout starsL = new GlyphLayout(winFont, starsText);
+        winFont.draw(batch, starsL, pX + (pW - starsL.width) / 2f, pY + pH - 96f);
+
+        // Score
+        Color scoreCol = finalScore >= 95 ? Color.GOLD : finalScore >= 60 ? Color.GREEN : Color.WHITE;
+        winFont.setColor(scoreCol);
+        String scoreText = "Score:  " + finalScore + " / 100";
+        GlyphLayout scoreL = new GlyphLayout(winFont, scoreText);
+        winFont.draw(batch, scoreL, pX + (pW - scoreL.width) / 2f, pY + pH - 120f);
+
+        // Objects used
+        int freeObjs  = currentLevel.getFreeObjects();
+        int extraObjs = Math.max(0, currentLevel.getNumDrawnObjects() - freeObjs);
+        String objText = extraObjs == 0
+            ? "Objects: " + currentLevel.getNumDrawnObjects() + "  (no penalty)"
+            : "Objects: " + currentLevel.getNumDrawnObjects() + "  (+" + extraObjs + " over limit)";
+        winFont.setColor(extraObjs == 0 ? new Color(0.4f, 1f, 0.5f, 1f) : new Color(1f, 0.55f, 0.2f, 1f));
+        GlyphLayout objL = new GlyphLayout(winFont, objText);
+        winFont.draw(batch, objL, pX + (pW - objL.width) / 2f, pY + pH - 140f);
+
+        // Time
+        winFont.setColor(new Color(0.65f, 0.65f, 0.65f, 1f));
+        String timeText = String.format("Time:  %.1f s", levelTimer);
+        GlyphLayout timeL = new GlyphLayout(winFont, timeText);
+        winFont.draw(batch, timeL, pX + (pW - timeL.width) / 2f, pY + pH - 158f);
+
+        // Restart hint
+        winFont.setColor(new Color(0.48f, 0.48f, 0.48f, 1f));
+        GlyphLayout hintL = new GlyphLayout(winFont, "[R]  Play Again");
+        winFont.draw(batch, hintL, pX + (pW - hintL.width) / 2f, pY + 22f);
+
+        winFont.setColor(Color.WHITE);
+        batch.end();
     }
 
     @Override
