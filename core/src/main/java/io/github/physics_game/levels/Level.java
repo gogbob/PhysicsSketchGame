@@ -23,9 +23,10 @@ public abstract class Level {
     private ArrayList<Float> currentDrawnAmounts;
     private int selectedPaint = 0;
     private int numDrawnObjects;
-    private int freeObjects = 0;
+    private float freeProp = 0.5f;
     private Texture background;
     private float levelTimer = 0f;
+    private String description;
 
     public Level(int levelId, String levelName, ArrayList<PhysicsObject> internalObjects, ArrayList<DrawType> drawTypes, ArrayList<Float> drawAmounts, float viewPortWidth, float viewPortHeight) {
         if(drawTypes.size() != drawAmounts.size()) {
@@ -57,6 +58,7 @@ public abstract class Level {
         this.drawTypes = drawTypes;
         this.drawAmounts = drawAmounts;
         this.currentDrawnAmounts = new ArrayList<>(Collections.nCopies(drawAmounts.size(), 0f));
+        this.description = "";
     }
 
     public ArrayList<PhysicsObject> getPhysicsObjects() {
@@ -96,6 +98,12 @@ public abstract class Level {
     public float getDrawLeft() {
         return getDrawAmounts().get(getSelectedPaint()) - getCurrentDrawnAmounts().get(getSelectedPaint());
     }
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    public String getDescription() {
+        return description;
+    }
     public int getLevelId() {
         return levelId;
     }
@@ -114,15 +122,18 @@ public abstract class Level {
     public int getNumDrawnObjects() {
         return numDrawnObjects;
     }
-    public int getFreeObjects() { return freeObjects; }
-    public void setFreeObjects(int freeObjects) { this.freeObjects = freeObjects; }
     public void setLevelTimer(float levelTimer) {
         this.levelTimer = levelTimer;
     }
     public float getLevelTimer() {
         return levelTimer;
     }
-
+    public void setFreeProp(float freeProp) {
+        this.freeProp = freeProp;
+    }
+    public float getFreeProp() {
+        return freeProp;
+    }
 
     public abstract boolean isComplete();
     public abstract LevelTickData tick(float deltaTime);

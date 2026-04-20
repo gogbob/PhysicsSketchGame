@@ -18,101 +18,6 @@ public class PhysicsResolver {
     final static int NUM_POS_ITERATIONS = 2; // position correction (twice)
     final static Vector2 GRAVITY = new Vector2(0, -9.8f); // gravity vector
 
-    // get everything that need to be calculate with physics
-    public static void step(ArrayList<PhysicsObject> objects) {
-        while(GameScreen.accumulator >= fixedStep) {
-            // when accumulato >= fixstep, do a refresh
-
-            //RESOLVING ALL FORCES
-            for (int i = 0; i < objects.size(); i++) { // go through all objects
-                PhysicsObject obj = objects.get(i);
-                if (obj instanceof DynamicObject) { // if object is dynamicObject = will move
-                    DynamicObject dynObj = (DynamicObject) obj;
-                    //apply gravity
-                    if(dynObj instanceof AntigravityObject){ // not Antigravity, more like reduced gravity
-                        Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity()); // new vector
-                        Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(0.1f).scl(fixedStep));
-                        dynObj.setLinearVelocity(newVelocity);
-                        // Formula here Velocitynew = Velocityold + aδt
-                        // (I think it's like this, not sure if i understand the code will enough -Jiayu)
-                    } else { // normal objects' gravity
-                        Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
-                        Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
-                        dynObj.setLinearVelocity(newVelocity);
-                    }// Formula here Velocitynew = Velocityold + gδt
-
-                }
-                // for charges
-                for(int j = i + 1; j < objects.size(); j++) {
-                    PhysicsObject other = objects.get(j);
-                    // 2 objects have BOTH be charged, at least 1 is dynamicObject
-                    if((obj instanceof Charged && other instanceof Charged) && (obj instanceof DynamicObject || other instanceof DynamicObject)) {
-                        //force goes from A to B when they have same sign charge
-                        ((Charged) obj).applyChargeForcePair(other, true);
-                    }
-                }
-            }
-
-            // empty list to detect all collision info
-            ArrayList<ContactManifold> collisions = new ArrayList<>();
-
-            // checked collision 2 by 2
-            for (int i = 0; i < objects.size(); i++) {
-                for (int j = i + 1; j < objects.size(); j++) {
-                    PhysicsObject obj1 = objects.get(i);
-                    PhysicsObject obj2 = objects.get(j);
-                    if (!broadphaseOverlap(obj1, obj2)) continue; // AABB broadphase
-                    ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
-                    if(manifold.isColliding() && manifold.getPointCount() > 0) {
-                        collisions.add(manifold);
-                    } // when collision exist and contact point > 0, put in list of collision
-                }
-            }
-
-            // trigger game logic
-            triggerAdditionalLogic(collisions);
-
-            // do velocity iteration
-            for(int i = 0; i < NUM_VEL_ITERATIONS; i++) {
-                for (ContactManifold coll : collisions) { // go through all collision
-                    resolveCollision(coll, false, null, i, true);
-                }
-            }
-
-            // move the objects
-            for (PhysicsObject obj : objects) {
-                if (obj instanceof DynamicObject) { // if it's dynamic = update position
-                    DynamicObject dynObj = (DynamicObject) obj;
-                    dynObj.updatePosition(fixedStep);
-                    // position formula Xnew = Xold + vδt (? I think...
-                }
-                if(obj instanceof Following) { // position update for Following objects
-                    ((Following) obj).updatePosition();
-                }
-            }
-
-            //correct the positions to prevent sinking due to numerical errors
-            for(int iteration = 0; iteration < NUM_POS_ITERATIONS; iteration++) { // position correction iteration
-                boolean anyCorrection = false;
-                for (int i = 0; i < objects.size(); i++) { // check 2 by 2
-                    for (int j = i + 1; j < objects.size(); j++) {
-                        PhysicsObject obj1 = objects.get(i);
-                        PhysicsObject obj2 = objects.get(j);
-                        if(resolvePenetrationCorrection(obj1, obj2)) {
-                            anyCorrection = true;
-                        }
-                    }
-                }
-                if(!anyCorrection) {
-                    break; // no correction = quit
-                }
-            }
-
-            // reduce accumulated time
-            GameScreen.accumulator -= fixedStep;
-        }
-    }
-
     // show force and collision (I think it's more like visualization)
     public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects) {
         ArrayList<DebugForce> forces = new ArrayList<>(); // empty force arrayList
@@ -171,6 +76,22 @@ public class PhysicsResolver {
                     }
                 }
             }
+
+            collisions = new ArrayList<>();
+
+            for (int i = 0; i < objects.size(); i++) {
+                for (int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject obj1 = objects.get(i);
+                    PhysicsObject obj2 = objects.get(j);
+                    if (!broadphaseOverlap(obj1, obj2)) continue; // AABB broadphase
+                    ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+                    if(manifold.isColliding() && manifold.getPointCount() > 0) {
+                        collisions.add(manifold);
+                    } // if collision = valid, then save the manifold in
+                }
+            }
+
+            triggerAdditionalLogic(collisions);
 
             // velocity iteration
             for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {

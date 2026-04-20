@@ -105,7 +105,8 @@ public class Level1 extends Level {
         );
         addPhysicsObject(cupInside);
         setBackground(new Texture("background_forest.png"));
-        setFreeObjects(1);
+        setDescription("Here, to make it easier, \n a good tip is to hold click \n while drawing, which will make \n the object float and stay stable." +
+            "\nYour goal is to get the ball \n into the cup and keep it\n there for a moment.\n");
     }
 
     @Override
@@ -130,6 +131,7 @@ public class Level1 extends Level {
             }
 
             elapsedTimeInside += deltaTime;
+            System.out.println(elapsedTimeInside);
 
             if (elapsedTimeInside >= timeToComplete) {
                 if (!isComplete) {
@@ -139,6 +141,7 @@ public class Level1 extends Level {
             }
         } else {
             elapsedTimeInside = 0f;
+            System.out.println("Ball is not in the cup!");
         }
 
         for (PhysicsObject obj : getPhysicsObjects()) {

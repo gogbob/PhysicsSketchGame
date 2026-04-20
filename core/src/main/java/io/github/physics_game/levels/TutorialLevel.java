@@ -17,7 +17,6 @@ public class TutorialLevel extends Level {
     private FollowingUncollidableField cupInside;
     private DynamicObject ball;
     private boolean isComplete;
-    private static final int ShapePenalty = 10; // Each shape took off 10 points
     private static final float TIME_PENALTY = 1.0f;
 
     public TutorialLevel(float viewPortWidth, float viewPortHeight) {
@@ -57,7 +56,9 @@ public class TutorialLevel extends Level {
         addPhysicsObject(cupInside);
 
         setBackground(new Texture("background_forest.png"));
-        setFreeObjects(1);
+        setDescription("Welcome to the tutorial level! \n Your goal is to get the ball \n out of the cup with as few \n objects as possible and as \n little  time as possible.\n" +
+            "To do this, you will need\n to draw objects, which you can\n simply do by drag clicking on\n the world." +
+            "If this level is too \n hard, try the next level. \nPress R to reset, if needed. \nYou can also check the object \ndata by clicking on an object.");
     }
 
     @Override

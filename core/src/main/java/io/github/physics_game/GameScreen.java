@@ -245,9 +245,9 @@ public class GameScreen extends ScreenAdapter {
         if(currentLevel.isComplete()) {
             if (!scoreCalculated) {
                 finalScore = ScoreCalculator.calculateScore(
-                    currentLevel.getNumDrawnObjects(),
+                    currentLevel.getCurrentDrawnProportion(),
                     currentLevel.getLevelTimer(),
-                    currentLevel.getFreeObjects()
+                    currentLevel.getFreeProp()
                 );
                 finalStars = ScoreCalculator.calculateStars(finalScore);
                 scoreCalculated = true;
@@ -336,11 +336,31 @@ public class GameScreen extends ScreenAdapter {
             (int)(currentLevel.getLevelTimer() / 60f),
             (int)(currentLevel.getLevelTimer()) % 60,
             ((int)(currentLevel.getLevelTimer() * 10)) % 10);
-        String levelHeaderStr = currentLevel.getLevelName() + "\nTime: " + timeStr;
-        winFont.draw(batch, levelHeaderStr, lx, topY);
+        String levelHeaderStr;
+        if(game.currentScores.get(currentLevel.getLevelId()) != null) {
+            String bestTimeStr = String.format("%d:%02d.%d",
+                (int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime() / 60f),
+                (int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime()) % 60,
+                ((int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime() * 10)) % 10);
+            levelHeaderStr = currentLevel.getLevelName() + "\nTime: " + timeStr
+                + "\nBest Time: " + bestTimeStr
+                + "\nBest Drawn proportion: " + String.format("%.0f%%", game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion() * 100f)
+                + "\nScore: " + ScoreCalculator.calculateScore(game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
+                game.currentScores.get(currentLevel.getLevelId()).getBestTime(), currentLevel.getFreeProp()) + "  [" + ScoreCalculator.calculateStars(ScoreCalculator.calculateScore(game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
+                game.currentScores.get(currentLevel.getLevelId()).getBestTime(), currentLevel.getFreeProp())) + "★]"
+                + "\nDescription: \n" + currentLevel.getDescription();
+        } else {
+            levelHeaderStr = currentLevel.getLevelName() + "\nTime: " + timeStr
+                + "\nBest Time: --"
+                + "\nBest Drawn proportion: --"
+                + "\nDescription: \n" + currentLevel.getDescription();
+        }
+
+        GlyphLayout glHeader = new GlyphLayout(winFont, levelHeaderStr.toString());
+        winFont.draw(batch, glHeader, lx, topY);
 
         // Separator
-        float sepY = topY - 36f;
+        float sepY = topY - glHeader.height - 4f;
         batch.setColor(0.3f, 0.5f, 0.8f, 0.4f);
         batch.draw(panelBgTexture, lx, sepY, panelW - 16f, 1f);
         batch.setColor(Color.WHITE);
@@ -577,12 +597,12 @@ public class GameScreen extends ScreenAdapter {
         GlyphLayout scoreL = new GlyphLayout(winFont, scoreText);
         winFont.draw(batch, scoreL, pX + (pW - scoreL.width) / 2f, pY + pH - 120f);
 
-        int freeObjs  = currentLevel.getFreeObjects();
-        int extraObjs = Math.max(0, currentLevel.getNumDrawnObjects() - freeObjs);
-        String objText = extraObjs == 0
-            ? "Objects: " + currentLevel.getNumDrawnObjects() + "  (no penalty)"
-            : "Objects: " + currentLevel.getNumDrawnObjects() + "  (+" + extraObjs + " over limit)";
-        winFont.setColor(extraObjs == 0 ? new Color(0.4f, 1f, 0.5f, 1f) : new Color(1f, 0.55f, 0.2f, 1f));
+        float drawnProp  = currentLevel.getCurrentDrawnProportion();
+        float freeProp = Math.max(0, currentLevel.getFreeProp());
+        String objText = drawnProp <= freeProp
+            ? "Drawn Proportion: " + (int)(drawnProp * 100) + "%  (no penalty <= " + (int)(freeProp * 100) + "%)"
+            : "Drawn Proportion: " + (int)(drawnProp * 100) + "%  (penalty >" + (int)(freeProp * 100)  + "%)";
+        winFont.setColor(drawnProp <= freeProp ? new Color(0.4f, 1f, 0.5f, 1f) : new Color(1f, 0.55f, 0.2f, 1f));
         GlyphLayout objL = new GlyphLayout(winFont, objText);
         winFont.draw(batch, objL, pX + (pW - objL.width) / 2f, pY + pH - 140f);
 
