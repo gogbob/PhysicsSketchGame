@@ -121,7 +121,6 @@ public class Level1 extends Level {
 
     @Override
     public LevelTickData tick(float deltaTime) {
-        if(!isComplete) setLevelTimer(getLevelTimer() + deltaTime);
         if (cupInside.getTriggerIds().contains(ball.getId())) {
             if (!hasEnteredCup) {
                 System.out.println("Ball entered the cup!");

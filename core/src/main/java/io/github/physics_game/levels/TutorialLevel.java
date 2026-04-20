@@ -60,13 +60,19 @@ public class TutorialLevel extends Level {
     }
 
     @Override
+    public void reset() {
+        super.reset();
+        isComplete = false;
+        elapsedTimeInside = 0f;
+    }
+
+    @Override
     public boolean isComplete() {
         return isComplete;
     }
 
     @Override
     public LevelTickData tick(float deltaTime) {
-        if(!isComplete) setLevelTimer(getLevelTimer() + deltaTime);
         if (cupInside.getTriggerIds().contains(ball.getId())) {
             elapsedTimeInside += deltaTime;
             System.out.println("Ball is inside the cup!");
