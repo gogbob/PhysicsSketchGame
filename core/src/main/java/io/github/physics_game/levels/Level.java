@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.DrawType;
+import io.github.physics_game.object_types.DynamicObject;
 import io.github.physics_game.object_types.PhysicsObject;
 import io.github.physics_game.object_types.StaticObject;
 
@@ -22,6 +23,7 @@ public abstract class Level {
     private ArrayList<Float> currentDrawnAmounts;
     private int selectedPaint = 0;
     private int numDrawnObjects;
+    private int freeObjects = 0;
     private Texture background;
     private float levelTimer = 0f;
 
@@ -112,6 +114,8 @@ public abstract class Level {
     public int getNumDrawnObjects() {
         return numDrawnObjects;
     }
+    public int getFreeObjects() { return freeObjects; }
+    public void setFreeObjects(int freeObjects) { this.freeObjects = freeObjects; }
     public void setLevelTimer(float levelTimer) {
         this.levelTimer = levelTimer;
     }
@@ -122,6 +126,12 @@ public abstract class Level {
 
     public abstract boolean isComplete();
     public abstract LevelTickData tick(float deltaTime);
+
+    public void reset() {
+        reinitialize();
+        numDrawnObjects = 0;
+    }
+
     public void reinitialize() {
         setRunPhysics(false);
         for(int i = 0; i < physicsObjects.size(); i++) {

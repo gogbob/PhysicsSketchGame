@@ -44,11 +44,4 @@ public class FollowingUncollidableField extends TriggerField implements Followin
             setAnchorPosition(nextAnchor);
         }
     }
-
-    @Override
-    public void reinitialize() {
-        super.reinitialize();
-        followedObj.reinitialize();
-        updatePosition();
-    }
 }

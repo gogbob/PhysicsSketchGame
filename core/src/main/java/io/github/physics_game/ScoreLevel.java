@@ -10,7 +10,7 @@ public class ScoreLevel {
     public ScoreLevel(float bestTime, float bestShapeProportion) {
         this.bestTime = bestTime;
         this.bestShapeProportion = bestShapeProportion;
-        this.bestScore = ScoreCalculator.calculateScore(bestTime, bestShapeProportion);
+        this.bestScore = ScoreCalculator.calculateScore(0, bestTime);
     }
 
     public float getBestTime() {
@@ -27,7 +27,7 @@ public class ScoreLevel {
     }
 
     public void setNewBestScore(float newTime, float newShapeProportion) {
-        this.bestScore = Math.min(ScoreCalculator.calculateScore(newTime, newShapeProportion), this.bestScore);
+        this.bestScore = Math.min(ScoreCalculator.calculateScore(0, newTime), this.bestScore);
         this.bestTime = Math.min(newTime, this.bestTime);
         this.bestShapeProportion = Math.min(newShapeProportion, this.bestShapeProportion);
     }
