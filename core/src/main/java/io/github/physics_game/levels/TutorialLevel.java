@@ -57,6 +57,7 @@ public class TutorialLevel extends Level {
         addPhysicsObject(cupInside);
 
         setBackground(new Texture("background_forest.png"));
+        setFreeObjects(1);
     }
 
     @Override
