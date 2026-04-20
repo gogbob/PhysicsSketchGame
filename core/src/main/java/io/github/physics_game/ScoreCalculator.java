@@ -6,7 +6,7 @@ public class ScoreCalculator {
     private static final float TIME_PENALTY = 2.0f;
     private static final int SHAPE_PENALTY = 100;
 
-    public static int calculateScore(float timeUsed, float shapeProportion, int shapePenalty, float timePenalty) {
+    public static int calculateScore(float timeUsed, float shapeProportion, float freeProp, int shapePenalty, float timePenalty) {
         int score = BaseScore;
 
         // shape penalty
@@ -21,16 +21,29 @@ public class ScoreCalculator {
         return Math.max(0, Math.min(100, score));
     }
 
-    public static int calculateScore(float timeUsed, float shapeProportion) {
-        return calculateScore(shapeProportion, timeUsed,
-            SHAPE_PENALTY, TIME_PENALTY);
+    /** Standard call — respects the level's free-object allowance. */
+    public static int calculateScore(float shapePropUsed, float timeUsed, float freeProp) {
+        return calculateScore(shapePropUsed, timeUsed, freeProp, SHAPE_PENALTY, TIME_PENALTY);
+    }
+
+    /** Legacy call — treats every object as billable. */
+    public static int calculateScore(float shapePropUsed, float timeUsed) {
+        return calculateScore(shapePropUsed, timeUsed, 0, SHAPE_PENALTY, TIME_PENALTY);
+    }
+
+    /** Legacy 4-param overload (custom penalties, no free objects). */
+    public static int calculateScore(float shapePropUsed, float timeUsed,
+                                     int shapePenalty, float timePenalty) {
+        return calculateScore(shapePropUsed, timeUsed, 0, shapePenalty, timePenalty);
     }
 
     // calculate star based on score
     public static int calculateStars(int score) {
-        if (score >= 80) return 3; // 3 stars
-        if (score >= 50) return 2; // 2 stars
-        return 1; // 1 stars
+        if (score >= 95) return 3;
+        if (score >= 60) return 2;
+        return 1;
     }
+
+
 
 }

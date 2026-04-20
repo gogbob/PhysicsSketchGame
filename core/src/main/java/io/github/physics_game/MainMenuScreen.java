@@ -1,23 +1,28 @@
 package io.github.physics_game;
 
 import com.badlogic.gdx.*;
-import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.scenes.scene2d.Stage;
-import com.badlogic.gdx.scenes.scene2d.ui.*;
-import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 
-public class MainMenuScreen extends ScreenAdapter{
+public class MainMenuScreen extends ScreenAdapter {
     private final MainGame game;
-    private Stage stage;
-    private Skin skin;
 
-    private Texture backgroundTexture;
-    private SpriteBatch batch;
+    private SpriteBatch     batch;
+    private Texture         bgTexture;
+    private TextureAtlas    atlas;
+    private TextureRegion   btnStartRegion;
+    private TextureRegion   btnExitRegion;
+    private TextureRegion   btnCreditsRegion;
+    private OrthographicCamera cam;
+    private ScreenViewport  vp;
+
+    // Button hit-rects [x, y, w, h]  (bottom-left origin, screen pixels)
+    private final float[] rPlay   = new float[4];
+    private final float[] rHelp   = new float[4];
+    private final float[] rQuit   = new float[4];
 
     public MainMenuScreen(MainGame game) {
         this.game = game;
@@ -25,80 +30,104 @@ public class MainMenuScreen extends ScreenAdapter{
 
     @Override
     public void show() {
-        stage = new Stage(new ScreenViewport());
-        Gdx.input.setInputProcessor(stage);
+        cam = new OrthographicCamera();
+        vp  = new ScreenViewport(cam);
+        vp.apply(true);
 
-        batch = new SpriteBatch();
-        backgroundTexture = new Texture(Gdx.files.internal("menu.png"));
+        batch     = new SpriteBatch();
+        bgTexture = new Texture(Gdx.files.internal("menu.png"));
+        bgTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
-        skin = new Skin(Gdx.files.internal("uiskin.json"));
+        atlas            = new TextureAtlas(Gdx.files.internal("menuButtons.atlas"));
+        btnStartRegion   = atlas.findRegion("startButton");
+        btnExitRegion    = atlas.findRegion("exitButton");
+        btnCreditsRegion = atlas.findRegion("creditsButton");
 
-        Label title = new Label("An Educational Physics Game", skin);
-        TextButton playButton = new TextButton("Play", skin);
-        TextButton quitButton = new TextButton("Quit", skin);
-        TextButton helpButton = new TextButton("How to Play", skin);
+        resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+    }
 
-        playButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new LevelScreen(game));
-            }
-        });
+    private void layout(int sw, int sh) {
+        // startButton original is 385×147 → draw at 320×112
+        float bw = 320f, bh = 112f;
+        float cx = sw / 2f;
+        float midY = sh * 0.46f;
+        rPlay[0] = cx - bw / 2f;   rPlay[1] = midY;        rPlay[2] = bw; rPlay[3] = bh;
 
-        helpButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                // game.setScreen(new HelpScreen(game));
-            }
-        });
+        // creditsButton → "How To Play"  364×103 → 240×68
+        float hw = 240f, hh = 68f;
+        rHelp[0] = cx - hw / 2f;   rHelp[1] = midY - hh - 18f; rHelp[2] = hw; rHelp[3] = hh;
 
-        quitButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                Gdx.app.exit();
-            }
-        });
-
-        Table table = new Table();
-        table.setFillParent(true);
-        table.center();
-
-        table.add(title).padBottom(40).row();
-        table.add(playButton).width(220).height(60).padBottom(20).row();
-        table.add(helpButton).width(220).height(60).padBottom(20).row();
-        table.add(quitButton).width(220).height(60);
-
-        stage.addActor(table);
+        // exitButton 168×116 → 180×65
+        float qw = 180f, qh = 65f;
+        rQuit[0] = cx - qw / 2f;   rQuit[1] = rHelp[1] - qh - 14f; rQuit[2] = qw; rQuit[3] = qh;
     }
 
     @Override
     public void render(float delta) {
-        Gdx.gl.glClearColor(0.08f, 0.08f, 0.12f, 1f);
+        int sw = Gdx.graphics.getWidth();
+        int sh = Gdx.graphics.getHeight();
+        // mouse in bottom-left origin
+        int mx = Gdx.input.getX();
+        int my = sh - Gdx.input.getY();
+
+        Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        vp.apply();
+        batch.setProjectionMatrix(cam.combined);
+
+        // ── Background ───────────────────────────────────────────────
         batch.begin();
-        // Draw texture starting at bottom-left (0,0) scaled to the screen size
-        batch.draw(backgroundTexture, 0, 0, stage.getWidth(), stage.getHeight());
+        batch.setColor(Color.WHITE);
+        batch.draw(bgTexture, 0, 0, sw, sh);
         batch.end();
 
-        stage.act(delta);
-        stage.draw();
+
+        // ── Click handling ───────────────────────────────────────────
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            if (hit(rPlay, mx, my)) { game.setScreen(new LevelScreen(game)); return; }
+            if (hit(rHelp, mx, my)) { /* TODO: HelpScreen */ }
+            if (hit(rQuit, mx, my)) { Gdx.app.exit(); }
+        }
+
+        // ── Button sprites ───────────────────────────────────────────
+        batch.begin();
+
+        // PLAY — startButton texture, tinted on hover
+        batch.setColor(hit(rPlay, mx, my) ? new Color(1f, 1f, 1f, 1f)
+                                          : new Color(0.85f, 0.85f, 0.85f, 0.92f));
+        batch.draw(btnStartRegion, rPlay[0], rPlay[1], rPlay[2], rPlay[3]);
+
+        // HOW TO PLAY — creditsButton texture re-purposed
+        batch.setColor(hit(rHelp, mx, my) ? new Color(1f, 1f, 1f, 1f)
+                                          : new Color(0.80f, 0.80f, 0.80f, 0.88f));
+        batch.draw(btnCreditsRegion, rHelp[0], rHelp[1], rHelp[2], rHelp[3]);
+
+        // QUIT — exitButton texture
+        batch.setColor(hit(rQuit, mx, my) ? new Color(1f, 1f, 1f, 1f)
+                                          : new Color(0.80f, 0.80f, 0.80f, 0.88f));
+        batch.draw(btnExitRegion, rQuit[0], rQuit[1], rQuit[2], rQuit[3]);
+
+        batch.end();
+    }
+
+    private boolean hit(float[] r, int mx, int my) {
+        return mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3];
     }
 
     @Override
     public void resize(int width, int height) {
-        stage.getViewport().update(width, height, true);
+        vp.update(width, height, true);
+        layout(width, height);
     }
 
     @Override
-    public void hide() {
-        dispose();
-    }
+    public void hide() { dispose(); }
 
     @Override
     public void dispose() {
-        backgroundTexture.dispose();
-        if (stage != null) stage.dispose();
-        if (skin != null) skin.dispose();
+        if (batch != null)     batch.dispose();
+        if (bgTexture != null) bgTexture.dispose();
+        if (atlas != null)     atlas.dispose();
     }
 }
