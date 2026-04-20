@@ -60,8 +60,8 @@ public class TutorialLevel extends Level {
     }
 
     @Override
-    public void reset() {
-        super.reset();
+    public void reinitialize() {
+        super.reinitialize();
         isComplete = false;
         elapsedTimeInside = 0f;
     }

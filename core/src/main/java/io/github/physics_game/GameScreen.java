@@ -71,7 +71,7 @@ public class GameScreen extends ScreenAdapter {
 
     // Graph recording
     private boolean showGraphs = false;
-    private static final int MAX_GRAPH_SAMPLES = 300; // 30 s at 10 Hz
+    private static final int MAX_GRAPH_SAMPLES = 100; // 10 s at 10 Hz
     private final List<Float> gTime  = new ArrayList<>();
     private final List<Float> gPosX  = new ArrayList<>();
     private final List<Float> gPosY  = new ArrayList<>();
@@ -451,10 +451,17 @@ public class GameScreen extends ScreenAdapter {
                 gAccX.add(accel.x); gAccY.add(accel.y);
                 gKE.add(ke);        gPE.add(pe);        gTE.add(ke + pe);
                 while (gTime.size() > MAX_GRAPH_SAMPLES) {
-                    gTime.remove(0);  gPosX.remove(0);  gPosY.remove(0);
-                    gVelX.remove(0);  gVelY.remove(0);  gSpeed.remove(0);
-                    gAccX.remove(0);  gAccY.remove(0);
-                    gKE.remove(0);    gPE.remove(0);    gTE.remove(0);
+                    gTime.remove(0);
+                    gPosX.remove(0);
+                    gPosY.remove(0);
+                    gVelX.remove(0);
+                    gVelY.remove(0);
+                    gSpeed.remove(0);
+                    gAccX.remove(0);
+                    gAccY.remove(0);
+                    gKE.remove(0);
+                    gPE.remove(0);
+                    gTE.remove(0);
                 }
 
                 if (!showGraphs) {
@@ -475,9 +482,9 @@ public class GameScreen extends ScreenAdapter {
                     sb.append(String.format(" w   %+8.3f r/s\n", omega));
                     sb.append("----------------\n");
                     sb.append(String.format(" m   %8.3f kg\n", mass));
-                    sb.append(String.format(" u   %8.3f\n", selectedObj.getFriction()));
-                    if(selectedObj instanceof Charged) {
-                        sb.append(String.format(" q   %8.3f C/kg\n", ((Charged) selectedObj).getChargeDensity()));
+                    sb.append(String.format(" u   %8.3f\n", displayObj.getFriction()));
+                    if(displayObj instanceof Charged) {
+                        sb.append(String.format(" q   %8.3f C/kg\n", ((Charged) displayObj).getChargeDensity()));
                     }
                     sb.append("----------------\n");
                     sb.append(String.format(" KE  %8.3f J\n", ke));
