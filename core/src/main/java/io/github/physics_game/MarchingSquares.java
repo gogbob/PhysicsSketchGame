@@ -70,10 +70,8 @@ public class MarchingSquares {
                     if(c != 0 && c != 15) {
                         int edgeIndex = edgeTable[c][0];
 
-                        if((c == 5 || c == 10) && travelledCells.get(y).get(x) > 0.2f) {
-                            if(travelledCells.get(y).get(x) < 0.5f) {
-                                edgeIndex = edgeTable[c][2];
-                            }
+                        if((c == 5 || c == 10) && travelledCells.get(y).get(x) == 0.25f) {
+                            edgeIndex = edgeTable[c][2];
                         }
 
                         List<Vector2> loop = sanitizeLoop(traceLoopFromEdge(x, y, edgeIndex, gridField, travelledCells, resolutionScale, minX, minY));
@@ -197,7 +195,14 @@ public class MarchingSquares {
 
             if(c == 5 || c == 10) {
                 //find the edge that corresponds the correct type
-                if((prevIndex != edgeTable[c][0] && prevIndex % 2 == edgeTable[c][0] % 2)) currentEdgeIndex = edgeTable[c][3];;
+                if(!(prevIndex != edgeTable[c][0] && prevIndex % 2 == edgeTable[c][0] % 2)) {
+                    currentEdgeIndex = edgeTable[c][3];
+                    tempTravelled.get(y).set(x, 0.75f + travelledCells.get(y).get(x));
+                } else {
+                    tempTravelled.get(y).set(x, 0.25f + travelledCells.get(y).get(x));
+                }
+            } else {
+                tempTravelled.get(y).set(x, 1f);
             }
 
             edgeBounds = edgeBoundsFromEdgeType(currentEdgeIndex, y, x, minX, minY, resolutionScale);
@@ -208,9 +213,6 @@ public class MarchingSquares {
                 values.get(currentEdgeIndex),
                 values.get((currentEdgeIndex + 1) % 4));
 
-            //add the first vertice
-
-            tempTravelled.get(y).set(x, (c == 5 || c == 10) ? ((currentEdgeIndex == edgeTable[c][3]) ? 0.75f : 0.25f) + travelledCells.get(y).get(x) : 1f);
             //update the x and y value according to edge type
             x += (currentEdgeIndex == 0 || currentEdgeIndex == 2) ? 0 : ((currentEdgeIndex == 1) ? 1 : -1);
             y += (currentEdgeIndex == 1 || currentEdgeIndex == 3) ? 0 : ((currentEdgeIndex == 2) ? 1 : -1);
@@ -656,6 +658,7 @@ public class MarchingSquares {
 
     public static void printField(List<List<Float>> gridField) {
         for(int i = 0; i < gridField.size(); i++) {
+            System.out.print(i + (i < 10 ? "   " : (i < 100) ? "  " : (i < 1000) ? " " : ""));
             for(int j = 0; j < gridField.get(i).size(); j++) {
                 System.out.print(gridField.get(i).get(j) > 0.8 ? "#" : (gridField.get(i).get(j) > 0.5 ? "/" : (gridField.get(i).get(j) > 0.1 ? ":" : "_")));
             }
