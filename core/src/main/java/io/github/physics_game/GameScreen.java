@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
@@ -28,6 +29,7 @@ import java.util.List;
 public class GameScreen extends ScreenAdapter {
     private final MainGame game;
 
+    // Initialize viewport and camera
     private DrawType drawType = DrawType.POSITIVE;
     private SpriteBatch batch;
     FitViewport viewport;
@@ -37,10 +39,14 @@ public class GameScreen extends ScreenAdapter {
     private ScreenViewport uiViewport;
     public static float accumulator = 0f;
     BitmapFont winFont;
+
+    // Score calculation
     private int finalScore = -1;
     private int finalStars = 0;
     private Integer selectedObject = null;
     private boolean scoreCalculated = false;
+
+    // UI Sizing parameters
     public static final float viewPortWidth = 40f;
     public static final float viewPortHeight = 30f;
     public static int SIDE_BUFFER_PX = 250;
@@ -48,7 +54,6 @@ public class GameScreen extends ScreenAdapter {
     public static int BOTTOM_BUFFER_PX = 10;
     public static int BUTTON_WIDTH = 200;
     public static int BUTTON_HEIGHT = 64;
-    public static int BUTTON_STARTY = 400;
     public static final float selectInfoPeriod = 0.1f;
 
     public GameScreen(MainGame game, Level selectedLevel) {
@@ -91,10 +96,100 @@ public class GameScreen extends ScreenAdapter {
     private DrawTool drawTool;
     private Texture panelBgTexture;
 
+    // Help charts for physics explanation
+    private final ArrayList<ChartHelpTarget> chartHelpTargets = new ArrayList<>();
+    private ChartHelpTarget hoveredChartHelp = null;
+
+    private static class ChartHelpTarget {
+        String key;
+        Rectangle iconBounds;
+        Rectangle groupBounds;
+
+        ChartHelpTarget(String key, Rectangle iconBounds, Rectangle groupBounds) {
+            this.key = key;
+            this.iconBounds = iconBounds;
+            this.groupBounds = groupBounds;
+        }
+    }
+
+    private void updateChartHelpHover() {
+        hoveredChartHelp = null;
+
+        float mx = Gdx.input.getX();
+        float my = uiViewport.getScreenHeight() - Gdx.input.getY() - 1;
+
+        for (ChartHelpTarget target : chartHelpTargets) {
+            if (target.iconBounds.contains(mx, my)) {
+                hoveredChartHelp = target;
+                break;
+            }
+        }
+    }
+
+    // Render the chart tooltips on the right hand side of the game screen
+    private void renderChartHelpTooltip() {
+        if (hoveredChartHelp == null) return;
+
+        String text = getChartHelpText(hoveredChartHelp.key);
+        if (text == null || text.isEmpty()) return;
+
+        GlyphLayout layout = new GlyphLayout(winFont, text);
+        float pad = 10f;
+        float boxW = Math.min(layout.width + pad * 2f, 280f);
+        float boxH = layout.height + pad * 2f;
+
+        float x = hoveredChartHelp.iconBounds.x - boxW - 8f;
+        float y = hoveredChartHelp.iconBounds.y + boxH;
+
+        if (x < 8f) {
+            x = hoveredChartHelp.iconBounds.x + hoveredChartHelp.iconBounds.width + 8f;
+        }
+        if (y > uiViewport.getScreenHeight() - 8f) {
+            y = uiViewport.getScreenHeight() - 8f;
+        }
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        shapeRenderer.setProjectionMatrix(uiCamera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0.05f, 0.08f, 0.16f, 0.95f);
+        shapeRenderer.rect(x, y - boxH, boxW, boxH);
+        shapeRenderer.end();
+
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(new Color(0.45f, 0.75f, 1f, 1f));
+        shapeRenderer.rect(x, y - boxH, boxW, boxH);
+        shapeRenderer.end();
+
+        batch.setProjectionMatrix(uiCamera.combined);
+        batch.begin();
+        winFont.setColor(Color.WHITE);
+        winFont.draw(batch, text, x + pad, y - pad);
+        batch.end();
+    }
+
+    // Formulas and Explanations of each chart displayed
+    private String getChartHelpText(String key) {
+        switch (key) {
+            case "position":
+                return "Position\nExplanation coming later.";
+            case "velocity":
+                return "Velocity\nExplanation coming later.";
+            case "speed":
+                return "Speed\nExplanation coming later.";
+            case "acceleration":
+                return "Acceleration\nExplanation coming later.";
+            case "energy":
+                return "Energy\nExplanation coming later.";
+            default:
+                return "";
+        }
+    }
 
     @Override
     public void show() {
-        // Use a small world size (meters) so objects are visible with the debug renderer.
+        // Camera and viewport placement
         camera = new OrthographicCamera();
         viewport = new FitViewport(viewPortWidth, viewPortHeight, camera); // world units: 20 x 15
         viewport.apply(true);
@@ -110,16 +205,6 @@ public class GameScreen extends ScreenAdapter {
         pm.fill();
         panelBgTexture = new Texture(pm);
         pm.dispose();
-        DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
-            Arrays.asList(
-                new Vector2(-0.7f, 0.7f),
-                new Vector2(0.7f, 0.7f),
-                new Vector2(0.7f, 0.2f),
-                new Vector2(0.2f, 0.2f),
-                new Vector2(0.2f, -0.7f),
-                new Vector2(-0.7f, -0.7f)
-            ),
-            5, 5, 0);
 
         fullRegionTexture = new Texture("full_region.png");
         selectRegionTexture = new Texture("select_region.png");
@@ -486,6 +571,9 @@ public class GameScreen extends ScreenAdapter {
 
         // Right panel graphs
         renderGraphOverlay();
+
+        // Draw tooltip on top of everything
+        renderChartHelpTooltip();
 
         // Physics data tracking
         physicsDataTimer += delta;
@@ -869,13 +957,14 @@ public class GameScreen extends ScreenAdapter {
         );
     }
 
-    // 9 mini-graphs stacked in the right panel — game world stays fully visible.
-    @SuppressWarnings("unchecked")
+    // 9 mini-graphs stacked in the right panel
     private void renderGraphOverlay() {
+        chartHelpTargets.clear();
+
         int panelW = (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2;
-        int rightX  = uiViewport.getScreenWidth() - panelW;
-        int panelH  = viewport.getScreenHeight();
-        int panelY  = (uiViewport.getScreenHeight() - panelH) / 2;
+        int rightX = uiViewport.getScreenWidth() - panelW;
+        int panelH = viewport.getScreenHeight();
+        int panelY = (uiViewport.getScreenHeight() - panelH) / 2;
         if (panelW < 20) return;
 
         final int N = 9;
@@ -883,18 +972,120 @@ public class GameScreen extends ScreenAdapter {
         float cellW = panelW - PAD * 2;
         float cellH = (panelH - PAD * 2 - GAP * (N - 1)) / N;
 
-        String[] labels = { "X Pos (m)", "Y Pos (m)", "Speed m/s",
-                            "Vel X",     "Vel Y",     "Acc Y m/s2",
-                            "KE (J)",    "PE (J)",    "E_tot (J)" };
-        List<Float>[] sets = new List[]{ gPosX, gPosY, gSpeed,
-                                         gVelX, gVelY, gAccY,
-                                         gKE,   gPE,   gTE };
-        Color[] cols = {
-            Color.CYAN,   Color.GREEN,  Color.YELLOW,
-            Color.ORANGE, Color.CORAL,  Color.RED,
-            Color.GOLD,   new Color(0.8f, 0.4f, 1f, 1f), Color.WHITE
+        String[] labels = {
+            "X Pos (m)", "Y Pos (m)", "Speed m/s",
+            "Vel X", "Vel Y", "Acc Y m/s2",
+            "KE (J)", "PE (J)", "E_tot (J)"
         };
 
+        List<Float>[] sets = new List[]{
+            gPosX, gPosY, gSpeed,
+            gVelX, gVelY, gAccY,
+            gKE, gPE, gTE
+        };
+
+        Color[] cols = {
+            Color.CYAN, Color.GREEN, Color.YELLOW,
+            Color.ORANGE, Color.CORAL, Color.RED,
+            Color.GOLD, new Color(0.8f, 0.4f, 1f, 1f), Color.WHITE
+        };
+
+        // ── Build grouped help targets ──────────────────────────────────
+        float groupX = rightX + PAD;
+        float groupW = cellW;
+        float iconSize = 14f;
+
+        Rectangle posGroup = new Rectangle(
+            groupX,
+            panelY + panelH - PAD - (2 * cellH) - (1 * GAP),
+            groupW,
+            2 * cellH + GAP
+        );
+
+        Rectangle speedGroup = new Rectangle(
+            groupX,
+            panelY + panelH - PAD - (3 * cellH) - (2 * GAP),
+            groupW,
+            cellH
+        );
+
+        Rectangle velGroup = new Rectangle(
+            groupX,
+            panelY + panelH - PAD - (5 * cellH) - (4 * GAP),
+            groupW,
+            2 * cellH + GAP
+        );
+
+        Rectangle accGroup = new Rectangle(
+            groupX,
+            panelY + panelH - PAD - (6 * cellH) - (5 * GAP),
+            groupW,
+            cellH
+        );
+
+        Rectangle energyGroup = new Rectangle(
+            groupX,
+            panelY + panelH - PAD - (9 * cellH) - (8 * GAP),
+            groupW,
+            3 * cellH + 2 * GAP
+        );
+
+        chartHelpTargets.add(new ChartHelpTarget(
+            "position",
+            new Rectangle(
+                posGroup.x + posGroup.width - iconSize - 6f,
+                posGroup.y + posGroup.height - iconSize - 4f,
+                iconSize,
+                iconSize
+            ),
+            posGroup
+        ));
+
+        chartHelpTargets.add(new ChartHelpTarget(
+            "speed",
+            new Rectangle(
+                speedGroup.x + speedGroup.width - iconSize - 6f,
+                speedGroup.y + speedGroup.height - iconSize - 4f,
+                iconSize,
+                iconSize
+            ),
+            speedGroup
+        ));
+
+        chartHelpTargets.add(new ChartHelpTarget(
+            "velocity",
+            new Rectangle(
+                velGroup.x + velGroup.width - iconSize - 6f,
+                velGroup.y + velGroup.height - iconSize - 4f,
+                iconSize,
+                iconSize
+            ),
+            velGroup
+        ));
+
+        chartHelpTargets.add(new ChartHelpTarget(
+            "acceleration",
+            new Rectangle(
+                accGroup.x + accGroup.width - iconSize - 6f,
+                accGroup.y + accGroup.height - iconSize - 4f,
+                iconSize,
+                iconSize
+            ),
+            accGroup
+        ));
+
+        chartHelpTargets.add(new ChartHelpTarget(
+            "energy",
+            new Rectangle(
+                energyGroup.x + energyGroup.width - iconSize - 6f,
+                energyGroup.y + energyGroup.height - iconSize - 4f,
+                iconSize,
+                iconSize
+            ),
+            energyGroup
+        ));
+
+        // ── Backgrounds ────────────────────────────────────────────────
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         shapeRenderer.setProjectionMatrix(uiCamera.combined);
@@ -902,42 +1093,78 @@ public class GameScreen extends ScreenAdapter {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(0f, 0f, 0.08f, 0.95f);
         shapeRenderer.rect(rightX, panelY, panelW, panelH);
+
         for (int i = 0; i < N; i++) {
             float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
             shapeRenderer.setColor(0.04f, 0.04f, 0.16f, 1f);
             shapeRenderer.rect(rightX + PAD, cy, cellW, cellH);
         }
+
+        // Draw tooltip icons
+        for (ChartHelpTarget target : chartHelpTargets) {
+            float cx = target.iconBounds.x + target.iconBounds.width / 2f;
+            float cy = target.iconBounds.y + target.iconBounds.height / 2f;
+            float radius = target.iconBounds.width / 2f;
+
+            shapeRenderer.setColor(0.18f, 0.45f, 0.85f, 0.95f);
+            shapeRenderer.circle(cx, cy, radius, 24);
+        }
         shapeRenderer.end();
 
+        // ── Graph lines ────────────────────────────────────────────────
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         for (int i = 0; i < N; i++) {
             float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
             drawGraphLines(rightX + PAD, cy, cellW, cellH, sets[i], cols[i]);
         }
         shapeRenderer.end();
+
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        // ── Text and icon labels ───────────────────────────────────────
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
         winFont.setUseIntegerPositions(true);
+
         for (int i = 0; i < N; i++) {
             float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
             List<Float> data = sets[i];
             float tx = rightX + PAD + 2;
+
             winFont.setColor(cols[i]);
             winFont.draw(batch, labels[i], tx, cy + cellH - 1);
+
             if (!data.isEmpty()) {
                 float last = data.get(data.size() - 1);
                 float vMin = last, vMax = last;
-                for (float v : data) { if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
+                for (float v : data) {
+                    if (v < vMin) vMin = v;
+                    if (v > vMax) vMax = v;
+                }
+
                 winFont.setColor(Color.WHITE);
                 winFont.draw(batch, String.format("%+.2f", last), tx, cy + cellH - 12);
+
                 winFont.setColor(new Color(0.5f, 0.5f, 0.5f, 1f));
                 winFont.draw(batch, String.format("%.1f", vMax), tx, cy + cellH * 0.72f);
                 winFont.draw(batch, String.format("%.1f", vMin), tx, cy + 10f);
             }
         }
+
+        // Draw the "i" label inside each icon
+        for (ChartHelpTarget target : chartHelpTargets) {
+            GlyphLayout infoGlyph = new GlyphLayout(winFont, "i");
+            float tx = target.iconBounds.x + (target.iconBounds.width - infoGlyph.width) / 2f;
+            float ty = target.iconBounds.y + (target.iconBounds.height + infoGlyph.height) / 2f - 1f;
+
+            winFont.setColor(Color.WHITE);
+            winFont.draw(batch, "i", tx, ty);
+        }
+
         batch.end();
+
+        // Update hover state after bounds are built and icons drawn
+        updateChartHelpHover();
     }
 
     private void drawGraphLines(float cx, float cy, float gW, float gH,
