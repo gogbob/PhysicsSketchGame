@@ -10,7 +10,6 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
@@ -19,16 +18,11 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.physics_game.collision.CustomContactHandler;
 import io.github.physics_game.levels.Level;
-import io.github.physics_game.levels.Level1;
-import io.github.physics_game.levels.TutorialLevel;
 import io.github.physics_game.object_types.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static com.badlogic.gdx.Input.Keys.B;
-import static com.badlogic.gdx.utils.JsonValue.ValueType.object;
 
 /** {@link com.badlogic.gdx.ApplicationListener} implementation shared by all platforms. */
 public class GameScreen extends ScreenAdapter {
@@ -49,11 +43,11 @@ public class GameScreen extends ScreenAdapter {
     private boolean scoreCalculated = false;
     public static final float viewPortWidth = 40f;
     public static final float viewPortHeight = 30f;
-    public static int SIDE_BUFFER_PX = 200;
+    public static int SIDE_BUFFER_PX = 250;
     public static int TOP_BUFFER_PX = 10;
     public static int BOTTOM_BUFFER_PX = 10;
-    public static int BUTTON_WIDTH = 240;
-    public static int BUTTON_HEIGHT = 120;
+    public static int BUTTON_WIDTH = 200;
+    public static int BUTTON_HEIGHT = 64;
     public static int BUTTON_STARTY = 400;
     public static final float selectInfoPeriod = 0.1f;
 
@@ -68,6 +62,11 @@ public class GameScreen extends ScreenAdapter {
     private float physicsDataTimer = selectInfoPeriod;
     private String physicsDataString = "";
     private final Vector2 lastClickPos = new Vector2();
+
+    // Texture loading
+    private Texture fullRegionTexture;
+    private Texture selectRegionTexture;
+    private Texture whiteRegionTexture;
 
     // Graph recording
     private boolean showGraphs = false;
@@ -122,6 +121,10 @@ public class GameScreen extends ScreenAdapter {
             ),
             5, 5, 0);
 
+        fullRegionTexture = new Texture("full_region.png");
+        selectRegionTexture = new Texture("select_region.png");
+        whiteRegionTexture = new Texture("white_region.png");
+
         drawType = currentLevel.getDrawTypes().get(currentLevel.getSelectedPaint());
 
         drawTool = new DrawTool(0.5f);
@@ -135,114 +138,125 @@ public class GameScreen extends ScreenAdapter {
     @Override
     public void render(float delta) {
         boolean isSelecting = false;
-        // Shared layout values — computed once, used in both click handler and drawing
-        int panelW  = (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2;
-        int panelH  = viewport.getScreenHeight();
-        int panelY  = (uiViewport.getScreenHeight() - panelH) / 2;
-        int restartBtnY = panelY + 8;
-        int restartBtnH = 28;
-        int paintBtnsBaseY = restartBtnY + restartBtnH + 44; // bottom of paint button stack
 
-        if(Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+        // Shared layout values
+        int panelW = (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2;
+        int panelH = viewport.getScreenHeight();
+        int panelY = (uiViewport.getScreenHeight() - panelH) / 2;
+
+        int restartBtnH = 34;
+        float restartBtnY = panelY + 12f;
+        float shortcutsBaseY = restartBtnY + restartBtnH + 16f;
+
+        int sidebarBtnW = panelW - 16;
+        int paintGap = 6;
+
+        // Input handling
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             float mx = Gdx.input.getX();
             float my = uiViewport.getScreenHeight() - Gdx.input.getY() - 1;
-            int btnW = panelW - 16;
+            lastClickPos.set(mx, my);
 
-            // Paint button click detection (stacked from paintBtnsBaseY upward)
+            // Approximate paint button click region from bottom layout
             int numPaintBtns = currentLevel.getDrawTypes().size();
-            int totalPaintH  = numPaintBtns * BUTTON_HEIGHT + (numPaintBtns - 1) * 5;
-            if (mx >= 0 && mx < panelW && my >= paintBtnsBaseY && my < paintBtnsBaseY + totalPaintH) {
-                int relY = (int)(my - paintBtnsBaseY);
-                int slotH = BUTTON_HEIGHT + 5;
-                int slot  = relY / slotH;
+            float shortcutTitleY = shortcutsBaseY + 86f;
+            float paintBtnsBaseYForInput = shortcutTitleY + 20f;
+            int totalPaintH = numPaintBtns * BUTTON_HEIGHT + Math.max(0, numPaintBtns - 1) * paintGap;
+
+            if (mx >= 0 && mx < panelW && my >= paintBtnsBaseYForInput && my < paintBtnsBaseYForInput + totalPaintH) {
+                int relY = (int) (my - paintBtnsBaseYForInput);
+                int slotH = BUTTON_HEIGHT + paintGap;
+                int slot = relY / slotH;
                 if (slot < numPaintBtns && relY % slotH < BUTTON_HEIGHT) {
                     currentLevel.setSelectedPaint(slot);
                     drawType = currentLevel.getDrawTypes().get(slot);
                 }
-            } else if (mx >= 8 && mx <= 8 + btnW && my >= restartBtnY && my <= restartBtnY + restartBtnH) {
+            } else if (mx >= 8 && mx <= 8 + sidebarBtnW && my >= restartBtnY && my <= restartBtnY + restartBtnH) {
                 resetLevel();
-                isSelecting = true; // consume the click
-            } else if(mx < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
+                isSelecting = true;
+            } else if (mx < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2
+                && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
                 Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
-                if(i != null) {
-                    System.out.println("Selecting");
+                if (i != null) {
                     selectedObject = i;
                     isSelecting = true;
                 } else {
-                    System.out.println("Clicked on empty space, starting draw");
                     Vector3 worldPos = viewport.unproject(new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
                     drawTool.update(drawType, currentLevel, 1, worldPos.x, worldPos.y);
                 }
             }
-        } else if(Gdx.input.getX() < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && Gdx.input.getX() > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
+        } else if (Gdx.input.getX() < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2
+            && Gdx.input.getX() > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
             Vector3 worldPos = viewport.unproject(new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
             drawTool.update(drawType, currentLevel, Gdx.input.isButtonPressed(Input.Buttons.LEFT) ? 2 : 0, worldPos.x, worldPos.y);
         }
 
-
-        if(currentLevel.getRunPhysics()) accumulator += Math.min(delta, 0.25f);
+        if (currentLevel.getRunPhysics()) accumulator += Math.min(delta, 0.25f);
         else accumulator = 0.0f;
 
         logTimer += delta;
-        if (currentLevel.getRunPhysics() && !currentLevel.isComplete()) currentLevel.setLevelTimer(currentLevel.getLevelTimer() + delta);
+        if (currentLevel.getRunPhysics() && !currentLevel.isComplete()) {
+            currentLevel.setLevelTimer(currentLevel.getLevelTimer() + delta);
+        }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
             showDebugOverlay = !showDebugOverlay;
             Gdx.app.log("Main", "Debug overlay " + (showDebugOverlay ? "ON" : "OFF"));
         }
 
-        if(Gdx.input.isKeyJustPressed(Input.Keys.D)) {
-            //run debug
-            float maxIndex = -1;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.D)) {
             PhysicsObject lastObj = currentLevel.getPhysicsObjects().get(currentLevel.getPhysicsObjects().size() - 1);
             drawTool.testAddPoint(true);
             PhysicsResolver.printShape(lastObj.getVertices());
         }
 
-        if(Gdx.input.isKeyJustPressed(Input.Keys.R)) {
-            currentLevel.reinitialize();
-        }
-
-        if(Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             currentLevel.setRunPhysics(!currentLevel.getRunPhysics());
             Gdx.app.log("Main", "Physics " + (currentLevel.getRunPhysics() ? "RUNNING" : "PAUSED"));
         }
-        //make stepping key
-        if(Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             Gdx.app.log("Main", "ticking 1 time step");
             accumulator = 2f / 60f;
         }
 
-        if(Gdx.input.isKeyJustPressed(Input.Keys.G)) {
-            drawType = (drawType == DrawType.POSITIVE)? DrawType.NEGATIVE : DrawType.POSITIVE;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.G)) {
+            drawType = (drawType == DrawType.POSITIVE) ? DrawType.NEGATIVE : DrawType.POSITIVE;
         }
 
-        if(Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            currentLevel.reinitialize();
             resetLevel();
         }
 
-        if(Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
             showGraphs = !showGraphs;
         }
 
-        // clear the screen
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            game.setScreen(new MainMenuScreen(game));
+            return;
+        }
+
+        // Clear + background
         ScreenUtils.clear(Color.GRAY);
         viewport.apply();
         camera.update();
+
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        // create the background
         Texture txtBackground = currentLevel.getBackground();
-        if(txtBackground != null) {
+        if (txtBackground != null) {
             batch.setColor(new Color(0.8f, 0.8f, 0.8f, 1.0f));
             batch.draw(txtBackground, 0, 0, viewport.getWorldWidth(), viewport.getWorldHeight());
         } else {
             Gdx.app.log("Main", "Background texture is null!");
         }
         batch.end();
+
         ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
 
-        if(currentLevel.isComplete()) {
+        if (currentLevel.isComplete()) {
             if (!scoreCalculated) {
                 finalScore = ScoreCalculator.calculateScore(
                     currentLevel.getCurrentDrawnProportion(),
@@ -256,47 +270,41 @@ public class GameScreen extends ScreenAdapter {
                 Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
             }
         }
+
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
-
-        if(!showDebugOverlay) {
-            //Normal view
+        if (!showDebugOverlay) {
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-            int i = 1;
-            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-                if(!(obj instanceof UncollidableObject) || obj instanceof NoDrawField) {
+            for (PhysicsObject obj : currentLevel.getPhysicsObjects()) {
+                if (!(obj instanceof UncollidableObject) || obj instanceof NoDrawField) {
                     drawEarTriangles(obj.getLocalBody(), obj.getConcaveLocalTriangles(), obj.getColor());
                 }
             }
             shapeRenderer.end();
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
 
-            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-                if(selectedObject != null) {
-                    if(obj.getId() == selectedObject) {
-                        drawOutline(obj.getLocalBody(), Color.BLUE);
-                    }
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+            for (PhysicsObject obj : currentLevel.getPhysicsObjects()) {
+                if (selectedObject != null && obj.getId() == selectedObject) {
+                    drawOutline(obj.getLocalBody(), Color.BLUE);
                 }
             }
             shapeRenderer.end();
         } else {
             shapeRenderer.setProjectionMatrix(camera.combined);
             shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-            for(PhysicsObject obj : currentLevel.getPhysicsObjects()) {
-                if(obj instanceof DynamicTriggerObject) {
+            for (PhysicsObject obj : currentLevel.getPhysicsObjects()) {
+                if (obj instanceof DynamicTriggerObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.GOLD);
-                } else if(obj instanceof DynamicObject) {
+                } else if (obj instanceof DynamicObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.YELLOW);
                 } else if (obj instanceof StaticObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.CYAN);
                 } else if (obj instanceof UncollidableObject) {
                     drawPolygons(obj.getLocalBody(), obj.getConcaveLocalBest(), Color.RED);
                 }
-
-                //draw the outline
                 drawOutline(obj.getLocalBody(), Color.WHITE);
             }
             shapeRenderer.end();
@@ -305,67 +313,74 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-
-        for(DebugForce f : forces) {
-            if(f.getType() == DebugForce.Type.GRAVITY ||  f.getType() == DebugForce.Type.VELOCITY)
+        for (DebugForce f : forces) {
+            if (f.getType() == DebugForce.Type.GRAVITY || f.getType() == DebugForce.Type.VELOCITY) {
                 drawArrow(f.getPosition(), f.getForce().nor(), f.getForce().len(), f.getColor());
+            }
         }
-
         shapeRenderer.end();
 
-        if(currentLevel.getRunPhysics()) currentLevel.tick(delta);
+        if (currentLevel.getRunPhysics()) {
+            currentLevel.tick(delta);
+        }
 
-        //camera.update();
-        //batch.setProjectionMatrix(camera.combined);
-
+        // UI
         uiViewport.apply();
-
-        //PANELS
-
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
 
+        // Panel backgrounds
         batch.setColor(0f, 0f, 0f, 0.6f);
         batch.draw(panelBgTexture, uiViewport.getScreenWidth() - panelW, 0, panelW + 20f, uiViewport.getScreenHeight());
         batch.draw(panelBgTexture, 0, 0, panelW, uiViewport.getScreenHeight());
         batch.setColor(Color.WHITE);
 
         // ── LEFT PANEL ────────────────────────────────────────────────
-        float lx = 8f;
-        float topY = panelY + panelH - 20f;
+        float lx = 14f;
+        float topY = panelY + panelH - 10f;
 
-        // Level name + time
-        winFont.getData().setScale(1.0f);
+        winFont.getData().setScale(0.9f);
         winFont.setColor(new Color(0.7f, 0.85f, 1f, 1f));
         winFont.setUseIntegerPositions(true);
+
         String timeStr = String.format("%d:%02d.%d",
-            (int)(currentLevel.getLevelTimer() / 60f),
-            (int)(currentLevel.getLevelTimer()) % 60,
-            ((int)(currentLevel.getLevelTimer() * 10)) % 10);
+            (int) (currentLevel.getLevelTimer() / 60f),
+            (int) (currentLevel.getLevelTimer()) % 60,
+            ((int) (currentLevel.getLevelTimer() * 10)) % 10);
+
         String levelHeaderStr;
-        if(game.currentScores.get(currentLevel.getLevelId()) != null) {
+        if (game.currentScores.get(currentLevel.getLevelId()) != null) {
             String bestTimeStr = String.format("%d:%02d.%d",
-                (int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime() / 60f),
-                (int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime()) % 60,
-                ((int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime() * 10)) % 10);
+                (int) (game.currentScores.get(currentLevel.getLevelId()).getBestTime() / 60f),
+                (int) (game.currentScores.get(currentLevel.getLevelId()).getBestTime()) % 60,
+                ((int) (game.currentScores.get(currentLevel.getLevelId()).getBestTime() * 10)) % 10);
+
             levelHeaderStr = currentLevel.getLevelName() + "\nTime: " + timeStr
                 + "\nBest Time: " + bestTimeStr
                 + "\nBest Drawn proportion: " + String.format("%.0f%%", game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion() * 100f)
-                + "\nScore: " + ScoreCalculator.calculateScore(game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
-                game.currentScores.get(currentLevel.getLevelId()).getBestTime(), currentLevel.getFreeProp()) + "  [" + ScoreCalculator.calculateStars(ScoreCalculator.calculateScore(game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
-                game.currentScores.get(currentLevel.getLevelId()).getBestTime(), currentLevel.getFreeProp())) + "★]"
-                + "\nDescription: \n" + currentLevel.getDescription();
+                + "\nScore: " + ScoreCalculator.calculateScore(
+                game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
+                game.currentScores.get(currentLevel.getLevelId()).getBestTime(),
+                currentLevel.getFreeProp()
+            ) + "  [" + ScoreCalculator.calculateStars(
+                ScoreCalculator.calculateScore(
+                    game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
+                    game.currentScores.get(currentLevel.getLevelId()).getBestTime(),
+                    currentLevel.getFreeProp()
+                )
+            ) + "★]"
+                + "\nDescription:\n" + currentLevel.getDescription();
         } else {
             levelHeaderStr = currentLevel.getLevelName() + "\nTime: " + timeStr
                 + "\nBest Time: --"
                 + "\nBest Drawn proportion: --"
-                + "\nDescription: \n" + currentLevel.getDescription();
+                + "\nDescription:\n" + currentLevel.getDescription();
         }
 
-        GlyphLayout glHeader = new GlyphLayout(winFont, levelHeaderStr.toString());
+        GlyphLayout glHeader = new GlyphLayout(winFont, levelHeaderStr);
         winFont.draw(batch, glHeader, lx, topY);
+        winFont.getData().setScale(1f);
 
-        // Separator
         float sepY = topY - glHeader.height - 4f;
         batch.setColor(0.3f, 0.5f, 0.8f, 0.4f);
         batch.draw(panelBgTexture, lx, sepY, panelW - 16f, 1f);
@@ -374,116 +389,166 @@ public class GameScreen extends ScreenAdapter {
         // Physics data table
         winFont.setColor(Color.CYAN);
         winFont.setFixedWidthGlyphs("0123456789+-.,() ");
+        GlyphLayout physicsLayout = new GlyphLayout();
         if (!physicsDataString.isEmpty()) {
+            physicsLayout.setText(winFont, physicsDataString);
             winFont.draw(batch, physicsDataString, lx, sepY - 6f);
         }
         winFont.setFixedWidthGlyphs("");
 
-        // ── BOTTOM: hints → paint buttons → RESTART ──────────────────
-        // RESTART button
-        int btnW = panelW - 16;
-        batch.setColor(0.75f, 0.15f, 0.15f, 0.92f);
-        batch.draw(panelBgTexture, 8, restartBtnY, btnW, restartBtnH);
-        batch.setColor(Color.WHITE);
-        winFont.setColor(Color.WHITE);
-        GlyphLayout rl = new GlyphLayout(winFont, "RESTART  [R]");
-        winFont.draw(batch, rl, 8 + (btnW - rl.width) / 2f, restartBtnY + (restartBtnH + rl.height) / 2f);
+        // Dynamic layout for lower sidebar
+        float topContentBottomY = sepY - 6f - physicsLayout.height;
 
-        // Hint line above restart
-        winFont.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
-        winFont.draw(batch, "[P] graphs   [click] obj info", lx, restartBtnY + restartBtnH + 18f);
+        float shortcutTitleY = shortcutsBaseY + 86f;
+        float shortcutsTopY = shortcutTitleY;
 
-        // Paint selection buttons stacked from paintBtnsBaseY upward
+        float paintBtnsBaseY = topContentBottomY - 100f;
+        float minPaintBtnsBaseY = shortcutsTopY - 250f;
+        if (paintBtnsBaseY < minPaintBtnsBaseY) {
+            paintBtnsBaseY = minPaintBtnsBaseY;
+        }
+
+        // Paint selection buttons
         float trackY = 0f;
         for (int i = 0; i < MainGame.drawTypeButtons.size(); i++) {
             if (currentLevel.getDrawTypes().contains(MainGame.drawTypeButtons.get(i).drawType)) {
                 int ind = currentLevel.getDrawTypes().indexOf(MainGame.drawTypeButtons.get(i).drawType);
 
                 float btnBotY = paintBtnsBaseY + trackY;
-                int rectStartX = 48, rectStartY = 35, rectTotalWidth = 162, rectTotalHeight = 30;
-                float leftWidth = rectTotalWidth * currentLevel.getCurrentDrawnAmounts().get(ind)
-                                  / currentLevel.getDrawAmounts().get(ind);
-                boolean full = currentLevel.getDrawAmounts().get(ind) - currentLevel.getCurrentDrawnAmounts().get(ind) < 0.001f;
+
+                int rectStartX = 24;
+                int rectStartY = 18;
+                int rectTotalWidth = 145;
+                int rectTotalHeight = 22;
+
+                float amountNow = currentLevel.getCurrentDrawnAmounts().get(ind);
+                float amountMax = currentLevel.getDrawAmounts().get(ind);
+                float leftWidth = 0f;
+                if (amountMax > 0.0001f) {
+                    leftWidth = rectTotalWidth * amountNow / amountMax;
+                }
+
+                boolean full = (amountMax - amountNow) < 0.001f;
 
                 Texture barTex;
                 Texture btnTex;
                 if (currentLevel.getSelectedPaint() == ind) {
-                    barTex = full ? new Texture("full_region.png") : new Texture("select_region.png");
+                    barTex = full ? fullRegionTexture : selectRegionTexture;
                     btnTex = MainGame.drawTypeButtons.get(i).onTex;
                 } else {
-                    barTex = full ? new Texture("full_region.png") : new Texture("white_region.png");
+                    barTex = full ? fullRegionTexture : whiteRegionTexture;
                     btnTex = MainGame.drawTypeButtons.get(i).offTex;
                 }
-                batch.draw(barTex, lx + rectStartX, btnBotY + rectStartY, leftWidth, rectTotalHeight);
-                batch.draw(btnTex, lx, btnBotY, BUTTON_WIDTH, BUTTON_HEIGHT);
-                trackY += BUTTON_HEIGHT + 5;
+
+                batch.draw(barTex, lx + rectStartX, btnBotY + rectStartY - 60f, leftWidth, rectTotalHeight);
+                batch.draw(btnTex, lx, btnBotY -60f, BUTTON_WIDTH, BUTTON_HEIGHT);
+
+                trackY += BUTTON_HEIGHT + paintGap;
             }
         }
 
+        // Shortcuts block
+        winFont.setColor(new Color(0.78f, 0.78f, 0.78f, 1f));
+        winFont.draw(batch, "Shortcuts", lx, shortcutTitleY);
+
+        winFont.setColor(new Color(0.62f, 0.62f, 0.62f, 1f));
+        winFont.draw(batch, "[Esc] back", lx, shortcutTitleY - 20f);
+        winFont.draw(batch, "[R] restart", lx, shortcutTitleY - 38f);
+        winFont.draw(batch, "[Space] play/pause", lx, shortcutTitleY - 56f);
+        winFont.draw(batch, "[P] graphs", lx, shortcutTitleY - 74f);
+        winFont.draw(batch, "[Click] object info", lx, shortcutTitleY - 92f);
+
+        // Restart button
+        batch.setColor(0.75f, 0.15f, 0.15f, 0.92f);
+        batch.draw(panelBgTexture, 8f, restartBtnY, sidebarBtnW, restartBtnH);
+        batch.setColor(Color.WHITE);
+
+        winFont.setColor(Color.WHITE);
+        GlyphLayout rl = new GlyphLayout(winFont, "RESTART  [R]");
+        winFont.draw(batch, rl,
+            8f + (sidebarBtnW - rl.width) / 2f,
+            restartBtnY + (restartBtnH + rl.height) / 2f
+        );
+
         batch.end();
 
-        // ── RIGHT PANEL — always graphs ───────────────────────────────
+        // Right panel graphs
         renderGraphOverlay();
 
-        // Physics data tracking (graph recording + data-table string update)
+        // Physics data tracking
         physicsDataTimer += delta;
-
         if (physicsDataTimer >= selectInfoPeriod) {
             float temp = physicsDataTimer;
             while (physicsDataTimer >= selectInfoPeriod) physicsDataTimer -= selectInfoPeriod;
 
-            // Find the primary object (first DynamicObject) for graph recording
             DynamicObject mainObj = null;
             for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
-                if (o instanceof DynamicObject) { mainObj = (DynamicObject) o; break; }
+                if (o instanceof DynamicObject) {
+                    mainObj = (DynamicObject) o;
+                    break;
+                }
             }
 
-            // Record graph data from primary object whenever physics runs
             if (mainObj != null && currentLevel.getRunPhysics() && !currentLevel.isComplete()) {
-                Vector2 pos   = mainObj.getPosition();
-                Vector2 vel   = mainObj.getLinearVelocity();
-                float mass    = mainObj.getMass();
+                Vector2 pos = mainObj.getPosition();
+                Vector2 vel = mainObj.getLinearVelocity();
+                float mass = mainObj.getMass();
                 float inertia = mainObj.getInertia();
-                float omega   = mainObj.getAngularVelocity();
-                float ke      = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
-                float pe      = mass * 9.8f * pos.y;
+                float omega = mainObj.getAngularVelocity();
+                float ke = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
+                float pe = mass * 9.8f * pos.y;
                 Vector2 accel = mainObj.getCurrentLinearAcceleration(temp);
                 mainObj.setCurrentLinearAcceleration(new Vector2());
                 mainObj.setCurrentAngularAcceleration(0f);
 
                 gTime.add(currentLevel.getLevelTimer());
-                gPosX.add(pos.x);   gPosY.add(pos.y);
-                gVelX.add(vel.x);   gVelY.add(vel.y);
+                gPosX.add(pos.x);
+                gPosY.add(pos.y);
+                gVelX.add(vel.x);
+                gVelY.add(vel.y);
                 gSpeed.add(vel.len());
-                gAccX.add(accel.x); gAccY.add(accel.y);
-                gKE.add(ke);        gPE.add(pe);        gTE.add(ke + pe);
+                gAccX.add(accel.x);
+                gAccY.add(accel.y);
+                gKE.add(ke);
+                gPE.add(pe);
+                gTE.add(ke + pe);
+
                 while (gTime.size() > MAX_GRAPH_SAMPLES) {
-                    gTime.remove(0);  gPosX.remove(0);  gPosY.remove(0);
-                    gVelX.remove(0);  gVelY.remove(0);  gSpeed.remove(0);
-                    gAccX.remove(0);  gAccY.remove(0);
-                    gKE.remove(0);    gPE.remove(0);    gTE.remove(0);
+                    gTime.remove(0);
+                    gPosX.remove(0);
+                    gPosY.remove(0);
+                    gVelX.remove(0);
+                    gVelY.remove(0);
+                    gSpeed.remove(0);
+                    gAccX.remove(0);
+                    gAccY.remove(0);
+                    gKE.remove(0);
+                    gPE.remove(0);
+                    gTE.remove(0);
                 }
             }
 
-            // Build data-table string from primary object (or selected object if clicked)
             PhysicsObject displayObj = null;
             if (selectedObject != null) {
                 for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
-                    if (o.getId() == selectedObject) { displayObj = o; break; }
+                    if (o.getId() == selectedObject) {
+                        displayObj = o;
+                        break;
+                    }
                 }
             }
             if (displayObj == null) displayObj = mainObj;
 
             if (displayObj != null) {
-                Vector2 pos    = displayObj.getPosition();
-                Vector2 vel    = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getLinearVelocity() : new Vector2();
-                float speed    = vel.len();
-                float mass     = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getMass() : 0f;
-                float inertia  = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getInertia() : 0f;
-                float omega    = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getAngularVelocity() : 0f;
-                float ke       = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
-                float pe       = mass * 9.8f * pos.y;
-                Vector2 accel  = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getCurrentLinearAcceleration(temp) : new Vector2();
+                Vector2 pos = displayObj.getPosition();
+                Vector2 vel = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getLinearVelocity() : new Vector2();
+                float speed = vel.len();
+                float mass = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getMass() : 0f;
+                float inertia = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getInertia() : 0f;
+                float omega = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getAngularVelocity() : 0f;
+                float ke = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
+                float pe = mass * 9.8f * pos.y;
+                Vector2 accel = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getCurrentLinearAcceleration(temp) : new Vector2();
 
                 StringBuilder sb = new StringBuilder();
                 sb.append("  PHYSICS DATA  \n");
@@ -493,23 +558,23 @@ public class GameScreen extends ScreenAdapter {
                 sb.append(String.format(" x   %+8.3f m\n", pos.x));
                 sb.append(String.format(" y   %+8.3f m\n", pos.y));
                 sb.append("----------------\n");
-                sb.append(String.format(" vx  %+8.3f\n",   vel.x));
-                sb.append(String.format(" vy  %+8.3f\n",   vel.y));
+                sb.append(String.format(" vx  %+8.3f\n", vel.x));
+                sb.append(String.format(" vy  %+8.3f\n", vel.y));
                 sb.append(String.format("|v|  %8.3f m/s\n", speed));
                 sb.append("----------------\n");
-                sb.append(String.format(" ax  %+8.3f\n",   accel.x));
-                sb.append(String.format(" ay  %+8.3f\n",   accel.y));
+                sb.append(String.format(" ax  %+8.3f\n", accel.x));
+                sb.append(String.format(" ay  %+8.3f\n", accel.y));
                 sb.append(String.format(" w   %+8.3f r/s\n", omega));
                 sb.append("----------------\n");
                 sb.append(String.format(" m   %8.3f kg\n", mass));
-                sb.append(String.format(" u   %8.3f\n",    displayObj.getFriction()));
+                sb.append(String.format(" u   %8.3f\n", displayObj.getFriction()));
                 if (displayObj instanceof Charged) {
                     sb.append(String.format(" q   %8.3f C/kg\n", ((Charged) displayObj).getChargeDensity()));
                 }
                 sb.append("----------------\n");
-                sb.append(String.format(" KE  %8.3f J\n",  ke));
-                sb.append(String.format(" PE  %8.3f J\n",  pe));
-                sb.append(String.format(" E   %8.3f J",    ke + pe));
+                sb.append(String.format(" KE  %8.3f J\n", ke));
+                sb.append(String.format(" PE  %8.3f J\n", pe));
+                sb.append(String.format(" E   %8.3f J", ke + pe));
                 physicsDataString = sb.toString();
             } else {
                 physicsDataString = "";
@@ -631,6 +696,9 @@ public class GameScreen extends ScreenAdapter {
         if (panelBgTexture != null) panelBgTexture.dispose();
         if (batch != null) batch.dispose();
         if (shapeRenderer != null) shapeRenderer.dispose();
+        if (fullRegionTexture != null) fullRegionTexture.dispose();
+        if (selectRegionTexture != null) selectRegionTexture.dispose();
+        if (whiteRegionTexture != null) whiteRegionTexture.dispose();
     }
 
     @Override
