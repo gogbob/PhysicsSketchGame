@@ -169,6 +169,7 @@ public class GameScreen extends ScreenAdapter {
                     game.setScreen(new LevelScreen(game));
                 } else if (action == GameSidebarRenderer.SidebarAction.RESTART) {
                     resetLevel();
+                    graphicOverlayRenderer.resetEnergyScale();
                 } else if (mx < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2
                     && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
                     Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
@@ -621,6 +622,7 @@ public class GameScreen extends ScreenAdapter {
     private void resetLevel() {
         currentLevel.reset();
         drawTool.reset();
+        graphicOverlayRenderer.resetEnergyScale();
         gTime.clear();  gPosX.clear();  gPosY.clear();
         gVelX.clear();  gVelY.clear();  gSpeed.clear();
         gAccX.clear();  gAccY.clear();

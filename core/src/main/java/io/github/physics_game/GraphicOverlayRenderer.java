@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -25,6 +26,55 @@ public class GraphicOverlayRenderer {
 
     private final ArrayList<ChartHelpTarget> chartHelpTargets = new ArrayList<>();
     private ChartHelpTarget hoveredChartHelp = null;
+
+    private float maxObservedTotalEnergy = 1f;
+
+    private void drawEnergyBars(
+        float x,
+        float y,
+        float w,
+        float h,
+        List<Float> gKE,
+        List<Float> gPE,
+        List<Float> gTE
+    ) {
+        if (gKE.isEmpty() || gPE.isEmpty() || gTE.isEmpty()) return;
+
+        float ke = gKE.get(gKE.size() - 1);
+        float pe = gPE.get(gPE.size() - 1);
+        float te = gTE.get(gTE.size() - 1);
+
+        float maxVal = Math.max(maxObservedTotalEnergy, 1f);
+
+        float padX = 18f;
+        float padTop = 22f;
+        float padBottom = 22f;
+
+        float chartX = x + padX;
+        float chartY = y + padBottom;
+        float chartW = w - padX * 2f;
+        float chartH = h - padTop - padBottom;
+
+        float gap = 14f;
+        float barW = (chartW - 2f * gap) / 3f;
+
+        float keH = chartH * (ke / maxVal);
+        float peH = chartH * (pe / maxVal);
+        float teH = chartH * (te / maxVal);
+
+        shapeRenderer.setColor(Color.GOLD);
+        shapeRenderer.rect(chartX, chartY, barW, keH);
+
+        shapeRenderer.setColor(new Color(0.8f, 0.4f, 1f, 1f));
+        shapeRenderer.rect(chartX + barW + gap, chartY, barW, peH);
+
+        shapeRenderer.setColor(Color.WHITE);
+        shapeRenderer.rect(chartX + 2f * (barW + gap), chartY, barW, teH);
+    }
+
+    public void resetEnergyScale() {
+        maxObservedTotalEnergy = 1f;
+    }
 
     public GraphicOverlayRenderer(
         ShapeRenderer shapeRenderer,
@@ -68,6 +118,11 @@ public class GraphicOverlayRenderer {
         float cellW = panelW - PAD * 2;
         float cellH = (panelH - PAD * 2 - GAP * (N - 1)) / N;
 
+        float energyX = rightX + PAD;
+        float energyY = panelY + panelH - PAD - (9 * cellH) - (8 * GAP);
+        float energyW = cellW;
+        float energyH = 3 * cellH + 2 * GAP;
+
         String[] labels = {
             "X Pos (m)", "Y Pos (m)", "Speed m/s",
             "Vel X", "Vel Y", "Acc Y m/s2",
@@ -96,11 +151,15 @@ public class GraphicOverlayRenderer {
         shapeRenderer.setColor(0f, 0f, 0.08f, 0.95f);
         shapeRenderer.rect(rightX, panelY, panelW, panelH);
 
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < 6; i++) {
             float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
             shapeRenderer.setColor(0.04f, 0.04f, 0.16f, 1f);
             shapeRenderer.rect(rightX + PAD, cy, cellW, cellH);
         }
+
+        // merged energy panel
+        shapeRenderer.setColor(0.04f, 0.04f, 0.16f, 1f);
+        shapeRenderer.rect(energyX, energyY, energyW, energyH);
 
         for (ChartHelpTarget target : chartHelpTargets) {
             float cx = target.iconBounds.x + target.iconBounds.width / 2f;
@@ -113,10 +172,15 @@ public class GraphicOverlayRenderer {
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < 6; i++) {
             float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
             drawGraphLines(rightX + PAD, cy, cellW, cellH, gTime, sets[i], cols[i]);
         }
+        shapeRenderer.end();
+
+        // draw energy bars in their own ShapeRenderer pass
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        drawEnergyBars(energyX, energyY, energyW, energyH, gKE, gPE, gTE);
         shapeRenderer.end();
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
@@ -125,7 +189,7 @@ public class GraphicOverlayRenderer {
         batch.begin();
         winFont.setUseIntegerPositions(true);
 
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < 6; i++) {
             float cy = panelY + panelH - PAD - (i + 1) * cellH - i * GAP;
             List<Float> data = sets[i];
             float tx = rightX + PAD + 2;
@@ -152,6 +216,38 @@ public class GraphicOverlayRenderer {
             }
         }
 
+        winFont.setColor(Color.WHITE);
+        winFont.draw(batch, "Energy (J)", energyX + 2f, energyY + energyH - 2f);
+
+        if (!gKE.isEmpty() && !gPE.isEmpty() && !gTE.isEmpty()) {
+            maxObservedTotalEnergy = Math.max(maxObservedTotalEnergy, gTE.get(gTE.size() - 1));
+
+            float ke = gKE.get(gKE.size() - 1);
+            float pe = gPE.get(gPE.size() - 1);
+            float te = gTE.get(gTE.size() - 1);
+
+            float labelY = energyY + 14f;
+            float padX = 18f;
+            float chartW = energyW - padX * 2f;
+            float gap = 14f;
+            float barW = (chartW - 2f * gap) / 3f;
+            float chartX = energyX + padX;
+
+            winFont.setColor(Color.GOLD);
+            winFont.draw(batch, "KE", chartX + barW * 0.25f, labelY);
+
+            winFont.setColor(new Color(0.8f, 0.4f, 1f, 1f));
+            winFont.draw(batch, "PE", chartX + barW + gap + barW * 0.25f, labelY);
+
+            winFont.setColor(Color.WHITE);
+            winFont.draw(batch, "E", chartX + 2f * (barW + gap) + barW * 0.35f, labelY);
+
+            winFont.setColor(Color.LIGHT_GRAY);
+            winFont.draw(batch, String.format("KE %.1f", ke), energyX + 2f, energyY + energyH - 16f);
+            winFont.draw(batch, String.format("PE %.1f", pe), energyX + 2f, energyY + energyH - 28f);
+            winFont.draw(batch, String.format("E %.1f", te), energyX + 2f, energyY + energyH - 40f);
+        }
+
         for (ChartHelpTarget target : chartHelpTargets) {
             GlyphLayout infoGlyph = new GlyphLayout(winFont, "i");
             float tx = target.iconBounds.x + (target.iconBounds.width - infoGlyph.width) / 2f;
@@ -172,9 +268,20 @@ public class GraphicOverlayRenderer {
         String text = ChartHelpText.get(hoveredChartHelp.key);
         if (text == null || text.isEmpty()) return;
 
-        GlyphLayout layout = new GlyphLayout(winFont, text);
         float pad = 10f;
-        float boxW = Math.min(layout.width + pad * 2f, 280f);
+        float maxWidth = 260f; // tooltip max width (adjust as needed)
+
+        GlyphLayout layout = new GlyphLayout();
+        layout.setText(
+            winFont,
+            text,
+            Color.WHITE,
+            maxWidth,
+            Align.left,
+            true
+        );
+
+        float boxW = layout.width + pad * 2f;
         float boxH = layout.height + pad * 2f;
 
         float x = hoveredChartHelp.iconBounds.x - boxW - 8f;
@@ -203,8 +310,9 @@ public class GraphicOverlayRenderer {
 
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
+        winFont.getData().markupEnabled = true;
         winFont.setColor(Color.WHITE);
-        winFont.draw(batch, text, x + pad, y - pad);
+        winFont.draw(batch, layout, x + pad, y - pad);
         batch.end();
     }
 
