@@ -105,6 +105,7 @@ public class GameScreen extends ScreenAdapter {
         batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
         winFont = new BitmapFont();
+        winFont.getData().markupEnabled = true;
         winFont.setColor(Color.WHITE);
         Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pm.setColor(1f, 1f, 1f, 1f);
@@ -369,18 +370,12 @@ public class GameScreen extends ScreenAdapter {
                 (int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime() / 60f),
                 (int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime()) % 60,
                 ((int)(game.currentScores.get(currentLevel.getLevelId()).getBestTime() * 10)) % 10);
-            levelHeaderStr = currentLevel.getLevelName() + "\nTime: " + timeStr
-                + "\nBest Time: " + bestTimeStr
-                + "\nBest Drawn proportion: " + String.format("%.0f%%", game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion() * 100f)
-                + "\nScore: " + ScoreCalculator.calculateScore(game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
-                game.currentScores.get(currentLevel.getLevelId()).getBestTime(), currentLevel.getFreeProp()) + "  [" + ScoreCalculator.calculateStars(ScoreCalculator.calculateScore(game.currentScores.get(currentLevel.getLevelId()).getBestShapeProportion(),
-                game.currentScores.get(currentLevel.getLevelId()).getBestTime(), currentLevel.getFreeProp())) + "★]"
-                + "\nDescription: \n" + currentLevel.getDescription();
+            levelHeaderStr = currentLevel.getLevelName()
+                + "\nTime:  " + timeStr
+                + "\nBest:  " + bestTimeStr;
         } else {
-            levelHeaderStr = currentLevel.getLevelName() + "\nTime: " + timeStr
-                + "\nBest Time: --"
-                + "\nBest Drawn proportion: --"
-                + "\nDescription: \n" + currentLevel.getDescription();
+            levelHeaderStr = currentLevel.getLevelName()
+                + "\nTime:  " + timeStr;
         }
 
         GlyphLayout glHeader = new GlyphLayout(winFont, levelHeaderStr.toString());
@@ -392,13 +387,16 @@ public class GameScreen extends ScreenAdapter {
         batch.draw(panelBgTexture, lx, sepY, panelW - 16f, 1f);
         batch.setColor(Color.WHITE);
 
-        // Physics data table
-        winFont.setColor(Color.CYAN);
+        // Physics formula showcase
+        winFont.getData().setScale(1.3f);
+        winFont.setColor(Color.WHITE);
         winFont.setFixedWidthGlyphs("0123456789+-.,() ");
         if (!physicsDataString.isEmpty()) {
-            winFont.draw(batch, physicsDataString, lx, sepY - 6f);
+            winFont.draw(batch, physicsDataString, lx,        sepY - 6f);
+            winFont.draw(batch, physicsDataString, lx + 0.8f, sepY - 6f);
         }
         winFont.setFixedWidthGlyphs("");
+        winFont.getData().setScale(1f);
 
         // ── BOTTOM: hints → paint buttons → RESTART ──────────────────
         // LEVELS + RESTART buttons
@@ -458,7 +456,7 @@ public class GameScreen extends ScreenAdapter {
         // Physics data tracking (graph recording + data-table string update)
         physicsDataTimer += delta;
 
-        if (physicsDataTimer >= selectInfoPeriod) {
+        if (physicsDataTimer >= selectInfoPeriod && !currentLevel.isComplete()) {
             float temp = physicsDataTimer;
             while (physicsDataTimer >= selectInfoPeriod) physicsDataTimer -= selectInfoPeriod;
 
@@ -467,6 +465,9 @@ public class GameScreen extends ScreenAdapter {
             for (PhysicsObject o : currentLevel.getPhysicsObjects()) {
                 if (o instanceof DynamicObject) { mainObj = (DynamicObject) o; break; }
             }
+
+            // Save accel here so the left panel can reuse it after the reset below
+            Vector2 mainAccel = new Vector2();
 
             // Record graph data from primary object whenever physics runs
             if (mainObj != null && currentLevel.getRunPhysics() && !currentLevel.isComplete()) {
@@ -478,6 +479,7 @@ public class GameScreen extends ScreenAdapter {
                 float ke      = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
                 float pe      = mass * 9.8f * pos.y;
                 Vector2 accel = mainObj.getCurrentLinearAcceleration(temp);
+                mainAccel.set(accel);
                 mainObj.setCurrentLinearAcceleration(new Vector2());
                 mainObj.setCurrentAngularAcceleration(0f);
 
@@ -513,33 +515,54 @@ public class GameScreen extends ScreenAdapter {
                 float omega    = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getAngularVelocity() : 0f;
                 float ke       = 0.5f * mass * vel.len2() + 0.5f * inertia * omega * omega;
                 float pe       = mass * 9.8f * pos.y;
-                Vector2 accel  = (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getCurrentLinearAcceleration(temp) : new Vector2();
+                Vector2 accel  = (displayObj == mainObj) ? mainAccel
+                               : (displayObj instanceof DynamicObject) ? ((DynamicObject) displayObj).getCurrentLinearAcceleration(temp)
+                               : new Vector2();
 
                 StringBuilder sb = new StringBuilder();
-                sb.append("  PHYSICS DATA  \n");
-                sb.append("----------------\n");
-                sb.append(String.format(" t   %8.2f s\n", currentLevel.getLevelTimer()));
-                sb.append("----------------\n");
-                sb.append(String.format(" x   %+8.3f m\n", pos.x));
-                sb.append(String.format(" y   %+8.3f m\n", pos.y));
-                sb.append("----------------\n");
-                sb.append(String.format(" vx  %+8.3f\n",   vel.x));
-                sb.append(String.format(" vy  %+8.3f\n",   vel.y));
-                sb.append(String.format("|v|  %8.3f m/s\n", speed));
-                sb.append("----------------\n");
-                sb.append(String.format(" ax  %+8.3f\n",   accel.x));
-                sb.append(String.format(" ay  %+8.3f\n",   accel.y));
-                sb.append(String.format(" w   %+8.3f r/s\n", omega));
-                sb.append("----------------\n");
-                sb.append(String.format(" m   %8.3f kg\n", mass));
-                sb.append(String.format(" u   %8.3f\n",    displayObj.getFriction()));
+
+                // KINEMATICS
+                sb.append("[GOLD]-- KINEMATICS --[]\n");
+                sb.append("[CYAN] v = sqrt(vx^2 + vy^2)[]\n");
+                sb.append(String.format("[WHITE]   = %.2f m/s[]\n", speed));
+                sb.append(String.format("[LIGHT_GRAY] vx=%+.2f  vy=%+.2f[]\n", vel.x, vel.y));
+                sb.append(String.format("[LIGHT_GRAY] ax=%+.2f  ay=%+.2f[]\n", accel.x, accel.y));
+                sb.append("\n");
+
+                // NEWTON'S 2ND LAW
+                sb.append("[GOLD]-- NEWTON'S 2ND LAW --[]\n");
+                sb.append("[CYAN] F = m * a[]\n");
+                sb.append(String.format("[WHITE] m  = %.3f kg[]\n", mass));
+                sb.append("[CYAN] Weight = m * g[]\n");
+                sb.append(String.format("[WHITE] Fg = %.3f N[]\n", mass * 9.8f));
+                sb.append(String.format("[LIGHT_GRAY] (g = 9.8 m/s^2)[]\n"));
+                sb.append(String.format("[WHITE] Friction: u = %.2f[]\n", displayObj.getFriction()));
+                sb.append("\n");
+
+                // ENERGY
+                sb.append("[GOLD]-- ENERGY --[]\n");
+                sb.append("[CYAN] KE = (1/2) * m * v^2[]\n");
+                sb.append(String.format("[WHITE]    = %.3f J[]\n", ke));
+                sb.append("[CYAN] PE = m * g * h[]\n");
+                sb.append(String.format("[WHITE]    = %.3f J[]\n", pe));
+                sb.append("[CYAN] E  = KE + PE[]\n");
+                sb.append(String.format("[WHITE]    = %.3f J[]\n", ke + pe));
+                sb.append("\n");
+
+                // ROTATION
+                sb.append("[GOLD]-- ROTATION --[]\n");
+                sb.append("[CYAN] KE_rot = (1/2)*I*w^2[]\n");
+                sb.append(String.format("[WHITE] w = %.3f rad/s[]\n", omega));
+                sb.append(String.format("[WHITE] I = %.3f kg*m^2[]\n", inertia));
+                sb.append(String.format("[WHITE] KE_rot = %.3f J[]\n", 0.5f * inertia * omega * omega));
+
+                // CHARGE (if applicable)
                 if (displayObj instanceof Charged) {
-                    sb.append(String.format(" q   %8.3f C/kg\n", ((Charged) displayObj).getChargeDensity()));
+                    sb.append("\n[GOLD]-- CHARGE --[]\n");
+                    sb.append("[CYAN] F = k * q1*q2 / r^2[]\n");
+                    sb.append(String.format("[WHITE] q = %.3f C/kg[]\n", ((Charged) displayObj).getChargeDensity()));
                 }
-                sb.append("----------------\n");
-                sb.append(String.format(" KE  %8.3f J\n",  ke));
-                sb.append(String.format(" PE  %8.3f J\n",  pe));
-                sb.append(String.format(" E   %8.3f J",    ke + pe));
+
                 physicsDataString = sb.toString();
             } else {
                 physicsDataString = "";
