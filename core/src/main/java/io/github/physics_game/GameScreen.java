@@ -91,6 +91,9 @@ public class GameScreen extends ScreenAdapter {
     private Level currentLevel;
     private DrawTool drawTool;
     private Texture panelBgTexture;
+    private Texture texFull;
+    private Texture texSelect;
+    private Texture texWhite;
 
 
     @Override
@@ -112,6 +115,9 @@ public class GameScreen extends ScreenAdapter {
         pm.fill();
         panelBgTexture = new Texture(pm);
         pm.dispose();
+        texFull   = new Texture(Gdx.files.internal("full_region.png"));
+        texSelect = new Texture(Gdx.files.internal("select_region.png"));
+        texWhite  = new Texture(Gdx.files.internal("white_region.png"));
         DynamicObject exampleObject = new DynamicObject(0, 0.5f, 0.1f, 0.5f,
             Arrays.asList(
                 new Vector2(-0.7f, 0.7f),
@@ -436,10 +442,10 @@ public class GameScreen extends ScreenAdapter {
                 Texture barTex;
                 Texture btnTex;
                 if (currentLevel.getSelectedPaint() == ind) {
-                    barTex = full ? new Texture("full_region.png") : new Texture("select_region.png");
+                    barTex = full ? texFull : texSelect;
                     btnTex = MainGame.drawTypeButtons.get(i).onTex;
                 } else {
-                    barTex = full ? new Texture("full_region.png") : new Texture("white_region.png");
+                    barTex = full ? texFull : texWhite;
                     btnTex = MainGame.drawTypeButtons.get(i).offTex;
                 }
                 batch.draw(barTex, lx + rectStartX, btnBotY + rectStartY, leftWidth, rectTotalHeight);
@@ -521,46 +527,84 @@ public class GameScreen extends ScreenAdapter {
 
                 StringBuilder sb = new StringBuilder();
 
-                // KINEMATICS
-                sb.append("[GOLD]-- KINEMATICS --[]\n");
-                sb.append("[CYAN] v = sqrt(vx^2 + vy^2)[]\n");
-                sb.append(String.format("[WHITE]   = %.2f m/s[]\n", speed));
-                sb.append(String.format("[LIGHT_GRAY] vx=%+.2f  vy=%+.2f[]\n", vel.x, vel.y));
-                sb.append(String.format("[LIGHT_GRAY] ax=%+.2f  ay=%+.2f[]\n", accel.x, accel.y));
-                sb.append("\n");
-
-                // NEWTON'S 2ND LAW
-                sb.append("[GOLD]-- NEWTON'S 2ND LAW --[]\n");
-                sb.append("[CYAN] F = m * a[]\n");
-                sb.append(String.format("[WHITE] m  = %.3f kg[]\n", mass));
-                sb.append("[CYAN] Weight = m * g[]\n");
-                sb.append(String.format("[WHITE] Fg = %.3f N[]\n", mass * 9.8f));
-                sb.append(String.format("[LIGHT_GRAY] (g = 9.8 m/s^2)[]\n"));
-                sb.append(String.format("[WHITE] Friction: u = %.2f[]\n", displayObj.getFriction()));
-                sb.append("\n");
-
-                // ENERGY
-                sb.append("[GOLD]-- ENERGY --[]\n");
-                sb.append("[CYAN] KE = (1/2) * m * v^2[]\n");
-                sb.append(String.format("[WHITE]    = %.3f J[]\n", ke));
-                sb.append("[CYAN] PE = m * g * h[]\n");
-                sb.append(String.format("[WHITE]    = %.3f J[]\n", pe));
-                sb.append("[CYAN] E  = KE + PE[]\n");
-                sb.append(String.format("[WHITE]    = %.3f J[]\n", ke + pe));
-                sb.append("\n");
-
-                // ROTATION
-                sb.append("[GOLD]-- ROTATION --[]\n");
-                sb.append("[CYAN] KE_rot = (1/2)*I*w^2[]\n");
-                sb.append(String.format("[WHITE] w = %.3f rad/s[]\n", omega));
-                sb.append(String.format("[WHITE] I = %.3f kg*m^2[]\n", inertia));
-                sb.append(String.format("[WHITE] KE_rot = %.3f J[]\n", 0.5f * inertia * omega * omega));
-
-                // CHARGE (if applicable)
                 if (displayObj instanceof Charged) {
-                    sb.append("\n[GOLD]-- CHARGE --[]\n");
+                    Charged chargedObj = (Charged) displayObj;
+                    float density = chargedObj.getChargeDensity();
+                    float q       = density * mass;
+                    float feX     = mass * accel.x;
+                    float feY     = mass * (accel.y + 9.8f);
+
+                    // COULOMB'S LAW
+                    sb.append("[GOLD]-- COULOMB'S LAW --[]\n");
                     sb.append("[CYAN] F = k * q1*q2 / r^2[]\n");
-                    sb.append(String.format("[WHITE] q = %.3f C/kg[]\n", ((Charged) displayObj).getChargeDensity()));
+                    sb.append("[LIGHT_GRAY] k = 8.99x10^9 N*m^2/C^2[]\n");
+                    sb.append("\n");
+
+                    // CHARGE
+                    sb.append("[GOLD]-- CHARGE --[]\n");
+                    sb.append("[CYAN] q = density * mass[]\n");
+                    sb.append(String.format("[WHITE] density = %.2f C/kg[]\n", density));
+                    sb.append(String.format("[WHITE] q = %.2f C[]\n", q));
+                    sb.append("\n");
+
+                    // ELECTRIC FORCE
+                    sb.append("[GOLD]-- ELECTRIC FORCE --[]\n");
+                    sb.append("[CYAN] F_e = F_total - F_gravity[]\n");
+                    sb.append(String.format("[WHITE] F_ex = %.2f N[]\n", feX));
+                    sb.append(String.format("[WHITE] F_ey = %.2f N[]\n", feY));
+                    sb.append("\n");
+
+                    // KINEMATICS
+                    sb.append("[GOLD]-- KINEMATICS --[]\n");
+                    sb.append("[CYAN] v = sqrt(vx^2 + vy^2)[]\n");
+                    sb.append(String.format("[WHITE]   = %.2f m/s[]\n", speed));
+                    sb.append(String.format("[LIGHT_GRAY] vx=%+.2f  vy=%+.2f[]\n", vel.x, vel.y));
+                    sb.append("\n");
+
+                    // ENERGY
+                    sb.append("[GOLD]-- ENERGY --[]\n");
+                    sb.append("[CYAN] KE = (1/2) * m * v^2[]\n");
+                    sb.append(String.format("[WHITE]    = %.3f J[]\n", ke));
+                    sb.append("[CYAN] PE = m * g * h[]\n");
+                    sb.append(String.format("[WHITE]    = %.3f J[]\n", pe));
+                    sb.append("[CYAN] E  = KE + PE[]\n");
+                    sb.append(String.format("[WHITE]    = %.3f J[]\n", ke + pe));
+
+                } else {
+                    // KINEMATICS
+                    sb.append("[GOLD]-- KINEMATICS --[]\n");
+                    sb.append("[CYAN] v = sqrt(vx^2 + vy^2)[]\n");
+                    sb.append(String.format("[WHITE]   = %.2f m/s[]\n", speed));
+                    sb.append(String.format("[LIGHT_GRAY] vx=%+.2f  vy=%+.2f[]\n", vel.x, vel.y));
+                    sb.append(String.format("[LIGHT_GRAY] ax=%+.2f  ay=%+.2f[]\n", accel.x, accel.y));
+                    sb.append("\n");
+
+                    // NEWTON'S 2ND LAW
+                    sb.append("[GOLD]-- NEWTON'S 2ND LAW --[]\n");
+                    sb.append("[CYAN] F = m * a[]\n");
+                    sb.append(String.format("[WHITE] m  = %.3f kg[]\n", mass));
+                    sb.append("[CYAN] Weight = m * g[]\n");
+                    sb.append(String.format("[WHITE] Fg = %.3f N[]\n", mass * 9.8f));
+                    sb.append(String.format("[LIGHT_GRAY] (g = 9.8 m/s^2)[]\n"));
+                    sb.append(String.format("[WHITE] Friction: u = %.2f[]\n", displayObj.getFriction()));
+                    sb.append("\n");
+
+                    // ENERGY
+                    sb.append("[GOLD]-- ENERGY --[]\n");
+                    sb.append("[CYAN] KE = (1/2) * m * v^2[]\n");
+                    sb.append(String.format("[WHITE]    = %.3f J[]\n", ke));
+                    sb.append("[CYAN] PE = m * g * h[]\n");
+                    sb.append(String.format("[WHITE]    = %.3f J[]\n", pe));
+                    sb.append("[CYAN] E  = KE + PE[]\n");
+                    sb.append(String.format("[WHITE]    = %.3f J[]\n", ke + pe));
+                    sb.append("\n");
+
+                    // ROTATION
+                    sb.append("[GOLD]-- ROTATION --[]\n");
+                    sb.append("[CYAN] KE_rot = (1/2)*I*w^2[]\n");
+                    sb.append(String.format("[WHITE] w = %.3f rad/s[]\n", omega));
+                    sb.append(String.format("[WHITE] I = %.3f kg*m^2[]\n", inertia));
+                    sb.append(String.format("[WHITE] KE_rot = %.3f J[]\n", 0.5f * inertia * omega * omega));
                 }
 
                 physicsDataString = sb.toString();
@@ -680,10 +724,13 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void dispose() {
-        if (debugRenderer != null) debugRenderer.dispose();
+        if (debugRenderer != null)  debugRenderer.dispose();
         if (panelBgTexture != null) panelBgTexture.dispose();
-        if (batch != null) batch.dispose();
-        if (shapeRenderer != null) shapeRenderer.dispose();
+        if (texFull != null)        texFull.dispose();
+        if (texSelect != null)      texSelect.dispose();
+        if (texWhite != null)       texWhite.dispose();
+        if (batch != null)          batch.dispose();
+        if (shapeRenderer != null)  shapeRenderer.dispose();
     }
 
     @Override
