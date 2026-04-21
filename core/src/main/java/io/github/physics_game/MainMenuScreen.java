@@ -2,22 +2,29 @@ package io.github.physics_game;
 
 import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.*;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 public class MainMenuScreen extends ScreenAdapter {
     private final MainGame game;
 
     private SpriteBatch     batch;
+    private ShapeRenderer   sr;
+    private BitmapFont      font;
     private Texture         bgTexture;
+    private Texture         whitePx;
     private TextureAtlas    atlas;
     private TextureRegion   btnStartRegion;
     private TextureRegion   btnExitRegion;
     private TextureRegion   btnCreditsRegion;
     private OrthographicCamera cam;
     private ScreenViewport  vp;
+    private boolean         showCredits = false;
 
     // Button hit-rects [x, y, w, h]  (bottom-left origin, screen pixels)
     private final float[] rPlay   = new float[4];
@@ -35,8 +42,15 @@ public class MainMenuScreen extends ScreenAdapter {
         vp.apply(true);
 
         batch     = new SpriteBatch();
+        sr        = new ShapeRenderer();
+        font      = new BitmapFont();
         bgTexture = new Texture(Gdx.files.internal("menu.png"));
         bgTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pm.setColor(Color.WHITE); pm.fill();
+        whitePx = new Texture(pm);
+        pm.dispose();
 
         atlas            = new TextureAtlas(Gdx.files.internal("menuButtons.atlas"));
         btnStartRegion   = atlas.findRegion("startButton");
@@ -85,8 +99,9 @@ public class MainMenuScreen extends ScreenAdapter {
 
         // ── Click handling ───────────────────────────────────────────
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            if (showCredits) { showCredits = false; return; }
             if (hit(rPlay, mx, my)) { game.setScreen(new LevelScreen(game)); return; }
-            if (hit(rHelp, mx, my)) { /* TODO: HelpScreen */ }
+            if (hit(rHelp, mx, my)) { showCredits = true; return; }
             if (hit(rQuit, mx, my)) { Gdx.app.exit(); }
         }
 
@@ -109,6 +124,55 @@ public class MainMenuScreen extends ScreenAdapter {
         batch.draw(btnExitRegion, rQuit[0], rQuit[1], rQuit[2], rQuit[3]);
 
         batch.end();
+
+        // ── Credits overlay ──────────────────────────────────────────
+        if (showCredits) {
+            Gdx.gl.glEnable(GL20.GL_BLEND);
+            Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+            // Dim background
+            batch.begin();
+            batch.setColor(0f, 0f, 0f, 0.72f);
+            batch.draw(whitePx, 0, 0, sw, sh);
+            batch.end();
+
+            // Panel
+            float pw = 420f, ph = 220f;
+            float px = sw / 2f - pw / 2f, py = sh / 2f - ph / 2f;
+            sr.setProjectionMatrix(cam.combined);
+            sr.begin(ShapeRenderer.ShapeType.Filled);
+            sr.setColor(0.08f, 0.13f, 0.28f, 0.96f);
+            sr.rect(px, py, pw, ph);
+            sr.end();
+            sr.begin(ShapeRenderer.ShapeType.Line);
+            sr.setColor(0.28f, 0.52f, 0.86f, 0.80f);
+            sr.rect(px, py, pw, ph);
+            sr.end();
+
+            Gdx.gl.glDisable(GL20.GL_BLEND);
+
+            // Text
+            batch.begin();
+            String[] lines = { "Credits", "", "Jiayu Yan", "Christophe Lewis", "Tony Yang", "", "Click anywhere to close" };
+            float lineH = 28f;
+            float totalH = lines.length * lineH;
+            float textY = py + ph / 2f + totalH / 2f;
+            for (int li = 0; li < lines.length; li++) {
+                String line = lines[li];
+                if (line.isEmpty()) { textY -= lineH; continue; }
+                boolean isTitle = li == 0;
+                boolean isDismiss = li == lines.length - 1;
+                font.getData().setScale(isTitle ? 1.6f : (isDismiss ? 0.9f : 1.2f));
+                font.setColor(isTitle ? new Color(0.28f, 0.72f, 1f, 1f)
+                            : isDismiss ? new Color(0.5f, 0.5f, 0.6f, 1f)
+                            : Color.WHITE);
+                GlyphLayout gl = new GlyphLayout(font, line);
+                font.draw(batch, line, sw / 2f - gl.width / 2f, textY);
+                textY -= lineH;
+            }
+            font.getData().setScale(1f);
+            batch.end();
+        }
     }
 
     private boolean hit(float[] r, int mx, int my) {
@@ -127,7 +191,10 @@ public class MainMenuScreen extends ScreenAdapter {
     @Override
     public void dispose() {
         if (batch != null)     batch.dispose();
+        if (sr != null)        sr.dispose();
+        if (font != null)      font.dispose();
         if (bgTexture != null) bgTexture.dispose();
+        if (whitePx != null)   whitePx.dispose();
         if (atlas != null)     atlas.dispose();
     }
 }
