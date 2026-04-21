@@ -11,196 +11,73 @@ import java.util.Arrays;
 import java.util.List;
 
 public class Level2 extends Level {
-    private final float timeToComplete = 1.2f;
+    private final float timeToComplete = 0.8f;
     private float elapsedTimeInside = 0f;
     private boolean hasEnteredCup = false;
 
     private FollowingUncollidableField cupInside;
-    private DynamicObject ball;
+    private ChargedDynamicObject ball;
     private boolean isComplete;
 
     public Level2(float viewPortWidth, float viewPortHeight) {
-        super(
-            3,
-            "Over the Ridge",
+        super(3, "Coulomb's Challenge",
             new ArrayList<>(),
-            new ArrayList<>(Arrays.asList(DrawType.NORMAL, DrawType.POSITIVE)),
-            new ArrayList<>(Arrays.asList(80f, 30f)),
-            viewPortWidth,
-            viewPortHeight
-        );
+            new ArrayList<>(Arrays.asList(DrawType.POSITIVE, DrawType.NEGATIVE)),
+            new ArrayList<>(Arrays.asList(60f, 60f)),
+            viewPortWidth, viewPortHeight);
 
-        // Long starting platform on the left
-        List<Vector2> startPlatformVertices = new ArrayList<>(
-            Arrays.asList(
-                new Vector2(-3.2f, -0.25f),
-                new Vector2(3.2f, -0.25f),
-                new Vector2(3.2f, 0.25f),
-                new Vector2(-3.2f, 0.25f)
-            )
+        // Platform the ball rests on (left side)
+        List<Vector2> platformVerts = Arrays.asList(
+            new Vector2(-3f, -0.3f), new Vector2(3f, -0.3f),
+            new Vector2(3f,  0.3f), new Vector2(-3f,  0.3f)
         );
+        StaticObject platform = new StaticObject(10, 0.5f, 0.3f, platformVerts, 7f, 20f, 0f);
+        addPhysicsObject(platform);
 
-        StaticObject startPlatform = new StaticObject(
-            20,
-            0.5f,
-            0.5f,
-            startPlatformVertices,
-            5.2f,
-            22.0f,
-            -0.08f
-        );
-        addPhysicsObject(startPlatform);
-
-        // Central tilted blocker / ridge
-        List<Vector2> ridgeVertices = new ArrayList<>(
-            Arrays.asList(
-                new Vector2(-2.8f, -0.3f),
-                new Vector2(2.8f, -0.3f),
-                new Vector2(2.8f, 0.3f),
-                new Vector2(-2.8f, 0.3f)
-            )
-        );
-
-        StaticObject ridge = new StaticObject(
-            21,
-            0.8f,
-            0.5f,
-            ridgeVertices,
-            18.5f,
-            16.0f,
-            0.55f
-        );
-        addPhysicsObject(ridge);
-
-        // Small landing shelf before the cup
-        List<Vector2> shelfVertices = new ArrayList<>(
-            Arrays.asList(
-                new Vector2(-2.2f, -0.22f),
-                new Vector2(2.2f, -0.22f),
-                new Vector2(2.2f, 0.22f),
-                new Vector2(-2.2f, 0.22f)
-            )
-        );
-
-        StaticObject shelf = new StaticObject(
-            22,
-            0.6f,
-            0.5f,
-            shelfVertices,
-            29.0f,
-            10.0f,
-            -0.05f
-        );
-        addPhysicsObject(shelf);
-
-        // Ball starts high and left
-        List<Vector2> circleVertices = PhysicsResolver.getCircleVertices(14, 0.5f);
-
-        this.ball = new DynamicObject(
-            23,
-            0.5f,
-            0.5f,
-            1f,
-            circleVertices,
-            4.0f,
-            23.4f,
-            0f
-        );
+        // Positively charged ball — constructor auto-colors it red
+        List<Vector2> circleVerts = PhysicsResolver.getCircleVertices(12, 0.5f);
+        this.ball = new ChargedDynamicObject(11, 0.5f, 0.4f, 1f, circleVerts, 7f, 20.8f, 0f, 2.0f);
         addPhysicsObject(ball);
 
-        // Cup placed farther right and lower
-        List<Vector2> cupVertices = new ArrayList<>(
-            Arrays.asList(
-                new Vector2(0, 0),
-                new Vector2(3f, 0),
-                new Vector2(3.6f, 5f),
-                new Vector2(3.3f, 5f),
-                new Vector2(2.7f, 0.4f),
-                new Vector2(0.3f, 0.4f),
-                new Vector2(-0.3f, 5f),
-                new Vector2(-0.6f, 5f)
-            )
+        // Tall wall blocking direct path (top at y=24, above the ball's starting height)
+        List<Vector2> wallVerts = Arrays.asList(
+            new Vector2(-0.5f,  0f), new Vector2(0.5f,  0f),
+            new Vector2(0.5f, 23f), new Vector2(-0.5f, 23f)
         );
+        StaticObject wall = new StaticObject(15, 0.3f, 0.2f, wallVerts, 20f, 1f, 0f);
+        addPhysicsObject(wall);
 
-        List<Vector2> cupInsideVertices = new ArrayList<>(
-            Arrays.asList(
-                new Vector2(2.7f, 0.4f),
-                new Vector2(3.2f, 0.4f + 4.6f * (5f / 6f)),
-                new Vector2(-0.2f, 0.4f + 4.6f * (5f / 6f)),
-                new Vector2(0.3f, 0.4f)
-            )
+        // Cup (dynamic, heavy so it barely moves)
+        List<Vector2> cupVerts = Arrays.asList(
+            new Vector2(0,    0),
+            new Vector2(3f,   0),
+            new Vector2(3.6f, 5f),
+            new Vector2(3.3f, 5f),
+            new Vector2(2.7f, 0.4f),
+            new Vector2(0.3f, 0.4f),
+            new Vector2(-0.3f, 5f),
+            new Vector2(-0.6f, 5f)
         );
-
-        DynamicObject cup = new DynamicObject(
-            24,
-            0.5f,
-            0.5f,
-            1f,
-            cupVertices,
-            33.0f,
-            6.0f,
-            0f
-        );
+        DynamicObject cup = new DynamicObject(12, 0.5f, 0.3f, 1f, cupVerts, 28f, 1.5f, 0f);
         addPhysicsObject(cup);
 
-        // Narrow obstacle near the cup to force a cleaner approach
-        List<Vector2> blockerVertices = new ArrayList<>(
-            Arrays.asList(
-                new Vector2(-0.25f, -2.0f),
-                new Vector2(0.25f, -2.0f),
-                new Vector2(0.25f, 2.0f),
-                new Vector2(-0.25f, 2.0f)
-            )
+        // Trigger field inside the cup
+        List<Vector2> cupInsideVerts = Arrays.asList(
+            new Vector2(2.7f, 0.4f),
+            new Vector2(3.2f, 0.4f + 4.6f * (5f / 6f)),
+            new Vector2(-0.2f, 0.4f + 4.6f * (5f / 6f)),
+            new Vector2(0.3f, 0.4f)
         );
-
-        StaticObject blocker = new StaticObject(
-            25,
-            0.7f,
-            0.4f,
-            blockerVertices,
-            27.0f,
-            8.5f,
-            0f
-        );
-        addPhysicsObject(blocker);
-
-        // No-draw region on the right half, like Level1, but stricter
-        List<Vector2> noDrawZone = new ArrayList<>(
-            Arrays.asList(
-                new Vector2(getWorldBounds().x / 2.4f, floorHeight),
-                new Vector2(getWorldBounds().x - wallWidth, floorHeight),
-                new Vector2(getWorldBounds().x - wallWidth, getWorldBounds().y - floorHeight),
-                new Vector2(getWorldBounds().x / 2.4f, getWorldBounds().y - floorHeight)
-            )
-        );
-
-        NoDrawField noDrawField = new NoDrawField(
-            26,
-            noDrawZone,
-            0f,
-            0f,
-            0f
-        );
-        addPhysicsObject(noDrawField);
-
-        this.cupInside = new FollowingUncollidableField(
-            27,
-            cupInsideVertices,
-            33.0f,
-            6.0f,
-            0f,
-            cup
-        );
+        this.cupInside = new FollowingUncollidableField(13, cupInsideVerts, 28f, 1.5f, 0f, cup);
         addPhysicsObject(cupInside);
 
         setBackground(new Texture("background_forest.png"));
         setDescription(
-            "A harder follow-up.\n" +
-                "The ball must cross the ridge\n" +
-                "and approach the cup cleanly.\n" +
-                "You have less charged material,\n" +
-                "so use your shapes carefully.\n" +
-                "Keep the ball in the cup a bit longer."
+            "The red ball is POSITIVELY charged!\n" +
+            "Draw RED (+) behind it to repel it forward.\n" +
+            "Draw BLUE (-) above the wall to attract\n" +
+            "it up and over.\n" +
+            "Get the ball into the cup!"
         );
     }
 
@@ -221,16 +98,10 @@ public class Level2 extends Level {
     public LevelTickData tick(float deltaTime) {
         if (cupInside.getTriggerIds().contains(ball.getId())) {
             if (!hasEnteredCup) {
-                System.out.println("Ball entered the cup!");
                 hasEnteredCup = true;
             }
-
             elapsedTimeInside += deltaTime;
-
             if (elapsedTimeInside >= timeToComplete) {
-                if (!isComplete) {
-                    System.out.println("Level complete!");
-                }
                 isComplete = true;
             }
         } else {
