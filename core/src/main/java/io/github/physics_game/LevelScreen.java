@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.physics_game.levels.Level1;
 import io.github.physics_game.levels.TutorialLevel;
+import io.github.physics_game.levels.Level2;
 
 public class LevelScreen extends ScreenAdapter {
     private final MainGame game;
@@ -30,11 +31,46 @@ public class LevelScreen extends ScreenAdapter {
     private final float[][] cards = new float[NUM_CARDS][4];
 
     private static final String[] NAMES  = { "Tutorial", "Level 1", "Level 2" };
-    private static final String[] DESCS  = { "Learn the basics", "Drop into the cup", "Coming soon..." };
-    private static final int[]    STARS  = { 0, 0, -1 }; // -1 = locked
+    private static final String[] DESCS  = { "Learn the basics", "Drop into the cup", "Including obstacles!" };
 
     public LevelScreen(MainGame game) {
         this.game = game;
+    }
+
+    private int getStarsForLevel(int levelId) {
+        if (levelId == 0) return 0; // tutorial always available, no stars shown as progression
+        if (game.currentScores == null) return 0;
+        if (game.currentScores.get(levelId) == null) return 0;
+
+        return ScoreCalculator.calculateStars(
+            ScoreCalculator.calculateScore(
+                game.currentScores.get(levelId).getBestShapeProportion(),
+                game.currentScores.get(levelId).getBestTime(),
+                getFreePropForLevel(levelId)
+            )
+        );
+    }
+
+    private boolean isLevelUnlocked(int cardIndex) {
+        // card 0 = Tutorial, card 1 = Level 1, card 2 = Level 2
+        if (cardIndex == 0) return true;
+        if (cardIndex == 1) return true;
+
+        // Level 2 unlocks after Level 1 gets completed with any score
+        return game.currentScores != null && game.currentScores.get(2) != null;
+    }
+
+    private float getFreePropForLevel(int levelId) {
+        if (levelId == 1) {
+            return new TutorialLevel(viewPortWidth, viewPortHeight).getFreeProp();
+        }
+        if (levelId == 2) {
+            return new Level1(viewPortWidth, viewPortHeight).getFreeProp();
+        }
+        if (levelId == 3) {
+            return new Level2(viewPortWidth, viewPortHeight).getFreeProp();
+        }
+        return 0f;
     }
 
     @Override
@@ -108,13 +144,20 @@ public class LevelScreen extends ScreenAdapter {
 
         // ── Click handling ───────────────────────────────────────────
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            if (hit(btnBack, mx, my)) { game.setScreen(new MainMenuScreen(game)); return; }
-            if (hit(cards[0], mx, my) && STARS[0] >= 0) {
+            if (hit(btnBack, mx, my)) {
+                game.setScreen(new MainMenuScreen(game));
+                return;
+            }
+            if (hit(cards[0], mx, my) && isLevelUnlocked(0)) {
                 game.setScreen(new GameScreen(game, new TutorialLevel(viewPortWidth, viewPortHeight)));
                 return;
             }
-            if (hit(cards[1], mx, my) && STARS[1] >= 0) {
+            if (hit(cards[1], mx, my) && isLevelUnlocked(1)) {
                 game.setScreen(new GameScreen(game, new Level1(viewPortWidth, viewPortHeight)));
+                return;
+            }
+            if (hit(cards[2], mx, my) && isLevelUnlocked(2)) {
+                game.setScreen(new GameScreen(game, new Level2(viewPortWidth, viewPortHeight)));
                 return;
             }
         }
@@ -132,7 +175,7 @@ public class LevelScreen extends ScreenAdapter {
 
         // Level cards
         for (int i = 0; i < NUM_CARDS; i++) {
-            boolean locked = STARS[i] < 0;
+            boolean locked = !isLevelUnlocked(i);
             boolean hov    = !locked && hit(cards[i], mx, my);
             float[] c = cards[i];
 
@@ -155,13 +198,17 @@ public class LevelScreen extends ScreenAdapter {
 
             // Stars (filled gold)
             if (!locked) {
+                int levelId = i + 1;
+                int earnedStars = getStarsForLevel(levelId);
+
                 float starR = 14f;
                 float starY = c[1] + c[3] / 2f - 22f;
                 float starSpacing = starR * 2.6f;
                 float starStartX = c[0] + c[2] / 2f - starSpacing;
+
                 for (int s = 0; s < 3; s++) {
-                    Color sc = s < STARS[i] ? Color.GOLD
-                                            : new Color(0.20f, 0.22f, 0.30f, 1f);
+                    Color sc = s < earnedStars ? Color.GOLD
+                        : new Color(0.20f, 0.22f, 0.30f, 1f);
                     drawStar(starStartX + s * starSpacing, starY, starR, sc);
                 }
             }
@@ -176,7 +223,7 @@ public class LevelScreen extends ScreenAdapter {
         sr.rect(btnBack[0], btnBack[1], btnBack[2], btnBack[3]);
 
         for (int i = 0; i < NUM_CARDS; i++) {
-            boolean locked = STARS[i] < 0;
+            boolean locked = !isLevelUnlocked(i);
             boolean hov    = !locked && hit(cards[i], mx, my);
             float[] c = cards[i];
             if (locked)   sr.setColor(0.22f, 0.22f, 0.28f, 0.40f);
@@ -212,7 +259,7 @@ public class LevelScreen extends ScreenAdapter {
 
         // Card text
         for (int i = 0; i < NUM_CARDS; i++) {
-            boolean locked = STARS[i] < 0;
+            boolean locked = !isLevelUnlocked(i);
             float[] c = cards[i];
             float cx = c[0], cy = c[1], cw = c[2], ch = c[3];
 

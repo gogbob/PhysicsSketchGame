@@ -266,6 +266,18 @@ public class GameScreen extends ScreenAdapter {
                 finalStars = ScoreCalculator.calculateStars(finalScore);
                 scoreCalculated = true;
 
+                int levelId = currentLevel.getLevelId();
+
+                if (game.currentScores.get(levelId) == null) {
+                    game.currentScores.set(levelId, new ScoreLevel());
+                }
+
+                game.currentScores.get(levelId).setNewBestScore(
+                    currentLevel.getLevelTimer(),
+                    currentLevel.getCurrentDrawnProportion(),
+                    currentLevel.getFreeProp()
+                );
+
                 Gdx.app.log("Main", "Level complete!");
                 Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
             }
