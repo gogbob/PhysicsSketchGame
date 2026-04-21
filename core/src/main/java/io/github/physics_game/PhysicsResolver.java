@@ -18,6 +18,79 @@ public class PhysicsResolver {
     final static int NUM_POS_ITERATIONS = 2; // position correction (twice)
     final static Vector2 GRAVITY = new Vector2(0, -9.8f); // gravity vector
 
+    public static void step(ArrayList<PhysicsObject> objects) {
+        while(GameScreen.accumulator >= fixedStep) {
+            for (int i = 0; i < objects.size(); i++) {
+                PhysicsObject obj = objects.get(i);
+                if (obj instanceof DynamicObject) {
+                    DynamicObject dynObj = (DynamicObject) obj;
+                    if(dynObj instanceof AntigravityObject){
+                        Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
+                        Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(0.1f).scl(fixedStep));
+                        dynObj.setLinearVelocity(newVelocity);
+                    } else {
+                        Vector2 currentVelocity = new Vector2(dynObj.getLinearVelocity());
+                        Vector2 newVelocity = currentVelocity.add(new Vector2(GRAVITY).scl(fixedStep));
+                        dynObj.setLinearVelocity(newVelocity);
+                    }
+                }
+                for(int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject other = objects.get(j);
+                    if((obj instanceof Charged && other instanceof Charged) && (obj instanceof DynamicObject || other instanceof DynamicObject)) {
+                        ((Charged) obj).applyChargeForcePair(other, true);
+                    }
+                }
+            }
+
+            ArrayList<ContactManifold> collisions = new ArrayList<>();
+            for (int i = 0; i < objects.size(); i++) {
+                for (int j = i + 1; j < objects.size(); j++) {
+                    PhysicsObject obj1 = objects.get(i);
+                    PhysicsObject obj2 = objects.get(j);
+                    if (!broadphaseOverlap(obj1, obj2)) continue;
+                    ContactManifold manifold = CustomContactHandler.detect(obj1, obj2);
+                    if(manifold.isColliding() && manifold.getPointCount() > 0) {
+                        collisions.add(manifold);
+                    }
+                }
+            }
+
+            triggerAdditionalLogic(collisions);
+
+            for(int i = 0; i < NUM_VEL_ITERATIONS; i++) {
+                for (ContactManifold coll : collisions) {
+                    resolveCollision(coll, false, null, i, true);
+                }
+            }
+
+            for (PhysicsObject obj : objects) {
+                if (obj instanceof DynamicObject) {
+                    DynamicObject dynObj = (DynamicObject) obj;
+                    dynObj.updatePosition(fixedStep);
+                }
+                if(obj instanceof Following) {
+                    ((Following) obj).updatePosition();
+                }
+            }
+
+            for(int iteration = 0; iteration < NUM_POS_ITERATIONS; iteration++) {
+                boolean anyCorrection = false;
+                for (int i = 0; i < objects.size(); i++) {
+                    for (int j = i + 1; j < objects.size(); j++) {
+                        PhysicsObject obj1 = objects.get(i);
+                        PhysicsObject obj2 = objects.get(j);
+                        if(resolvePenetrationCorrection(obj1, obj2)) {
+                            anyCorrection = true;
+                        }
+                    }
+                }
+                if(!anyCorrection) break;
+            }
+
+            GameScreen.accumulator -= fixedStep;
+        }
+    }
+
     // show force and collision (I think it's more like visualization)
     public static ArrayList<DebugForce> stepWithDebug(ArrayList<PhysicsObject> objects) {
         ArrayList<DebugForce> forces = new ArrayList<>(); // empty force arrayList

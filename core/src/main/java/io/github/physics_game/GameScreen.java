@@ -159,8 +159,13 @@ public class GameScreen extends ScreenAdapter {
                     currentLevel.setSelectedPaint(slot);
                     drawType = currentLevel.getDrawTypes().get(slot);
                 }
-            } else if (mx >= 8 && mx <= 8 + btnW && my >= restartBtnY && my <= restartBtnY + restartBtnH) {
-                resetLevel();
+            } else if (my >= restartBtnY && my <= restartBtnY + restartBtnH) {
+                int halfW = (btnW - 4) / 2;
+                if (mx >= 8 && mx <= 8 + halfW) {
+                    game.setScreen(new LevelScreen(game));
+                } else if (mx >= 8 + halfW + 4 && mx <= 8 + btnW) {
+                    resetLevel();
+                }
                 isSelecting = true; // consume the click
             } else if(mx < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
                 Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
@@ -240,7 +245,13 @@ public class GameScreen extends ScreenAdapter {
             Gdx.app.log("Main", "Background texture is null!");
         }
         batch.end();
-        ArrayList<DebugForce> forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
+        ArrayList<DebugForce> forces;
+        if (showDebugOverlay) {
+            forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
+        } else {
+            PhysicsResolver.step(currentLevel.getPhysicsObjects());
+            forces = new ArrayList<>();
+        }
 
         if(currentLevel.isComplete()) {
             if (!scoreCalculated) {
@@ -251,6 +262,16 @@ public class GameScreen extends ScreenAdapter {
                 );
                 finalStars = ScoreCalculator.calculateStars(finalScore);
                 scoreCalculated = true;
+
+                int levelId = currentLevel.getLevelId();
+                if (game.currentScores.get(levelId) == null) {
+                    game.currentScores.set(levelId, new ScoreLevel());
+                }
+                game.currentScores.get(levelId).setNewBestScore(
+                    currentLevel.getLevelTimer(),
+                    currentLevel.getCurrentDrawnProportion(),
+                    currentLevel.getFreeProp()
+                );
 
                 Gdx.app.log("Main", "Level complete!");
                 Gdx.app.log("Main", "Score = " + finalScore + ", Stars = " + finalStars);
@@ -380,14 +401,23 @@ public class GameScreen extends ScreenAdapter {
         winFont.setFixedWidthGlyphs("");
 
         // ── BOTTOM: hints → paint buttons → RESTART ──────────────────
-        // RESTART button
+        // LEVELS + RESTART buttons
         int btnW = panelW - 16;
-        batch.setColor(0.75f, 0.15f, 0.15f, 0.92f);
-        batch.draw(panelBgTexture, 8, restartBtnY, btnW, restartBtnH);
+        int halfW = (btnW - 4) / 2;
+
+        batch.setColor(0.15f, 0.35f, 0.75f, 0.92f);
+        batch.draw(panelBgTexture, 8, restartBtnY, halfW, restartBtnH);
         batch.setColor(Color.WHITE);
         winFont.setColor(Color.WHITE);
-        GlyphLayout rl = new GlyphLayout(winFont, "RESTART  [R]");
-        winFont.draw(batch, rl, 8 + (btnW - rl.width) / 2f, restartBtnY + (restartBtnH + rl.height) / 2f);
+        GlyphLayout ll = new GlyphLayout(winFont, "LEVELS");
+        winFont.draw(batch, ll, 8 + (halfW - ll.width) / 2f, restartBtnY + (restartBtnH + ll.height) / 2f);
+
+        batch.setColor(0.75f, 0.15f, 0.15f, 0.92f);
+        batch.draw(panelBgTexture, 8 + halfW + 4, restartBtnY, halfW, restartBtnH);
+        batch.setColor(Color.WHITE);
+        winFont.setColor(Color.WHITE);
+        GlyphLayout rl = new GlyphLayout(winFont, "RESTART [R]");
+        winFont.draw(batch, rl, 8 + halfW + 4 + (halfW - rl.width) / 2f, restartBtnY + (restartBtnH + rl.height) / 2f);
 
         // Hint line above restart
         winFont.setColor(new Color(0.6f, 0.6f, 0.6f, 1f));
@@ -546,7 +576,7 @@ public class GameScreen extends ScreenAdapter {
         int vw = viewport.getScreenWidth();
         int vh = viewport.getScreenHeight();
 
-        int pW = Math.min(vw - 40, 330);
+        int pW = Math.min(vw - 40, 420);
         int pH = 230;
         int pX = vx + (vw - pW) / 2;
         int pY = vy + (vh - pH) / 2;
