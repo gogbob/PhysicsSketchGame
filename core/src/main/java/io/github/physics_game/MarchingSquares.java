@@ -6,6 +6,7 @@ import com.badlogic.gdx.math.Vector2;
 import java.util.*;
 
 import static java.lang.Math.abs;
+import static java.lang.Math.max;
 
 public class MarchingSquares {
     private static final int[][] edgeTable = {
@@ -46,18 +47,18 @@ public class MarchingSquares {
         List<Vector2> exteriorLoop = new ArrayList<>();
         List<List<Vector2>> interiorLoops = new ArrayList<>();
 
-        List<List<Float>> travelledEdges = new ArrayList<>();
+        List<List<Float>> travelledCells = new ArrayList<>();
         for(int y = 0; y < gridField.size(); y++){
-            travelledEdges.add(new ArrayList<>());
+            travelledCells.add(new ArrayList<>());
             for(int x = 0; x < gridField.get(0).size(); x++){
-                travelledEdges.get(y).add(0f);
+                travelledCells.get(y).add(0f);
             }
         }
         List<List<Vector2>> foundLoops = new ArrayList<>();
 
         for(int y = 0; y < gridField.size() - 1; y++){
             for(int x = 0; x < gridField.get(0).size() - 1; x++){
-                if(travelledEdges.get(y).get(x) < 1.0f) {
+                if(travelledCells.get(y).get(x) < 1.0f) {
                     //not travelled through yet
                     List<Float> values = new ArrayList<>();
 
@@ -69,11 +70,15 @@ public class MarchingSquares {
                     if(c != 0 && c != 15) {
                         int edgeIndex = edgeTable[c][0];
 
-                        if((c == 5 || c == 10) && travelledEdges.get(y).get(x) > 0f) {
-                            edgeIndex = edgeTable[c][2];
+                        if((c == 5 || c == 10) && travelledCells.get(y).get(x) > 0.2f) {
+                            if(travelledCells.get(y).get(x) < 0.5f) {
+                                edgeIndex = edgeTable[c][2];
+                            }
                         }
 
-                        foundLoops.add(sanitizeLoop(traceLoopFromEdge(x, y, edgeIndex, gridField, travelledEdges, resolutionScale, minX, minY)));
+                        List<Vector2> loop = sanitizeLoop(traceLoopFromEdge(x, y, edgeIndex, gridField, travelledCells, resolutionScale, minX, minY));
+
+                        if(loop != null) foundLoops.add(loop);
                     }
                 }
             }
@@ -134,6 +139,16 @@ public class MarchingSquares {
         int x = startSegmentX;
         int y = startSegmentY;
 
+        int numLoops = 0;
+
+        List<List<Float>> tempTravelled = new ArrayList<>();
+        for(int i = 0; i < gridField.size(); i++){
+            tempTravelled.add(new ArrayList<>());
+            for(int j = 0; j < gridField.get(0).size(); j++){
+                tempTravelled.get(i).add(0f);
+            }
+        }
+
         List<Float> values = new ArrayList<>();
 
         values.add(gridField.get(y).get(x));
@@ -159,6 +174,11 @@ public class MarchingSquares {
         //go through until you get back to the previous vertice
         boolean foundStartVertex = false;
         while(!foundStartVertex) {
+            numLoops++;
+            if(numLoops > 10000) {
+                System.out.println("Too many loops");
+                return null;
+            }
             int currentEdgeIndex;
             values = new ArrayList<>();
 
@@ -177,7 +197,7 @@ public class MarchingSquares {
 
             if(c == 5 || c == 10) {
                 //find the edge that corresponds the correct type
-                if(edgeTable[c][0] != prevIndex) currentEdgeIndex = edgeTable[c][3];;
+                if((prevIndex != edgeTable[c][0] && prevIndex % 2 == edgeTable[c][0] % 2)) currentEdgeIndex = edgeTable[c][3];;
             }
 
             edgeBounds = edgeBoundsFromEdgeType(currentEdgeIndex, y, x, minX, minY, resolutionScale);
@@ -190,14 +210,10 @@ public class MarchingSquares {
 
             //add the first vertice
 
-            travelledCells.get(y).set(x, (c == 5 || c == 10) ? 0.5f + travelledCells.get(y).get(x) : 1f);
+            tempTravelled.get(y).set(x, (c == 5 || c == 10) ? ((currentEdgeIndex == edgeTable[c][3]) ? 0.75f : 0.25f) + travelledCells.get(y).get(x) : 1f);
             //update the x and y value according to edge type
             x += (currentEdgeIndex == 0 || currentEdgeIndex == 2) ? 0 : ((currentEdgeIndex == 1) ? 1 : -1);
             y += (currentEdgeIndex == 1 || currentEdgeIndex == 3) ? 0 : ((currentEdgeIndex == 2) ? 1 : -1);
-
-            if(travelledCells.get(y).get(x) > 0.5f) {
-                return null;
-            }
 
             //check if already reached start edge
             if(x == startSegmentX && y == startSegmentY && (edgeIndex != currentEdgeIndex && edgeIndex % 2 == currentEdgeIndex % 2)) {
@@ -206,11 +222,21 @@ public class MarchingSquares {
                 loop.add(p);
             }
 
+            if(travelledCells.get(y).get(x) > 0.8f && !foundStartVertex) {
+                return null;
+            }
+
             prevIndex = currentEdgeIndex;
         }
 
         if (loop.size() > 1 && loop.get(0).epsilonEquals(loop.get(loop.size() - 1), 1e-5f)) {
             loop.remove(loop.size() - 1);
+        }
+
+        for(int i = 0; i < gridField.size(); i++){
+            for(int j = 0; j < gridField.get(0).size(); j++){
+                travelledCells.get(i).set(j, max(tempTravelled.get(i).get(j), travelledCells.get(i).get(j)));
+            }
         }
 
         return loop;
@@ -621,17 +647,17 @@ public class MarchingSquares {
 
     private static int getCaseId(float v0, float v1, float v2, float v3) {
         int caseIndex = 0;
-        if(v0 > 0.8f) caseIndex |= 1;
-        if(v1 > 0.8f) caseIndex |= 2;
-        if(v2 > 0.8f) caseIndex |= 4;
-        if(v3 > 0.8f) caseIndex |= 8;
+        if(v0 > 0.9f) caseIndex |= 1;
+        if(v1 > 0.9f) caseIndex |= 2;
+        if(v2 > 0.9f) caseIndex |= 4;
+        if(v3 > 0.9f) caseIndex |= 8;
         return caseIndex;
     }
 
     public static void printField(List<List<Float>> gridField) {
         for(int i = 0; i < gridField.size(); i++) {
             for(int j = 0; j < gridField.get(i).size(); j++) {
-                System.out.print(gridField.get(i).get(j) > 0.7 ? "#" : (gridField.get(i).get(j) > 0.3 ? "/" : "_"));
+                System.out.print(gridField.get(i).get(j) > 0.8 ? "#" : (gridField.get(i).get(j) > 0.5 ? "/" : (gridField.get(i).get(j) > 0.1 ? ":" : "_")));
             }
             System.out.println();
         }
