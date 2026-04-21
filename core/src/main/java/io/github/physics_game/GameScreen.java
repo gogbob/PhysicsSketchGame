@@ -100,18 +100,6 @@ public class GameScreen extends ScreenAdapter {
     private final ArrayList<ChartHelpTarget> chartHelpTargets = new ArrayList<>();
     private ChartHelpTarget hoveredChartHelp = null;
 
-    private static class ChartHelpTarget {
-        String key;
-        Rectangle iconBounds;
-        Rectangle groupBounds;
-
-        ChartHelpTarget(String key, Rectangle iconBounds, Rectangle groupBounds) {
-            this.key = key;
-            this.iconBounds = iconBounds;
-            this.groupBounds = groupBounds;
-        }
-    }
-
     private void updateChartHelpHover() {
         hoveredChartHelp = null;
 
@@ -130,8 +118,8 @@ public class GameScreen extends ScreenAdapter {
     private void renderChartHelpTooltip() {
         if (hoveredChartHelp == null) return;
 
-        String text = getChartHelpText(hoveredChartHelp.key);
-        if (text == null || text.isEmpty()) return;
+        String text = ChartHelpText.get(hoveredChartHelp.key);
+        if (text.isEmpty()) return;
 
         GlyphLayout layout = new GlyphLayout(winFont, text);
         float pad = 10f;
@@ -167,24 +155,6 @@ public class GameScreen extends ScreenAdapter {
         winFont.setColor(Color.WHITE);
         winFont.draw(batch, text, x + pad, y - pad);
         batch.end();
-    }
-
-    // Formulas and Explanations of each chart displayed
-    private String getChartHelpText(String key) {
-        switch (key) {
-            case "position":
-                return "Position\nExplanation coming later.";
-            case "velocity":
-                return "Velocity\nExplanation coming later.";
-            case "speed":
-                return "Speed\nExplanation coming later.";
-            case "acceleration":
-                return "Acceleration\nExplanation coming later.";
-            case "energy":
-                return "Energy\nExplanation coming later.";
-            default:
-                return "";
-        }
     }
 
     @Override
