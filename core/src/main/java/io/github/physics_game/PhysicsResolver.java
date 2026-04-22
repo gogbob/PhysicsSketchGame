@@ -91,6 +91,8 @@ public class PhysicsResolver {
                 }
             }
 
+            triggerAdditionalLogic(collisions);
+
             // velocity iteration
             for(int iteration = 0; iteration < NUM_VEL_ITERATIONS; iteration++) {
                 for (ContactManifold coll : collisions) {

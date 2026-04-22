@@ -98,6 +98,7 @@ public class Level2 extends Level {
     public LevelTickData tick(float deltaTime) {
         if (cupInside.getTriggerIds().contains(ball.getId())) {
             if (!hasEnteredCup) {
+                System.out.println("Ball entered the cup!");
                 hasEnteredCup = true;
             }
             elapsedTimeInside += deltaTime;
@@ -105,6 +106,10 @@ public class Level2 extends Level {
                 isComplete = true;
             }
         } else {
+            if (hasEnteredCup) {
+                System.out.println("Ball outside the cup!");
+                hasEnteredCup = false;
+            }
             elapsedTimeInside = 0f;
         }
 

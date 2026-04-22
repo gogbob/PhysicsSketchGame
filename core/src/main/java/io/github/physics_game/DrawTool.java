@@ -108,19 +108,30 @@ public class DrawTool {
                 addPoint(true, currentLevel);
                 if(drawType != null) this.drawType = drawType;
                 drawing = false;
-            } else if ((inputKey == 2) && drawing && new Vector2(worldPos).sub(prevPosition).len() > minDist) {
-                //draw point
-                addPoint(false, currentLevel);
+            } else if ((inputKey == 2) && drawing) {
+                if(prevPosition == null) {
+                    //draw point
+                    addPoint(false, currentLevel);
+                } else if(new Vector2(worldPos).sub(prevPosition).len() > minDist) {
+                    //draw point
+                    addPoint(false, currentLevel);
+                }
             } else if((inputKey == 1) && currentLevel.getDrawLeft() >= 0.0001f) {
                 //start drawing
-                if(drawing) finishDrawing(drawType, currentLevel);
-                currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
-                    Math.min(currentLevel.getDrawAmounts().get(currentLevel.getSelectedPaint()),
-                    currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth * 3f));
-                startDrawing(drawType, currentLevel);
-                drawing = true;
+                if(drawing) {
+                    finishDrawing(drawType, currentLevel);
+                    drawing = false;
+                }
+                else {
+                    currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
+                        Math.min(currentLevel.getDrawAmounts().get(currentLevel.getSelectedPaint()),
+                            currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth * 3f));
+                    startDrawing(drawType, currentLevel);
+                    drawing = true;
+                }
+            } else if(drawing && inputKey == 0) {
+                finishDrawing(drawType, currentLevel);
             }
-
         }
     }
 
