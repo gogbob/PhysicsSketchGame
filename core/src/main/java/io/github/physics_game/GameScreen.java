@@ -195,7 +195,6 @@ public class GameScreen extends ScreenAdapter {
             //run debug
             float maxIndex = -1;
             PhysicsObject lastObj = currentLevel.getPhysicsObjects().get(currentLevel.getPhysicsObjects().size() - 1);
-            drawTool.testAddPoint(true);
             PhysicsResolver.printShape(lastObj.getVertices());
         }
 

@@ -10,8 +10,13 @@ public class StaticObject extends PhysicsObject {
     }
 
     public StaticObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY,
-                        float rotation, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments) {
-        super(id, friction, restitution, density, vertices, startX, startY, rotation, com, pointSegments, massSegments);
+                        float rotation) {
+        super(id, friction, restitution, density, vertices, startX, startY, rotation);
+    }
+
+    public StaticObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY,
+                        float rotation, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments, List<List<Vector2>> trianglesObj, List<List<Vector2>> concaveLocalBest) {
+        super(id, friction, restitution, density, vertices, startX, startY, rotation, com, pointSegments, massSegments, trianglesObj, concaveLocalBest);
     }
 
     @Override

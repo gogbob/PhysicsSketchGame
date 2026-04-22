@@ -30,6 +30,12 @@ public abstract class PhysicsObject {
 
         this(id, friction, restitution, density, vertices, startX, startY, rotation
             , PhysicsResolver.getCenterOfMassPolygon(EarClippingDecomposer.decomposeToTriangles(vertices)));
+        concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalTriangles);
+
+        for(int i = 0; i < concaveLocalBest.size(); i++) {
+            concaveLocalBest.set(i, recenterVertices(concaveLocalBest.get(i), PhysicsResolver.getCenterOfMassPolygon(concaveLocalTriangles)));
+        }
+
         for(List<Vector2> tri : this.getConcaveLocalTriangles()) {
             float massPoint = PhysicsResolver.getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density);
             Vector2 center = new Vector2(PhysicsResolver.getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)));
@@ -37,14 +43,24 @@ public abstract class PhysicsObject {
         }
     }
 
-    public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments) {
+    public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com,
+                         List<Vector2> pointSegments, List<Float> massSegments, List<List<Vector2>> trianglesObj, List<List<Vector2>> concaveLocalBest) {
         this(id, friction, restitution, density, vertices, startX, startY, rotation
-            , com);
+            , com, trianglesObj, concaveLocalBest);
         this.massSegments = massSegments;
         this.pointSegments = pointSegments;
     }
 
     public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com) {
+        this(id, friction, restitution, density, vertices, startX, startY, rotation, com, EarClippingDecomposer.decomposeToTriangles(vertices), new ArrayList<>());
+        concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalTriangles);
+        for(int i = 0; i < concaveLocalBest.size(); i++) {
+            concaveLocalBest.set(i, recenterVertices(concaveLocalBest.get(i), com));
+        }
+    }
+
+    public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com,
+                         List<List<Vector2>> trianglesObj, List<List<Vector2>> concaveLocalBest) {
         super();
         this.id = id;
         this.friction = friction;
@@ -57,21 +73,17 @@ public abstract class PhysicsObject {
         this.localCenterOffset = new Vector2(localCom);
         List<Vector2> centeredVertices = recenterVertices(vertices, localCom);
 
+        for(int i = 0; i < trianglesObj.size(); i++) {
+            trianglesObj.set(i, recenterVertices(trianglesObj.get(i), localCom));
+        }
+        for(int i = 0; i < concaveLocalBest.size(); i++) {
+            concaveLocalBest.set(i, recenterVertices(concaveLocalBest.get(i), localCom));
+        }
+
         this.vertices = new ArrayList<>(centeredVertices);
         this.localBody = new CustomContactHandler.PolygonBody(centeredVertices);
-        this.concaveLocalTriangles = EarClippingDecomposer.decomposeToTriangles(centeredVertices);
-        int prevSize = concaveLocalTriangles.size();
-
-
-        concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalTriangles);
-        int currentSize = concaveLocalBest.size();
-
-        while(concaveLocalBest.size() < prevSize) {
-            prevSize = currentSize;
-            //continuously find if you can simplify
-            concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalBest);
-            currentSize =  concaveLocalBest.size();
-        }
+        this.concaveLocalTriangles = trianglesObj;
+        this.concaveLocalBest = concaveLocalBest;
 
         // Keep the simulation transform at COM so impulses/rotation use the same origin.
         Vector2 rotatedLocalCom = new Vector2(localCenterOffset).rotateRad(rotation);

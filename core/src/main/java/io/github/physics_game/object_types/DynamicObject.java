@@ -29,8 +29,17 @@ public class DynamicObject extends PhysicsObject {
     }
 
     public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices,
-                         float startX, float startY, float rotation, float mass, float inertia, Vector2 com,  List<Vector2> pointSegments, List<Float> massSegments) {
-        super(id, friction, restitution, density, vertices, startX, startY, rotation, com, pointSegments, massSegments);
+                         float startX, float startY, float rotation, float mass, float inertia) {
+        super(id, friction, restitution, density, vertices, startX, startY, rotation);
+        this.density = density;
+        this.mass = mass;
+        this.inertia = inertia;
+    }
+
+    public DynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices,
+                         float startX, float startY, float rotation, float mass, float inertia, Vector2 com,  List<Vector2> pointSegments, List<Float> massSegments,
+                         List<List<Vector2>> trianglesObj, List<List<Vector2>> concaveLocalBest) {
+        super(id, friction, restitution, density, vertices, startX, startY, rotation, com, pointSegments, massSegments, trianglesObj, concaveLocalBest);
         this.density = density;
         this.mass = mass;
         this.inertia = inertia;

@@ -35,15 +35,15 @@ public class MarchingSquares {
 
     private static final float ISO_LEVEL = 0.9f;
 
-    public static List<Vector2> generateLocalContours(boolean debug, List<List<Float>> gridField, int minX, int minY, float resolutionScale) {
-        List<Vector2> exteriorLoop = createPixelatedEdges(debug, gridField, minX, minY, resolutionScale);
-        if (exteriorLoop == null || exteriorLoop.size() < 3) {
+    public static ContourData generateLocalContours(boolean debug, List<List<Float>> gridField, int minX, int minY, float resolutionScale) {
+        ContourData contourData = createPixelatedEdges(debug, gridField, minX, minY, resolutionScale);
+        if (contourData.contour == null || contourData.contour.size() < 3) {
             return null;
         }
-        return new ArrayList<>(exteriorLoop);
+        return contourData;
     }
 
-    private static List<Vector2> createPixelatedEdges(boolean debug, List<List<Float>> gridField, int minX, int minY, float resolutionScale) {
+    private static ContourData createPixelatedEdges(boolean debug, List<List<Float>> gridField, int minX, int minY, float resolutionScale) {
         List<Vector2> exteriorLoop = new ArrayList<>();
         List<List<Vector2>> interiorLoops = new ArrayList<>();
 
@@ -55,6 +55,8 @@ public class MarchingSquares {
             }
         }
         List<List<Vector2>> foundLoops = new ArrayList<>();
+
+        int numLoops = 0;
 
         for(int y = 0; y < gridField.size() - 1; y++){
             for(int x = 0; x < gridField.get(0).size() - 1; x++){
@@ -68,15 +70,20 @@ public class MarchingSquares {
                     values.add(gridField.get(y + 1).get(x));
                     int c = getCaseId(values.get(0), values.get(1), values.get(2), values.get(3));
                     if(c != 0 && c != 15) {
+                        numLoops++;
                         int edgeIndex = edgeTable[c][0];
 
-                        if((c == 5 || c == 10) && travelledCells.get(y).get(x) == 0.25f) {
+                        if((c == 5 || c == 10) && (travelledCells.get(y).get(x) < 0.3f && travelledCells.get(y).get(x) > 0.2f)) {
                             edgeIndex = edgeTable[c][2];
                         }
 
                         List<Vector2> loop = sanitizeLoop(traceLoopFromEdge(x, y, edgeIndex, gridField, travelledCells, resolutionScale, minX, minY));
 
-                        if(loop != null) foundLoops.add(loop);
+                        if(loop != null) {
+                            foundLoops.add(loop);
+                        } else {
+                            System.out.println("Removed bad loop");
+                        }
                     }
                 }
             }
@@ -110,9 +117,12 @@ public class MarchingSquares {
             PhysicsResolver.printListShape(allLoops);
         }
 
+        List<List<Integer>> verticePairs = new ArrayList<>();
+
         if(!interiorLoops.isEmpty()) {
-            exteriorLoop = connectInteriorLoopsToExterior(exteriorLoop, interiorLoops, resolutionScale);
+            exteriorLoop = connectInteriorLoopsToExterior(exteriorLoop, interiorLoops, verticePairs, resolutionScale);
         }
+
 
 
         if(debug) {
@@ -120,7 +130,8 @@ public class MarchingSquares {
         }
 
         exteriorLoop = normalizeMergedLoop(exteriorLoop);
-        return exteriorLoop;
+        ContourData contourData = new ContourData(exteriorLoop, verticePairs);
+        return contourData;
     }
 
 
@@ -138,14 +149,6 @@ public class MarchingSquares {
         int y = startSegmentY;
 
         int numLoops = 0;
-
-        List<List<Float>> tempTravelled = new ArrayList<>();
-        for(int i = 0; i < gridField.size(); i++){
-            tempTravelled.add(new ArrayList<>());
-            for(int j = 0; j < gridField.get(0).size(); j++){
-                tempTravelled.get(i).add(0f);
-            }
-        }
 
         List<Float> values = new ArrayList<>();
 
@@ -167,7 +170,7 @@ public class MarchingSquares {
             edgeBounds.get(1),
             values.get(edgeIndex),
             values.get((edgeIndex + 1) % 4)));
-        int prevIndex = edgeIndex;
+        int prevIndex = (edgeIndex + 2) % 4;
 
         //go through until you get back to the previous vertice
         boolean foundStartVertex = false;
@@ -197,12 +200,12 @@ public class MarchingSquares {
                 //find the edge that corresponds the correct type
                 if(!(prevIndex != edgeTable[c][0] && prevIndex % 2 == edgeTable[c][0] % 2)) {
                     currentEdgeIndex = edgeTable[c][3];
-                    tempTravelled.get(y).set(x, 0.75f + travelledCells.get(y).get(x));
+                    travelledCells.get(y).set(x, 0.75f + travelledCells.get(y).get(x));
                 } else {
-                    tempTravelled.get(y).set(x, 0.25f + travelledCells.get(y).get(x));
+                    travelledCells.get(y).set(x, 0.25f + travelledCells.get(y).get(x));
                 }
             } else {
-                tempTravelled.get(y).set(x, 1f);
+                travelledCells.get(y).set(x, 1f);
             }
 
             edgeBounds = edgeBoundsFromEdgeType(currentEdgeIndex, y, x, minX, minY, resolutionScale);
@@ -233,12 +236,6 @@ public class MarchingSquares {
 
         if (loop.size() > 1 && loop.get(0).epsilonEquals(loop.get(loop.size() - 1), 1e-5f)) {
             loop.remove(loop.size() - 1);
-        }
-
-        for(int i = 0; i < gridField.size(); i++){
-            for(int j = 0; j < gridField.get(0).size(); j++){
-                travelledCells.get(i).set(j, max(tempTravelled.get(i).get(j), travelledCells.get(i).get(j)));
-            }
         }
 
         return loop;
@@ -307,7 +304,7 @@ public class MarchingSquares {
             Vector2 prev = out.get((i - 1 + out.size()) % out.size());
             Vector2 curr = out.get(i);
             Vector2 next = out.get((i + 1) % out.size());
-            if (Math.abs(orientedArea(prev, curr, next)) <= 0.01f) {
+            if (Math.abs(orientedArea(prev, curr, next)) <= 0.001f) {
                 out.remove(i);
                 continue;
             }
@@ -413,30 +410,42 @@ public class MarchingSquares {
         return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     }
 
-    private static List<Vector2> connectInteriorLoopsToExterior(List<Vector2> outerLoop, List<List<Vector2>> innerLoops, float resolutionScale) {
+    private static List<Vector2> connectInteriorLoopsToExterior(List<Vector2> outerLoop, List<List<Vector2>> innerLoops, List<List<Integer>> verticePairs, float resolutionScale) {
         if(outerLoop == null || outerLoop.size() < 3 || innerLoops.isEmpty()) {
             return outerLoop;
         }
 
         List<Vector2> baseOuterLoop = ensureLoopWinding(new ArrayList<>(outerLoop), true);
         List<Vector2> merged = new ArrayList<>(baseOuterLoop);
-        for(int innerLoopIndex = 0; innerLoopIndex < innerLoops.size(); innerLoopIndex++) {
-            List<Vector2> innerLoop = innerLoops.get(innerLoopIndex);
-            if(innerLoop == null || innerLoop.size() < 3) {
-                continue;
+
+        while(!innerLoops.isEmpty()) {
+            boolean foundCandidate = false;
+            for(int innerLoopIndex = 0; innerLoopIndex < innerLoops.size() && !foundCandidate; innerLoopIndex++) {
+                List<Vector2> innerLoop = innerLoops.get(innerLoopIndex);
+                if(innerLoop == null || innerLoop.size() < 3) {
+                    continue;
+                }
+
+                List<Vector2> orientedInner = ensureLoopWinding(new ArrayList<>(innerLoop), false);
+                int[] bridge = findClosestBridge(merged, orientedInner, innerLoops, innerLoopIndex);
+
+                if(bridge[0] == -1) {
+                    continue;
+                }
+
+                verticePairs.add(Arrays.asList(bridge[0], bridge[1]));
+                foundCandidate = true;
+
+                innerLoops.remove(innerLoopIndex);
+
+                merged = spliceLoopAtBridge(merged, orientedInner, bridge[0], bridge[1], resolutionScale);
             }
 
-            List<Vector2> orientedInner = ensureLoopWinding(new ArrayList<>(innerLoop), false);
-            int[] bridge = findClosestBridge(baseOuterLoop, orientedInner, innerLoops, innerLoopIndex);
-
-            int mergedOuterIndex = findVertexIndex(merged, baseOuterLoop.get(bridge[0]));
-            if (mergedOuterIndex < 0) {
-                continue;
+            if(!foundCandidate) {
+                return merged;
             }
 
-            merged = spliceLoopAtBridge(merged, orientedInner, mergedOuterIndex, bridge[1], resolutionScale);
         }
-
         return merged;
     }
 
@@ -444,8 +453,8 @@ public class MarchingSquares {
                                     List<Vector2> innerLoop,
                                     List<List<Vector2>> allInnerLoops,
                                     int targetInnerLoopIndex) {
-        int outerIndex = 0;
-        int innerIndex = 0;
+        int outerIndex = -1;
+        int innerIndex = -1;
         float bestDist2 = Float.MAX_VALUE;
 
         for(int i = 0; i < outerLoop.size(); i++) {
@@ -636,6 +645,15 @@ public class MarchingSquares {
             this.innerEnter = innerEnter;
             this.innerExit = innerExit;
             this.outerExit = outerExit;
+        }
+    }
+
+    public static class ContourData {
+        public List<Vector2> contour;
+        public List<List<Integer>> pairedVerticies;
+        public ContourData(List<Vector2> contour, List<List<Integer>> pairedVerticies) {
+            this.contour = contour;
+            this.pairedVerticies = pairedVerticies;
         }
     }
 

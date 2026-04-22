@@ -20,8 +20,17 @@ public class ChargedDynamicObject extends DynamicObject implements Charged {
     }
 
     public ChargedDynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation,
-                               float mass, float inertia, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments,  float chargeDensity) {
-        super(id, friction, restitution, density, vertices, startX, startY, rotation, mass, inertia,com, pointSegments, massSegments);
+                               float mass, float inertia, float chargeDensity) {
+        super(id, friction, restitution, density, vertices, startX, startY, rotation, mass, inertia);
+        this.chargeDensity = chargeDensity;
+        setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1) :
+            new Color(1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f, 1));
+    }
+
+    public ChargedDynamicObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation,
+                                float mass, float inertia, Vector2 com, List<Vector2> pointSegments, List<Float> massSegments,  float chargeDensity, List<List<Vector2>> trianglesObj,
+                                List<List<Vector2>> concaveLocalBest) {
+        super(id, friction, restitution, density, vertices, startX, startY, rotation, mass, inertia,com, pointSegments, massSegments, trianglesObj, concaveLocalBest);
         this.chargeDensity = chargeDensity;
         setColor((chargeDensity * getDensity() >= 0) ? new Color(1f, 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1f - Math.min(chargeDensity * getDensity(), 0.7f), 1) :
             new Color(1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f - Math.min(-chargeDensity * getDensity(), 0.7f), 1f, 1));

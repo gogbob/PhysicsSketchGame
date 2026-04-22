@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Vector2;
 import io.github.physics_game.collision.ContactManifold;
 import io.github.physics_game.collision.CustomContactHandler;
+import io.github.physics_game.collision.EarClippingDecomposer;
 import io.github.physics_game.levels.Level;
 import io.github.physics_game.object_types.*;
 
@@ -16,6 +17,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static java.lang.Math.*;
@@ -26,7 +31,6 @@ public class DrawTool {
     public static final float minDist = 0.5f;
 
     private long elapsedTime = 0;
-    private ReentrantLock lock = new ReentrantLock();
     public float chargeDensity = 2.0f;
     private boolean drawing; // check if it's drawing or not
     private Vector2 worldPos = new Vector2();
@@ -42,12 +46,13 @@ public class DrawTool {
     private List<Vector2> pointSegments;
     private List<Float> massSegments;
     private Vector2 referencePoint;
-    private List<Vector2> exteriorLoop = new ArrayList<>();
-    private List<List<Vector2>> interiorLoops = new ArrayList<>();
     private int minX = -50;
     private int maxX = 50;
     private int minY = -50;
     private int maxY = 50;
+    private final ExecutorService contourExec = Executors.newSingleThreadExecutor();
+    private Future<BuildResult> pendingBuild;
+    private volatile BuildResult completedBuild;
     //make it in anticlockwise order
 
 
@@ -64,49 +69,66 @@ public class DrawTool {
 
     // call the method each frame
     public synchronized void update(DrawType drawType, Level currentLevel, int inputKey, float worldPosX, float worldPosY) {
-        if(lock.tryLock()) {
-            try {
-                elapsedTime = System.currentTimeMillis();
-                PhysicsObject obj = null;
-                worldPos.set(worldPosX, worldPosY);
-                // release mouse = done + create object
-                if ((!(inputKey == 2) || currentLevel.getDrawLeft() <= 0.0001f || (inputKey == 1)) && drawing) {
-                    if(currentLevel.getDrawLeft() <= 0.0001f) System.out.println("No more Draw");
-                    obj = finishDrawing(drawType, currentLevel);
-                }
+        elapsedTime = System.currentTimeMillis();
+        worldPos.set(worldPosX, worldPosY);
 
-                // press mouse = start to draw
-                if ((inputKey == 1) && currentLevel.getDrawLeft() >= toolWidth) {
-                    currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
-                        currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth);
-                    obj = startDrawing(drawType, currentLevel);
-                }
+        // release mouse = done + create object
+        boolean awaiting = false;
+        if(pendingBuild != null) {
+            if(pendingBuild.isDone()) {
+                PhysicsObject storedObj = pollBuiltObjectAndApply(currentLevel);
 
-                // continue press mouse = continue to draw
-                if ((inputKey == 2) && drawing && new Vector2(worldPos).sub(prevPosition).len() > minDist) {
-                    obj = addPoint(false, currentLevel);
-                }
-
-                if(obj != null) {
+                if(storedObj != null) {
                     currentLevel.setRunPhysics(true);
-                    if (obj instanceof DynamicObject) {
+                    if (storedObj instanceof DynamicObject) {
                         currentLevel.getPhysicsObjects().removeIf(o -> o.getId() >= 1000);
-                        currentLevel.addPhysicsObject(obj);
+                        currentLevel.addPhysicsObject(storedObj);
                         currentLevel.setNumDrawnObjects(currentLevel.getNumDrawnObjects() + 1);
                     } else {
                         currentLevel.getPhysicsObjects().removeIf(o -> o.getId() >= 1000);
-                        currentLevel.addPhysicsObject(obj);
+                        currentLevel.addPhysicsObject(storedObj);
+
+                        if(!drawing) {
+                            finishDrawing(drawType, currentLevel);
+                            awaiting = true;
+                        }
                     }
                 }
-
-            } finally {
-                lock.unlock();
+            } else {
+                awaiting = true;
+                System.out.println("Awaiting...");
             }
         }
+        System.out.println("Elapsed time await: " + (System.currentTimeMillis() - elapsedTime)/1000f);
+        elapsedTime = System.currentTimeMillis();
+        if(awaiting) {
+            if(inputKey != 2) drawing = false;
+        } else {
+            if ((!(inputKey == 2) || currentLevel.getDrawLeft() <= 0.0001f) && drawing) {
+                if(currentLevel.getDrawLeft() <= 0.0001f) System.out.println("No more Draw");
+                //well behaved end draw
+                addPoint(true, currentLevel);
+                if(drawType != null) this.drawType = drawType;
+                drawing = false;
+            } else if ((inputKey == 2) && drawing && new Vector2(worldPos).sub(prevPosition).len() > minDist) {
+                //draw point
+                addPoint(false, currentLevel);
+            } else if((inputKey == 1) && currentLevel.getDrawLeft() >= toolWidth) {
+                //start drawing
+                if(drawing) finishDrawing(drawType, currentLevel);
+                currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
+                    currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth);
+                startDrawing(drawType, currentLevel);
+                drawing = true;
+            }
+
+        }
+        System.out.println("Elapsed time draw: " + (System.currentTimeMillis() - elapsedTime)/1000f);
+        elapsedTime = System.currentTimeMillis();
     }
 
     // start drawing method (make a circle)
-    private StaticObject startDrawing(DrawType drawType, Level currentLevel) {
+    private void startDrawing(DrawType drawType, Level currentLevel) {
         Vector2 pos = new Vector2(worldPos);
 
         PhysicsObject tempCircle = new StaticObject(2000, 1.0f, 1.0f, PhysicsResolver.getCircleVertices(12, toolWidth), pos.x, pos.y, 0f);
@@ -115,14 +137,11 @@ public class DrawTool {
                 ContactManifold manifold = CustomContactHandler.detect(tempCircle, object);
                 if(manifold.isColliding() && manifold.getPointCount() > 0) {
                     //invalid place to draw
-                    return null;
+                    return;
                 }
             }
         }
-        drawing = true;
         if(drawType != null) this.drawType = drawType;
-        exteriorLoop.clear();
-        interiorLoops.clear();
         mass = (toolWidth * toolWidth * (float)PI)*density;
         inertia = 1/2f * mass * toolWidth * toolWidth;
         massSegments = new ArrayList<>();
@@ -157,22 +176,31 @@ public class DrawTool {
         System.out.println("Elapsed time draw circle: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
         elapsedTime = System.currentTimeMillis();
 
-        List<Vector2> contour = MarchingSquares.generateLocalContours(false, gridField, minX, minY, resolutionScale);
-
         referencePoint = pos;
 
+        BuildSnapshot buildSnapshot = new BuildSnapshot();
+        buildSnapshot.referencePoint = referencePoint;
+        buildSnapshot.com = com;
+        buildSnapshot.dynamic = false;
+        buildSnapshot.drawType = drawType;
+        buildSnapshot.grid = gridField;
+        buildSnapshot.density = density;
+        buildSnapshot.resolution = resolutionScale;
+        buildSnapshot.mass = mass;
+        buildSnapshot.inertia = inertia;
+        buildSnapshot.minX = minX;
+        buildSnapshot.minY = minY;
+        buildSnapshot.objectId = (false ? nextId : 1000);
+        buildSnapshot.pointSegments = new ArrayList<>(pointSegments);
+        buildSnapshot.chargeDensity = chargeDensity;
+
+        pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
+
         prevPosition = pos;
-        PhysicsObject preview = buildCurrentObject(contour, false);
-        System.out.println("Elapsed time build object: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
-        if(preview instanceof StaticObject) {
-            return (StaticObject) preview;
-        }
-        return null;
     }
 
     // add point method
-    private PhysicsObject addPoint(boolean buildDynamic, Level currentLevel) {
+    private void addPoint(boolean buildDynamic, Level currentLevel) {
         Vector2 pos = new Vector2(worldPos);
         Vector2 delta = new Vector2(pos).sub(prevPosition);
 
@@ -213,7 +241,7 @@ public class DrawTool {
                 ContactManifold manifold = CustomContactHandler.detect(tempSegment, object);
                 if(manifold.isColliding() && manifold.getPointCount() > 0) {
                     //invalid place to draw
-                    return null;
+                    return;
                 }
             }
         }
@@ -225,24 +253,29 @@ public class DrawTool {
         elapsedTime = System.currentTimeMillis();
 
         addPixelValues(pos, delta);
+        updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
+
+        BuildSnapshot buildSnapshot = new BuildSnapshot();
+        buildSnapshot.referencePoint = referencePoint;
+        buildSnapshot.com = com;
+        buildSnapshot.dynamic = buildDynamic;
+        buildSnapshot.drawType = drawType;
+        buildSnapshot.grid = gridField;
+        buildSnapshot.density = density;
+        buildSnapshot.resolution = resolutionScale;
+        buildSnapshot.mass = mass;
+        buildSnapshot.inertia = inertia;
+        buildSnapshot.minX = minX;
+        buildSnapshot.minY = minY;
+        buildSnapshot.objectId = (buildDynamic ? nextId : 1000);
+        buildSnapshot.pointSegments = new ArrayList<>(pointSegments);
+        buildSnapshot.chargeDensity = chargeDensity;
+
+        pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
         System.out.println("Elapsed time draw segment: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
         elapsedTime = System.currentTimeMillis();
-        updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
+
         prevPosition = pos;
-        List<Vector2> contour = MarchingSquares.generateLocalContours(false, gridField, minX, minY, resolutionScale);
-        System.out.println("Elapsed time draw contour: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
-        PhysicsObject temp = buildCurrentObject(contour, buildDynamic);
-
-        System.out.println("Elapsed time build object: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
-
-        return temp;
-    }
-
-    public void testAddPoint(boolean buildDynamic) {
-        List<Vector2> contour = MarchingSquares.generateLocalContours(true, gridField, minX, minY, resolutionScale);
-        buildCurrentObject(contour, buildDynamic);
     }
 
     private void addPixelValues(Vector2 pos, Vector2 delta) {
@@ -369,51 +402,128 @@ public class DrawTool {
         mass = totalMass;
     }
 
-    private PhysicsObject buildCurrentObject(List<Vector2> contour, boolean dynamicObject) {
-        if(contour == null) {
+    private static class BuildSnapshot {
+        List<List<Float>> grid;
+        int minX, minY;
+        float resolution;
+        DrawType drawType;
+        Vector2 referencePoint, com;
+        float mass, inertia, density, chargeDensity;
+        List<Vector2> pointSegments;
+        List<Float> massSegments;
+        boolean dynamic;
+        int objectId; // nextId captured on main
+    }
+
+    private static class BuildResult {
+        List<Vector2> contour;
+        List<List<Integer>> pairedVertices;
+        List<List<Vector2>> triangles;
+        List<List<Vector2>> convexes;
+        BuildSnapshot src;
+    }
+
+    private BuildResult compute(BuildSnapshot s) {
+        MarchingSquares.ContourData cd = MarchingSquares.generateLocalContours(false, s.grid, s.minX, s.minY, s.resolution);
+        if (cd == null || cd.contour == null || cd.contour.size() < 3) return null;
+        long elapsedTime = System.currentTimeMillis();
+        List<List<Vector2>> tris = EarClippingDecomposer.decomposeToTriangles(cd.contour, cd.pairedVerticies);
+        System.out.println("Elapsed time tris: " + (elapsedTime - System.currentTimeMillis()) / 1000f);
+        elapsedTime = System.currentTimeMillis();
+        List<List<Vector2>> convs = EarClippingDecomposer.mergePolygons(tris);
+        System.out.println("Elapsed time convexs: " + (elapsedTime - System.currentTimeMillis()) / 1000f);
+        elapsedTime = System.currentTimeMillis();
+        BuildResult r = new BuildResult();
+        r.contour = cd.contour;
+        r.pairedVertices = cd.pairedVerticies;
+        r.triangles = tris;
+        r.convexes = convs;
+        r.src = s;
+        return r;
+    }
+
+    public PhysicsObject pollBuiltObjectAndApply(Level level) {
+        elapsedTime = System.currentTimeMillis();
+        if (pendingBuild != null && pendingBuild.isDone()) {
+            try {
+                completedBuild = pendingBuild.get(); // handle exceptions
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+            pendingBuild = null;
+        }
+        if (completedBuild == null) return null;
+        System.out.println("Elapsed time check pending: " + (System.currentTimeMillis() - elapsedTime)/1000f);
+        elapsedTime = System.currentTimeMillis();
+
+        PhysicsObject obj = buildCurrentObject(completedBuild); // instantiate object
+        System.out.println("Elapsed time build: " + (System.currentTimeMillis() - elapsedTime)/1000f);
+        elapsedTime = System.currentTimeMillis();
+        completedBuild = null;
+        return obj;
+    }
+
+    private static PhysicsObject buildCurrentObject(BuildResult buildResult) {
+        if(buildResult.contour == null) {
             System.out.println("Error: contour is null");
             return null;
         }
 
-        if(dynamicObject) {
+        if(buildResult.src.dynamic) {
             DynamicObject obj;
-            if(drawType == DrawType.ANTIGRAVITY) {
-                obj = new AntigravityObject(nextId, 0.5f, 0.4f, density, contour,
-                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
+            if(buildResult.src.drawType == DrawType.ANTIGRAVITY) {
+                obj = new AntigravityObject(buildResult.src.objectId, 0.5f, 0.4f, buildResult.src.density, buildResult.contour,
+                    buildResult.src.referencePoint.x, buildResult.src.referencePoint.y, 0,
+                    buildResult.src.mass, buildResult.src.inertia, buildResult.src.com, buildResult.src.pointSegments, buildResult.src.massSegments,
+                    buildResult.triangles, buildResult.convexes);
                 System.out.println("Creating Antigravity object");
-            } else if(drawType == DrawType.POSITIVE ||  drawType == DrawType.NEGATIVE) {
-                obj = new ChargedDynamicObject(nextId, 0.5f, 0.4f, density, contour,
-                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments, (drawType == DrawType.POSITIVE)? chargeDensity : -chargeDensity);
+            } else if(buildResult.src.drawType == DrawType.POSITIVE ||  buildResult.src.drawType == DrawType.NEGATIVE) {
+                obj = new ChargedDynamicObject(buildResult.src.objectId, 0.5f, 0.4f, buildResult.src.density, buildResult.contour,
+                    buildResult.src.referencePoint.x, buildResult.src.referencePoint.y, 0, buildResult.src.mass,
+                    buildResult.src.inertia, buildResult.src.com, buildResult.src.pointSegments, buildResult.src.massSegments,
+                    (buildResult.src.drawType == DrawType.POSITIVE)? buildResult.src.chargeDensity : -buildResult.src.chargeDensity,
+                    buildResult.triangles, buildResult.convexes);
                 System.out.println("Creating Charged object");
-            } else if(drawType == DrawType.ICY) {
-                obj = new DynamicObject(nextId, 0.00f, 0.4f, density, contour,
-                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
+            } else if(buildResult.src.drawType == DrawType.ICY) {
+                obj = new DynamicObject(buildResult.src.objectId, 0.00f, 0.4f, buildResult.src.density, buildResult.contour,
+                    buildResult.src.referencePoint.x, buildResult.src.referencePoint.y, 0, buildResult.src.mass,
+                    buildResult.src.inertia, buildResult.src.com, buildResult.src.pointSegments, buildResult.src.massSegments,
+                    buildResult.triangles, buildResult.convexes);
                 System.out.println("Creating Icy object");
                 obj.setColor(new Color(0.8f, 0.8f, 1.0f, 1));
             } else {
-                obj = new DynamicObject(nextId, 0.5f, 0.4f, density, contour,
-                    referencePoint.x, referencePoint.y, 0, mass, inertia, com, pointSegments, massSegments);
+                obj = new DynamicObject(buildResult.src.objectId, 0.5f, 0.4f, buildResult.src.density, buildResult.contour,
+                    buildResult.src.referencePoint.x, buildResult.src.referencePoint.y, 0,
+                    buildResult.src.mass, buildResult.src.inertia, buildResult.src.com, buildResult.src.pointSegments, buildResult.src.massSegments,
+                    buildResult.triangles, buildResult.convexes);
                 System.out.println("Creating Normal object");
             }
-            nextId++;
             return obj;
         }
 
         StaticObject staticObject;
-        if(drawType == DrawType.ANTIGRAVITY) {
-            staticObject = new StaticObject(1000, 0.5f, 0.4f, density, contour, referencePoint.x, referencePoint.y,
-                0, com, pointSegments, massSegments);
+        if(buildResult.src.drawType == DrawType.ANTIGRAVITY) {
+            staticObject = new StaticObject(buildResult.src.objectId, 0.5f, 0.4f, buildResult.src.density, buildResult.contour,
+                buildResult.src.referencePoint.x, buildResult.src.referencePoint.y,
+                0, buildResult.src.com, buildResult.src.pointSegments, buildResult.src.massSegments, buildResult.triangles, buildResult.convexes);
             staticObject.setColor(Color.CORAL);
-        } else if(drawType == DrawType.POSITIVE ||  drawType == DrawType.NEGATIVE) {
-            staticObject = new ChargedStaticObject(1000, 0.5f, 0.4f, density, contour, referencePoint.x, referencePoint.y,
-                0, com, pointSegments, massSegments, (drawType == DrawType.POSITIVE)? chargeDensity : -chargeDensity);
-        } else if(drawType == DrawType.ICY) {
-            staticObject = new StaticObject(1000, 0.0f, 0.4f, density, contour, referencePoint.x, referencePoint.y,
-                0, com, pointSegments, massSegments);
+        } else if(buildResult.src.drawType == DrawType.POSITIVE ||  buildResult.src.drawType == DrawType.NEGATIVE) {
+            staticObject = new ChargedStaticObject(buildResult.src.objectId, 0.5f, 0.4f, buildResult.src.density, buildResult.contour,
+                buildResult.src.referencePoint.x, buildResult.src.referencePoint.y, 0,
+                buildResult.src.com, buildResult.src.pointSegments, buildResult.src.massSegments, (buildResult.src.drawType == DrawType.POSITIVE)?
+                buildResult.src.chargeDensity : -buildResult.src.chargeDensity,
+                buildResult.triangles, buildResult.convexes);
+        } else if(buildResult.src.drawType == DrawType.ICY) {
+            staticObject = new StaticObject(buildResult.src.objectId, 0.0f, 0.4f, buildResult.src.density, buildResult.contour,
+                buildResult.src.referencePoint.x, buildResult.src.referencePoint.y, 0, buildResult.src.com, buildResult.src.pointSegments,
+                buildResult.src.massSegments, buildResult.triangles, buildResult.convexes);
             staticObject.setColor(new Color(0.8f, 0.8f, 1.0f, 1));
         } else {
-            staticObject = new StaticObject(1000, 0.5f, 0.4f, density, contour, referencePoint.x, referencePoint.y,
-                0, com, pointSegments, massSegments);
+            staticObject = new StaticObject(buildResult.src.objectId, 0.5f, 0.4f, buildResult.src.density, buildResult.contour,
+                buildResult.src.referencePoint.x, buildResult.src.referencePoint.y, 0, buildResult.src.com, buildResult.src.pointSegments, buildResult.src.massSegments,
+                buildResult.triangles, buildResult.convexes);
         }
         return staticObject;
     }
@@ -429,12 +539,24 @@ public class DrawTool {
 
 
     // finish drawing + create object method
-    private DynamicObject finishDrawing(DrawType drawType, Level currentLevel) {
-        DynamicObject temp = (DynamicObject)addPoint(true, currentLevel);
-        if(temp == null) return null;
-        drawing = false;
-        if(drawType != null) this.drawType = drawType;
-        return (DynamicObject)addPoint(true, currentLevel);
+    private void finishDrawing(DrawType drawType, Level currentLevel) {
+        BuildSnapshot buildSnapshot = new BuildSnapshot();
+        buildSnapshot.referencePoint = referencePoint;
+        buildSnapshot.com = com;
+        buildSnapshot.dynamic = true;
+        buildSnapshot.drawType = drawType;
+        buildSnapshot.grid = gridField;
+        buildSnapshot.density = density;
+        buildSnapshot.resolution = resolutionScale;
+        buildSnapshot.mass = mass;
+        buildSnapshot.inertia = inertia;
+        buildSnapshot.minX = minX;
+        buildSnapshot.minY = minY;
+        buildSnapshot.objectId = nextId;
+        buildSnapshot.pointSegments = new ArrayList<>(pointSegments);
+        buildSnapshot.chargeDensity = chargeDensity;
+
+        pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
     }
 
     // check if it is drawing or not

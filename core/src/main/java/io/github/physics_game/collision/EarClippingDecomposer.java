@@ -13,7 +13,7 @@ public final class EarClippingDecomposer {
     private EarClippingDecomposer() {
     }
 
-    public static List<List<Vector2>> decomposeToTriangles(List<Vector2> polygon) {
+    public static List<List<Vector2>> decomposeToTriangles(List<Vector2> polygon, List<List<Integer>> pairVertices) {
         List<Vector2> cleaned = sanitizePolygon(polygon);
         if (cleaned.size() < 3) {
             return Collections.emptyList();
@@ -51,8 +51,34 @@ public final class EarClippingDecomposer {
                     continue;
                 }
 
+                List<Integer> exempt = new ArrayList<>();
+
+                for(List<Integer> pair : pairVertices) {
+                    if(pair.contains(currIndex)) {
+                        for(int idx : pair) {
+                            if(idx != currIndex) {
+                                exempt.add(idx);
+                            }
+                        }
+                    }
+                    if(pair.contains(prevIndex)) {
+                        for(int idx : pair) {
+                            if(idx != prevIndex) {
+                                exempt.add(idx);
+                            }
+                        }
+                    }
+                    if(pair.contains(nextIndex)) {
+                        for(int idx : pair) {
+                            if(idx != nextIndex) {
+                                exempt.add(idx);
+                            }
+                        }
+                    }
+                }
+
                 // A valid ear triangle contains no other remaining polygon vertex.
-                if (containsAnyVertex(indices, cleaned, prevIndex, currIndex, nextIndex, prev, curr, next)) {
+                if (containsAnyVertex(indices, cleaned, prevIndex, currIndex, nextIndex, prev, curr, next, exempt)) {
                     continue;
                 }
 
@@ -64,7 +90,7 @@ public final class EarClippingDecomposer {
 
             if (!earFound) {
                 // If strict ear selection fails, clip the least-bad local ear instead of arbitrary fan splitting.
-                int bestFallbackEar = selectBestFallbackEar(indices, cleaned);
+                int bestFallbackEar = selectBestFallbackEar(indices, cleaned, pairVertices);
                 if (bestFallbackEar < 0) {
                     fanTriangulateFallback(indices, cleaned, triangles);
                     return triangles;
@@ -88,6 +114,10 @@ public final class EarClippingDecomposer {
         }
 
         return triangles;
+    }
+
+    public static List<List<Vector2>> decomposeToTriangles(List<Vector2> polygon) {
+        return decomposeToTriangles(polygon, new ArrayList<>());
     }
 
     private static List<Vector2> sanitizePolygon(List<Vector2> polygon) {
@@ -136,8 +166,10 @@ public final class EarClippingDecomposer {
                                              int cIndex,
                                              Vector2 a,
                                              Vector2 b,
-                                             Vector2 c) {
-        return countContainedVertices(indices, vertices, aIndex, bIndex, cIndex, a, b, c) > 0;
+                                             Vector2 c,
+                                             List<Integer> exempt) {
+        return countContainedVertices(indices, vertices, aIndex, bIndex, cIndex, a, b, c,
+            exempt) > 0;
     }
 
     private static int countContainedVertices(List<Integer> indices,
@@ -147,10 +179,11 @@ public final class EarClippingDecomposer {
                                               int cIndex,
                                               Vector2 a,
                                               Vector2 b,
-                                              Vector2 c) {
+                                              Vector2 c,
+                                              List<Integer> exempt) {
         int count = 0;
         for (int idx : indices) {
-            if (idx == aIndex || idx == bIndex || idx == cIndex) {
+            if (idx == aIndex || idx == bIndex || idx == cIndex || exempt.contains(idx)) {
                 continue;
             }
 
@@ -199,7 +232,7 @@ public final class EarClippingDecomposer {
         return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     }
 
-    private static int selectBestFallbackEar(List<Integer> indices, List<Vector2> vertices) {
+    private static int selectBestFallbackEar(List<Integer> indices, List<Vector2> vertices, List<List<Integer>> pairVertices) {
         int bestEar = -1;
         int bestContained = Integer.MAX_VALUE;
         int bestOutsidePenalty = Integer.MAX_VALUE;
@@ -219,7 +252,33 @@ public final class EarClippingDecomposer {
                 continue;
             }
 
-            int contained = countContainedVertices(indices, vertices, prevIndex, currIndex, nextIndex, prev, curr, next);
+            List<Integer> exempt = new ArrayList<>();
+
+            for(List<Integer> pair : pairVertices) {
+                if(pair.contains(currIndex)) {
+                    for(int idx : pair) {
+                        if(idx != currIndex) {
+                            exempt.add(idx);
+                        }
+                    }
+                }
+                if(pair.contains(prevIndex)) {
+                    for(int idx : pair) {
+                        if(idx != prevIndex) {
+                            exempt.add(idx);
+                        }
+                    }
+                }
+                if(pair.contains(nextIndex)) {
+                    for(int idx : pair) {
+                        if(idx != nextIndex) {
+                            exempt.add(idx);
+                        }
+                    }
+                }
+            }
+
+            int contained = countContainedVertices(indices, vertices, prevIndex, currIndex, nextIndex, prev, curr, next, exempt);
             int outsidePenalty = computeOutsidePenalty(vertices, prev, curr, next);
 
             if (contained < bestContained
@@ -343,8 +402,10 @@ public final class EarClippingDecomposer {
             polygons.add(new ArrayList<>(poly));
         }
 
+        int numIt = 0;
+
         boolean mergedAny = true;
-        while (mergedAny) {
+        while (mergedAny && numIt < 3) {
             mergedAny = false;
 
             for (int i = 0; i < polygons.size() && !mergedAny; i++) {
@@ -359,6 +420,7 @@ public final class EarClippingDecomposer {
                     }
                 }
             }
+            numIt++;
         }
 
         return polygons;
@@ -378,7 +440,7 @@ public final class EarClippingDecomposer {
                 }
 
                 List<Vector2> merged = buildMergedLoop(a, b, i, j);
-                merged = sanitizePolygon(merged);
+                //merged = sanitizePolygon(merged);
                 if (merged.size() < 3) {
                     continue;
                 }
