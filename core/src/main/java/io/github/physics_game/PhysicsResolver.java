@@ -14,8 +14,8 @@ import java.util.List;
 
 public class PhysicsResolver {
     final static float fixedStep = 1f / 60f; // fixed time step
-    final static int NUM_VEL_ITERATIONS = 5; //velocity constraints will iterate 5 times
-    final static int NUM_POS_ITERATIONS = 5; // position correction (twice)
+    final static int NUM_VEL_ITERATIONS = 15; //velocity constraints will iterate 5 times
+    final static int NUM_POS_ITERATIONS = 15; // position correction (twice)
     final static Vector2 GRAVITY = new Vector2(0, -9.8f); // gravity vector
 
     // show force and collision (I think it's more like visualization)
@@ -281,7 +281,7 @@ public class PhysicsResolver {
         // velN = Vrel*n
 
 
-        if (contact.penetration < 0.01f) {
+        if (contact.penetration < 0.00001f) {
             return null;
         }
 
@@ -301,10 +301,14 @@ public class PhysicsResolver {
 
         // 1st iteration set bias
         if(contact.firstIteration) {
+            float slop = 0.001f;
+            float beta = 0.3f;
+
             contact.firstIteration = false;
+            contact.bias = (beta/fixedStep * Math.max(0, contact.penetration - slop));
             if(velN < -1f) {
-                contact.bias = -restitution * velN;
-            } // bias = -e*velN
+                contact.bias += -restitution * velN;
+            } // bias = beta/dt * max(0, pen - slop) - e*velN
         }
         //Calculate the magnitude of the normal impulse jn
         float jn = (-velN + contact.bias) / kN;

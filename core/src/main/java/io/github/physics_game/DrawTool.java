@@ -93,6 +93,9 @@ public class DrawTool {
                             awaiting = true;
                         }
                     }
+                } else if(!drawing) {
+                    finishDrawing(drawType, currentLevel);
+                    awaiting = true;
                 }
             } else {
                 awaiting = true;
@@ -105,11 +108,15 @@ public class DrawTool {
             if ((!(inputKey == 2) || currentLevel.getDrawLeft() <= 0.0001f) && drawing) {
                 if(currentLevel.getDrawLeft() <= 0.0001f) System.out.println("No more Draw");
                 //well behaved end draw
-                addPoint(true, currentLevel);
+                if(prevPosition == null) {
+                    finishDrawing(drawType, currentLevel);
+                } else if(!addPoint(true, currentLevel)) {
+                    finishDrawing(drawType, currentLevel);
+                }
                 if(drawType != null) this.drawType = drawType;
                 drawing = false;
             } else if ((inputKey == 2) && drawing) {
-                if(prevPosition == null) {
+                if(prevPosition != null) {
                     //draw point
                     addPoint(false, currentLevel);
                 } else if(new Vector2(worldPos).sub(prevPosition).len() > minDist) {
@@ -126,17 +133,15 @@ public class DrawTool {
                     currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
                         Math.min(currentLevel.getDrawAmounts().get(currentLevel.getSelectedPaint()),
                             currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth * 3f));
-                    startDrawing(drawType, currentLevel);
-                    drawing = true;
+                    if(startDrawing(drawType, currentLevel)) drawing = true;
+
                 }
-            } else if(drawing && inputKey == 0) {
-                finishDrawing(drawType, currentLevel);
             }
         }
     }
 
     // start drawing method (make a circle)
-    private void startDrawing(DrawType drawType, Level currentLevel) {
+    private boolean startDrawing(DrawType drawType, Level currentLevel) {
         Vector2 pos = new Vector2(worldPos);
 
         PhysicsObject tempCircle = new StaticObject(2000, 1.0f, 1.0f, PhysicsResolver.getCircleVertices(12, toolWidth), pos.x, pos.y, 0f);
@@ -145,7 +150,7 @@ public class DrawTool {
                 ContactManifold manifold = CustomContactHandler.detect(tempCircle, object);
                 if(manifold.isColliding() && manifold.getPointCount() > 0) {
                     //invalid place to draw
-                    return;
+                    return false;
                 }
             }
         }
@@ -205,10 +210,11 @@ public class DrawTool {
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
 
         prevPosition = pos;
+        return true;
     }
 
     // add point method
-    private void addPoint(boolean buildDynamic, Level currentLevel) {
+    private boolean addPoint(boolean buildDynamic, Level currentLevel) {
         Vector2 pos = new Vector2(worldPos);
         Vector2 delta = new Vector2(pos).sub(prevPosition);
 
@@ -245,7 +251,7 @@ public class DrawTool {
                 ContactManifold manifold = CustomContactHandler.detect(tempSegment, object);
                 if(manifold.isColliding() && manifold.getPointCount() > 0) {
                     //invalid place to draw
-                    return;
+                    return false;
                 }
             }
         }
@@ -279,6 +285,7 @@ public class DrawTool {
         nextId++;
 
         prevPosition = pos;
+        return true;
     }
 
     private void addPixelValues(Vector2 pos, Vector2 delta) {

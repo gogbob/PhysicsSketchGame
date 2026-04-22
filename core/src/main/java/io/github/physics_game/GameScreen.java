@@ -171,7 +171,7 @@ public class GameScreen extends ScreenAdapter {
                     resetLevel();
                     graphicOverlayRenderer.resetEnergyScale();
                 } else if (mx < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2
-                    && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
+                    && mx > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && !currentLevel.isComplete()) {
                     Integer i = isPointInsideObjects(viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY())));
                     if (i != null) {
                         selectedObject = i;
@@ -182,7 +182,7 @@ public class GameScreen extends ScreenAdapter {
                 }
             }
         } else if (Gdx.input.getX() < viewport.getScreenWidth() + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2
-            && Gdx.input.getX() > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2) {
+            && Gdx.input.getX() > 5 + (uiViewport.getScreenWidth() - viewport.getScreenWidth()) / 2 && !currentLevel.isComplete()) {
             Vector3 worldPos = viewport.unproject(new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0));
             drawTool.update(drawType, currentLevel, Gdx.input.isButtonPressed(Input.Buttons.LEFT) ? 2 : 0, worldPos.x, worldPos.y);
         }
@@ -222,7 +222,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void updateSimulation(float delta) {
-        if (currentLevel.getRunPhysics()) {
+        if (currentLevel.getRunPhysics() && !currentLevel.isComplete()) {
             accumulator += Math.min(delta, 0.25f);
         } else {
             accumulator = 0.0f;

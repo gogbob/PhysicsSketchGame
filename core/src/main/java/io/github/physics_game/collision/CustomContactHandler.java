@@ -24,7 +24,7 @@ public final class CustomContactHandler {
     }
 
     public static ContactManifold detect(PhysicsObject a, PhysicsObject b) {
-        if (a == null || a == null) {
+        if (a == null || b == null) {
             return ContactManifold.NO_CONTACT;
         }
 
