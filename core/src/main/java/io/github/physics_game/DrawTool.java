@@ -99,8 +99,6 @@ public class DrawTool {
                 System.out.println("Awaiting...");
             }
         }
-        System.out.println("Elapsed time await: " + (System.currentTimeMillis() - elapsedTime)/1000f);
-        elapsedTime = System.currentTimeMillis();
         if(awaiting) {
             if(inputKey != 2) drawing = false;
         } else {
@@ -123,8 +121,6 @@ public class DrawTool {
             }
 
         }
-        System.out.println("Elapsed time draw: " + (System.currentTimeMillis() - elapsedTime)/1000f);
-        elapsedTime = System.currentTimeMillis();
     }
 
     // start drawing method (make a circle)
@@ -173,9 +169,6 @@ public class DrawTool {
             }
         }
 
-        System.out.println("Elapsed time draw circle: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
-
         referencePoint = pos;
 
         BuildSnapshot buildSnapshot = new BuildSnapshot();
@@ -213,8 +206,6 @@ public class DrawTool {
         List<Vector2> circleVertTemp = PhysicsResolver.getCircleVertices(12, toolWidth);
         List<Vector2> segmentTemp = new ArrayList<>();
 
-        System.out.println("Elapsed time create init: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
 
         for(int i = 0; i < circleVertTemp.size(); i++) {
             Vector2 edge = new Vector2(circleVertTemp.get(i)).sub(circleVertTemp.get((i + 1) % circleVertTemp.size()));
@@ -232,8 +223,6 @@ public class DrawTool {
         segmentTemp.add(new Vector2(-delta.y, delta.x).nor().scl(toolWidth));
         segmentTemp.add(new Vector2(delta.y, -delta.x).nor().scl(toolWidth));
 
-        System.out.println("Elapsed time create temp segment: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
 
         PhysicsObject tempSegment = new StaticObject(2000, 1.0f, 1.0f, segmentTemp, prevPosition.x, prevPosition.y, 0f);
         for(PhysicsObject object : currentLevel.getPhysicsObjects()) {
@@ -249,8 +238,6 @@ public class DrawTool {
         currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
             currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + delta.len());
 
-        System.out.println("Elapsed time find intersection: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
 
         addPixelValues(pos, delta);
         updateDrawingMetrics(new Vector2(prevPosition).sub(referencePoint), new Vector2(pos).sub(referencePoint));
@@ -272,8 +259,6 @@ public class DrawTool {
         buildSnapshot.chargeDensity = chargeDensity;
 
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
-        System.out.println("Elapsed time draw segment: " + ((float)(System.currentTimeMillis() - elapsedTime) / 1000f));
-        elapsedTime = System.currentTimeMillis();
 
         prevPosition = pos;
     }
@@ -426,13 +411,8 @@ public class DrawTool {
     private BuildResult compute(BuildSnapshot s) {
         MarchingSquares.ContourData cd = MarchingSquares.generateLocalContours(false, s.grid, s.minX, s.minY, s.resolution);
         if (cd == null || cd.contour == null || cd.contour.size() < 3) return null;
-        long elapsedTime = System.currentTimeMillis();
         List<List<Vector2>> tris = EarClippingDecomposer.decomposeToTriangles(cd.contour, cd.pairedVerticies);
-        System.out.println("Elapsed time tris: " + (elapsedTime - System.currentTimeMillis()) / 1000f);
-        elapsedTime = System.currentTimeMillis();
         List<List<Vector2>> convs = EarClippingDecomposer.mergePolygons(tris);
-        System.out.println("Elapsed time convexs: " + (elapsedTime - System.currentTimeMillis()) / 1000f);
-        elapsedTime = System.currentTimeMillis();
         BuildResult r = new BuildResult();
         r.contour = cd.contour;
         r.pairedVertices = cd.pairedVerticies;
@@ -455,12 +435,8 @@ public class DrawTool {
             pendingBuild = null;
         }
         if (completedBuild == null) return null;
-        System.out.println("Elapsed time check pending: " + (System.currentTimeMillis() - elapsedTime)/1000f);
-        elapsedTime = System.currentTimeMillis();
 
         PhysicsObject obj = buildCurrentObject(completedBuild); // instantiate object
-        System.out.println("Elapsed time build: " + (System.currentTimeMillis() - elapsedTime)/1000f);
-        elapsedTime = System.currentTimeMillis();
         completedBuild = null;
         return obj;
     }
