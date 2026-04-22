@@ -22,8 +22,8 @@ public class Level2 extends Level {
     public Level2(float viewPortWidth, float viewPortHeight) {
         super(3, "Coulomb's Challenge",
             new ArrayList<>(),
-            new ArrayList<>(Arrays.asList(DrawType.POSITIVE, DrawType.NEGATIVE)),
-            new ArrayList<>(Arrays.asList(60f, 60f)),
+            new ArrayList<>(Arrays.asList(DrawType.POSITIVE)),
+            new ArrayList<>(Arrays.asList(20f)),
             viewPortWidth, viewPortHeight);
 
         // Platform the ball rests on (left side)
@@ -36,7 +36,7 @@ public class Level2 extends Level {
 
         // Positively charged ball — constructor auto-colors it red
         List<Vector2> circleVerts = PhysicsResolver.getCircleVertices(12, 0.5f);
-        this.ball = new ChargedDynamicObject(11, 0.5f, 0.4f, 1f, circleVerts, 7f, 20.8f, 0f, 2.0f);
+        this.ball = new ChargedDynamicObject(11, 0.5f, 0.4f, 1.5f, circleVerts, 7f, 20.8f, 0f, 1.0f);
         addPhysicsObject(ball);
 
         // Tall wall blocking direct path (top at y=24, above the ball's starting height)

@@ -188,6 +188,8 @@ public class DrawTool {
         buildSnapshot.massSegments = new ArrayList<>(massSegments);
         buildSnapshot.chargeDensity = chargeDensity;
 
+        nextId++;
+
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
 
         prevPosition = pos;
@@ -261,6 +263,8 @@ public class DrawTool {
         buildSnapshot.chargeDensity = chargeDensity;
 
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
+
+        nextId++;
 
         prevPosition = pos;
     }
@@ -534,6 +538,8 @@ public class DrawTool {
         buildSnapshot.pointSegments = new ArrayList<>(pointSegments);
         buildSnapshot.massSegments = new ArrayList<>(massSegments);
         buildSnapshot.chargeDensity = chargeDensity;
+
+        nextId++;
 
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
     }
