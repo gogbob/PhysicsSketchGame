@@ -14,12 +14,12 @@ public class ChartHelpText {
                     "object moves.[]\n" +
                     "\n" +
                     "[CYAN]Formulas:[]\n" +
-                    "[WHITE]x = x0 + vx * t[]\n" +
-                    "[WHITE]y = y0 + vy * t + (1/2) * ay * t^2[]\n" +
+                    "[WHITE]x = x0 + vx0*t + (1/2)*ax*t^2[]\n" +
+                    "[WHITE]y = y0 + vy0*t + (1/2)*ay*t^2[]\n" +
                     "\n" +
                     "[LIGHT_GRAY]x0, y0 = starting position[]\n" +
-                    "[LIGHT_GRAY]vx, vy = velocity[]\n" +
-                    "[LIGHT_GRAY]ay = vertical acceleration[]\n" +
+                    "[LIGHT_GRAY]vx0, vy0 = initial velocity[]\n" +
+                    "[LIGHT_GRAY]ax, ay = acceleration[]\n" +
                     "[LIGHT_GRAY]t = time[]";
             case "velocity":
                 return "[GOLD]Velocity X and Y[]\n" +
@@ -59,8 +59,9 @@ public class ChartHelpText {
                     "[GRAY]How fast is an object changing its velocity?[]\n" +
                     "[WHITE]Acceleration describes how velocity changes over time. " +
                     "In this game, the main acceleration is gravity, which constantly pulls " +
-                    "objects downward. This means the vertical velocity changes every moment, " +
-                    "even if no other forces are applied, increasing constantly.[]\n" +
+                    "objects downward. This means the vertical velocity changes at a constant rate, " +
+                    "even if no other forces are applied. When falling, speed increases; " +
+                    "when moving upward, speed decreases until the object stops and falls back.[]\n" +
                     "\n" +
                     "[CYAN]Formulas:[]\n" +
                     "[WHITE]a = dv / dt[]\n" +
@@ -89,7 +90,7 @@ public class ChartHelpText {
                     "[LIGHT_GRAY]g = gravity[]\n" +
                     "[LIGHT_GRAY]h = height[]\n" +
                     "\n" +
-                    "[LIGHT_GRAY]Total energy stays nearly constant if no energy is lost[]";
+                    "[LIGHT_GRAY]Total energy decreases over time due to friction and inelastic collisions[]";
             default:
                 return "";
         }

@@ -162,12 +162,16 @@ public class MainMenuScreen extends ScreenAdapter {
                 if (line.isEmpty()) { textY -= lineH; continue; }
                 boolean isTitle = li == 0;
                 boolean isDismiss = li == lines.length - 1;
-                font.getData().setScale(isTitle ? 1.6f : (isDismiss ? 0.9f : 1.2f));
+                font.getData().setScale(isTitle ? 1.6f : (isDismiss ? 0.9f : 1.5f));
                 font.setColor(isTitle ? new Color(0.28f, 0.72f, 1f, 1f)
                             : isDismiss ? new Color(0.5f, 0.5f, 0.6f, 1f)
                             : Color.WHITE);
                 GlyphLayout gl = new GlyphLayout(font, line);
-                font.draw(batch, line, sw / 2f - gl.width / 2f, textY);
+                float tx = sw / 2f - gl.width / 2f;
+                boolean isName = !isTitle && !isDismiss;
+                font.draw(batch, line, tx, textY);
+                if (isName) font.draw(batch, line, tx + 0.8f, textY);
+                if (isName) font.draw(batch, line, tx + 1.6f, textY);
                 textY -= lineH;
             }
             font.getData().setScale(1f);

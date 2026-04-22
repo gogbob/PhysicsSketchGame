@@ -187,9 +187,9 @@ public class GameSidebarRenderer {
 
                 float btnBotY = paintBtnsBaseY + trackY;
 
-                float rectStartX = GameScreen.BUTTON_WIDTH * 0.30f;
+                float rectStartX = GameScreen.BUTTON_WIDTH * 0.15f;
                 float rectStartY = GameScreen.BUTTON_HEIGHT * 0.29f;
-                float rectTotalWidth = GameScreen.BUTTON_WIDTH * 0.68f;
+                float rectTotalWidth = GameScreen.BUTTON_WIDTH * 0.73f;
                 float rectTotalHeight = GameScreen.BUTTON_HEIGHT * 0.25f;
 
                 float amountNow = currentLevel.getCurrentDrawnAmounts().get(ind);
