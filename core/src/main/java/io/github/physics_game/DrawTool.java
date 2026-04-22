@@ -111,11 +111,12 @@ public class DrawTool {
             } else if ((inputKey == 2) && drawing && new Vector2(worldPos).sub(prevPosition).len() > minDist) {
                 //draw point
                 addPoint(false, currentLevel);
-            } else if((inputKey == 1) && currentLevel.getDrawLeft() >= toolWidth) {
+            } else if((inputKey == 1) && currentLevel.getDrawLeft() >= 0.0001f) {
                 //start drawing
                 if(drawing) finishDrawing(drawType, currentLevel);
                 currentLevel.getCurrentDrawnAmounts().set(currentLevel.getSelectedPaint(),
-                    currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth);
+                    Math.min(currentLevel.getDrawAmounts().get(currentLevel.getSelectedPaint()),
+                    currentLevel.getCurrentDrawnAmounts().get(currentLevel.getSelectedPaint()) + toolWidth * 3f));
                 startDrawing(drawType, currentLevel);
                 drawing = true;
             }
