@@ -405,7 +405,7 @@ public final class EarClippingDecomposer {
         int numIt = 0;
 
         boolean mergedAny = true;
-        while (mergedAny && numIt < 3) {
+        while (mergedAny && numIt < 40) {
             mergedAny = false;
 
             for (int i = 0; i < polygons.size() && !mergedAny; i++) {

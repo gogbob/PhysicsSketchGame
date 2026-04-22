@@ -304,7 +304,7 @@ public class MarchingSquares {
             Vector2 prev = out.get((i - 1 + out.size()) % out.size());
             Vector2 curr = out.get(i);
             Vector2 next = out.get((i + 1) % out.size());
-            if (Math.abs(orientedArea(prev, curr, next)) <= 0.001f) {
+            if (Math.abs(orientedArea(prev, curr, next)) <= 0.01f) {
                 out.remove(i);
                 continue;
             }

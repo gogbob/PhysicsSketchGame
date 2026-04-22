@@ -273,12 +273,7 @@ public class GameScreen extends ScreenAdapter {
         batch.end();
 
         ArrayList<DebugForce> forces;
-        if (showDebugOverlay) {
-            forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
-        } else {
-            PhysicsResolver.step(currentLevel.getPhysicsObjects());
-            forces = new ArrayList<>();
-        }
+        forces = PhysicsResolver.stepWithDebug(currentLevel.getPhysicsObjects());
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
