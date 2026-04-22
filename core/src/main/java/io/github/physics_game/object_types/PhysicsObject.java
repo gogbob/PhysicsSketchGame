@@ -27,7 +27,6 @@ public abstract class PhysicsObject {
     private final Color color = new Color();
 
     public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation) {
-
         this(id, friction, restitution, density, vertices, startX, startY, rotation
             , PhysicsResolver.getCenterOfMassPolygon(EarClippingDecomposer.decomposeToTriangles(vertices)));
         concaveLocalBest = EarClippingDecomposer.mergePolygons(concaveLocalTriangles);
@@ -57,6 +56,12 @@ public abstract class PhysicsObject {
         for(int i = 0; i < concaveLocalBest.size(); i++) {
             concaveLocalBest.set(i, recenterVertices(concaveLocalBest.get(i), com));
         }
+
+        for(List<Vector2> tri : this.getConcaveLocalTriangles()) {
+            float massPoint = PhysicsResolver.getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density);
+            Vector2 center = new Vector2(PhysicsResolver.getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)));
+            addMassSegment(massPoint, center);
+        }
     }
 
     public PhysicsObject(int id, float friction, float restitution, float density, List<Vector2> vertices, float startX, float startY, float rotation, Vector2 com,
@@ -84,6 +89,12 @@ public abstract class PhysicsObject {
         this.localBody = new CustomContactHandler.PolygonBody(centeredVertices);
         this.concaveLocalTriangles = trianglesObj;
         this.concaveLocalBest = concaveLocalBest;
+
+        for(List<Vector2> tri : this.getConcaveLocalTriangles()) {
+            float massPoint = PhysicsResolver.getMassOfTriangle(tri.get(0), tri.get(1), tri.get(2), density);
+            Vector2 center = new Vector2(PhysicsResolver.getCenterOfMassTriangle(tri.get(0), tri.get(1), tri.get(2)));
+            addMassSegment(massPoint, center);
+        }
 
         // Keep the simulation transform at COM so impulses/rotation use the same origin.
         Vector2 rotatedLocalCom = new Vector2(localCenterOffset).rotateRad(rotation);

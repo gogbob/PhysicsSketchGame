@@ -185,6 +185,7 @@ public class DrawTool {
         buildSnapshot.minY = minY;
         buildSnapshot.objectId = (false ? nextId : 1000);
         buildSnapshot.pointSegments = new ArrayList<>(pointSegments);
+        buildSnapshot.massSegments = new ArrayList<>(massSegments);
         buildSnapshot.chargeDensity = chargeDensity;
 
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
@@ -256,6 +257,7 @@ public class DrawTool {
         buildSnapshot.minY = minY;
         buildSnapshot.objectId = (buildDynamic ? nextId : 1000);
         buildSnapshot.pointSegments = new ArrayList<>(pointSegments);
+        buildSnapshot.massSegments = new ArrayList<>(massSegments);
         buildSnapshot.chargeDensity = chargeDensity;
 
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
@@ -530,6 +532,7 @@ public class DrawTool {
         buildSnapshot.minY = minY;
         buildSnapshot.objectId = nextId;
         buildSnapshot.pointSegments = new ArrayList<>(pointSegments);
+        buildSnapshot.massSegments = new ArrayList<>(massSegments);
         buildSnapshot.chargeDensity = chargeDensity;
 
         pendingBuild = contourExec.submit(() -> compute(buildSnapshot));
