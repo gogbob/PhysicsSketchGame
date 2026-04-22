@@ -1,17 +1,11 @@
 package io.github.physics_game;
 
 public class ScoreLevel {
-    private float bestTime = 0f;
+    private float bestTime = Float.MAX_VALUE;
     private float bestShapeProportion = 0f;
-    private int bestScore = Integer.MAX_VALUE;
+    private int bestScore = -1;
 
     public ScoreLevel() {}
-
-    public ScoreLevel(float bestTime, float bestShapeProportion) {
-        this.bestTime = bestTime;
-        this.bestShapeProportion = bestShapeProportion;
-        this.bestScore = ScoreCalculator.calculateScore(0, bestTime);
-    }
 
     public float getBestTime() {
         return bestTime;
@@ -26,9 +20,17 @@ public class ScoreLevel {
         return ScoreCalculator.calculateStars(bestScore);
     }
 
-    public void setNewBestScore(float newTime, float newShapeProportion) {
-        this.bestScore = Math.min(ScoreCalculator.calculateScore(0, newTime), this.bestScore);
-        this.bestTime = Math.min(newTime, this.bestTime);
-        this.bestShapeProportion = Math.min(newShapeProportion, this.bestShapeProportion);
+    public void setNewBestScore(float newTime, float newShapeProportion, float freeProp) {
+        boolean isFirst = bestScore < 0;
+        int newScore = ScoreCalculator.calculateScore(newShapeProportion, newTime, freeProp);
+        if (isFirst || newScore > bestScore) {
+            bestScore = newScore;
+            bestTime = newTime;
+        } else if (newScore == bestScore && newTime < bestTime) {
+            bestTime = newTime;
+        }
+        if (isFirst || newShapeProportion < bestShapeProportion) {
+            bestShapeProportion = newShapeProportion;
+        }
     }
 }

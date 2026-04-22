@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.physics_game.levels.Level1;
+import io.github.physics_game.levels.Level2;
 import io.github.physics_game.levels.TutorialLevel;
 
 public class LevelScreen extends ScreenAdapter {
@@ -29,9 +30,10 @@ public class LevelScreen extends ScreenAdapter {
     private static final int NUM_CARDS = 3;
     private final float[][] cards = new float[NUM_CARDS][4];
 
-    private static final String[] NAMES  = { "Tutorial", "Level 1", "Level 2" };
-    private static final String[] DESCS  = { "Learn the basics", "Drop into the cup", "Coming soon..." };
-    private static final int[]    STARS  = { 0, 0, -1 }; // -1 = locked
+    private static final String[] NAMES     = { "Tutorial", "Level 1", "Level 2" };
+    private static final String[] DESCS     = { "Learn the basics", "Drop into the cup", "Coulomb's Challenge" };
+    private static final int[]    STARS     = { 0, 0, 0 }; // -1 = locked
+    private static final int[]    LEVEL_IDS = { 0, 2, 3 }; // levelId for each card
 
     public LevelScreen(MainGame game) {
         this.game = game;
@@ -117,6 +119,10 @@ public class LevelScreen extends ScreenAdapter {
                 game.setScreen(new GameScreen(game, new Level1(viewPortWidth, viewPortHeight)));
                 return;
             }
+            if (hit(cards[2], mx, my) && STARS[2] >= 0) {
+                game.setScreen(new GameScreen(game, new Level2(viewPortWidth, viewPortHeight)));
+                return;
+            }
         }
 
         // ── Filled shapes ─────────────────────────────────────────────
@@ -159,9 +165,12 @@ public class LevelScreen extends ScreenAdapter {
                 float starY = c[1] + c[3] / 2f - 22f;
                 float starSpacing = starR * 2.6f;
                 float starStartX = c[0] + c[2] / 2f - starSpacing;
+                int levelId = LEVEL_IDS[i];
+                ScoreLevel scoreLevel = (levelId >= 0 && levelId < game.currentScores.size()) ? game.currentScores.get(levelId) : null;
+                int earnedStars = (scoreLevel != null) ? scoreLevel.getNumStars() : 0;
                 for (int s = 0; s < 3; s++) {
-                    Color sc = s < STARS[i] ? Color.GOLD
-                                            : new Color(0.20f, 0.22f, 0.30f, 1f);
+                    Color sc = s < earnedStars ? Color.GOLD
+                                               : new Color(0.20f, 0.22f, 0.30f, 1f);
                     drawStar(starStartX + s * starSpacing, starY, starR, sc);
                 }
             }
