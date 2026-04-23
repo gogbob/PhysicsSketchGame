@@ -213,6 +213,7 @@ public class GameScreen extends ScreenAdapter {
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             currentLevel.reinitialize();
+            drawTool.reset();
             resetLevel();
         }
 

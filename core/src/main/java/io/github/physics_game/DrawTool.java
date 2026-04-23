@@ -64,7 +64,9 @@ public class DrawTool {
 
     public void reset() {
         nextId = 100;
+        resetGridField();
         drawing = false;
+        pendingBuild = null;
     }
 
     // call the method each frame
